@@ -1,0 +1,25 @@
+parameters:
+  - name: runtime
+    type: string
+  - name: project
+    type: string
+  - name: exeName
+    type: string
+
+steps:
+- task: DotNetCoreCLI@2
+  displayName: Building ${{ parameters.exeName }} ${{ parameters.runtime }}
+  inputs:
+    command: 'publish'
+    publishWebProjects: false
+    projects: ${{ parameters.project }}
+    arguments: '-c Release -r ${{ parameters.runtime }} /p:DebugType=None /p:DebugSymbols=false --output $(Build.ArtifactStagingDirectory)/${{ parameters.exeName }}-$(Build.BuildNumber)-${{ parameters.runtime }}'
+    zipAfterPublish: true
+    modifyOutputPath: false
+
+- task: PublishBuildArtifacts@1
+  displayName: Publish ${{ parameters.exeName }} ${{ parameters.runtime }}
+  inputs:
+    PathtoPublish: '$(Build.ArtifactStagingDirectory)/octo-cli-$(Build.BuildNumber)-${{ parameters.runtime }}'
+    ArtifactName: 'octo-cli'
+    publishLocation: 'Container'

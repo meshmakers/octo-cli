@@ -1,0 +1,36 @@
+﻿using System.Threading.Tasks;
+using Meshmakers.Common.CommandLineParser;
+using Meshmakers.Octo.Frontend.Client.System;
+using Meshmakers.Octo.Frontend.ManagementTool.Services;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+
+namespace Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Tenants;
+
+internal class CleanTenant : ServiceClientOctoCommand<IAssetServicesClient>
+{
+    private readonly IArgument _tenantIdArg;
+
+    public CleanTenant(ILogger<CleanTenant> logger, IOptions<OctoToolOptions> options,
+        IAssetServicesClient assetServicesClient, IAuthenticationService authenticationServices)
+        : base(logger, "Clean",
+            "Resets a tenant to factory defaults by deleting the construction kit and runtime model.", options,
+            assetServicesClient, authenticationServices)
+    {
+        _tenantIdArg = CommandArgumentValue.AddArgument("tid", "tenantId", new[] { "Id of tenant" },
+            true, 1);
+    }
+
+    public override async Task Execute()
+    {
+        var tenantId = CommandArgumentValue.GetArgumentScalarValue<string>(_tenantIdArg).ToLower();
+
+        Logger.LogInformation("Cleaning tenant \'{TenantId}\' on at \'{ServiceClientServiceUri}\'", tenantId,
+            ServiceClient.ServiceUri);
+
+        await ServiceClient.CleanTenant(tenantId);
+
+        Logger.LogInformation("Tenant \'{TenantId}\' on at \'{ServiceClientServiceUri}\' cleaned", tenantId,
+            ServiceClient.ServiceUri);
+    }
+}

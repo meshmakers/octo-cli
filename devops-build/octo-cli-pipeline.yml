@@ -1,0 +1,34 @@
+name: $(MajorVersion).$(MinorVersion).$(date:yyMM).$(DayOfMonth)$(rev:rrr)
+
+trigger:
+  batch: true
+  branches:
+    include:
+      - master
+      - release-1.0
+      - release-2.    
+
+variables:
+  Company: "meshmakers GmbH"
+  Copyright: "(c) 2022-2023 meshmakers GmbH"
+        
+pool:
+  name: Gerald-Local-Linux
+  
+steps:
+- template: setversion.yml
+- template: dotnet-publish-to-zip.yml
+  parameters:
+    exeName: 'octo-cli'
+    runtime: 'linux-x64'
+    project: 'src/ManagementTool/*.csproj'
+- template: dotnet-publish-to-zip.yml
+  parameters:
+    exeName: 'octo-cli'
+    runtime: 'osx-x64'
+    project: 'src/ManagementTool/*.csproj'
+- template: dotnet-publish-to-zip.yml
+  parameters:
+    exeName: 'octo-cli'
+    runtime: 'win-x64'
+    project: 'src/ManagementTool/*.csproj'

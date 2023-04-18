@@ -1,0 +1,15 @@
+﻿<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+
+    <PropertyGroup>
+        <OctoCliPath>$(MSBuildThisFileDirectory)..\tools\octo-cli.exe</OctoCliPath>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <OctoCliFiles Include="$(MSBuildThisFileDirectory)..\tools\**\*.*"/>
+    </ItemGroup>
+
+    <Target Name="CopyOctoCliToOutput" AfterTargets="CoreCompile">
+        <Copy SourceFiles="@(OctoCliFiles)" DestinationFolder="$(TargetDir)octo-cli\%(RecursiveDir)"/>
+    </Target>
+
+</Project>

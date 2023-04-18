@@ -1,0 +1,49 @@
+using System.Threading.Tasks;
+using Meshmakers.Common.CommandLineParser;
+using Meshmakers.Octo.Common.Shared;
+using Meshmakers.Octo.Common.Shared.DataTransferObjects;
+using Meshmakers.Octo.Frontend.Client.System;
+using Meshmakers.Octo.Frontend.ManagementTool.Services;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+
+namespace Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Clients;
+
+public class AddScopeToClient : ServiceClientOctoCommand<IIdentityServicesClient>
+{
+    private readonly IArgument _clientId;
+    private readonly IArgument _scopeName;
+
+    public AddScopeToClient(ILogger<AddScopeToClient> logger, IOptions<OctoToolOptions> options,
+        IIdentityServicesClient identityServicesClient, IAuthenticationService authenticationService)
+        : base(logger, "AddScopeToClient", "Grants the access to a client for a scope .", options,
+            identityServicesClient, authenticationService)
+    {
+        _clientId = CommandArgumentValue.AddArgument("id", "clientId", new[] { "ServiceClient ID, must be unique" },
+            true,
+            1);
+        _scopeName = CommandArgumentValue.AddArgument("n", "name", new[] { "Scope name" },
+            true,
+            1);
+    }
+
+    public override async Task Execute()
+    {
+        var clientId = CommandArgumentValue.GetArgumentScalarValue<string>(_clientId);
+        var scopeName = CommandArgumentValue.GetArgumentScalarValue<string>(_scopeName);
+
+        Logger.LogInformation("Allowing scope \'{ScopeName}\' for client \'{ClientId}\' at \'{ServiceClientServiceUri}\'",
+            scopeName, clientId, ServiceClient.ServiceUri);
+
+        var clientDto = new ClientDto
+        {
+            AllowedScopes = new[] { scopeName },
+        };
+
+        await ServiceClient.UpdateClient(clientId, clientDto);
+
+        Logger.LogInformation(
+            "ServiceClient \'{ClientId}\' at \'{ServiceClientServiceUri}\' updaded", clientId,
+            ServiceClient.ServiceUri);
+    }
+}

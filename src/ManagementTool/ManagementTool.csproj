@@ -1,0 +1,63 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <ApplicationIcon>ManagementTool.ico</ApplicationIcon>
+        <AssemblyName>octo-cli</AssemblyName>
+        <GeneratePackageOnBuild>false</GeneratePackageOnBuild>
+        <OutputType>Exe</OutputType>
+        <PackageIcon>meshmakers64.png</PackageIcon>
+        <PackageId>Meshmakers.Octo.Frontend.ManagementTool</PackageId>
+        <PackageLicenseFile>LICENSE</PackageLicenseFile>
+        <PublishProtocol>FileSystem</PublishProtocol>
+        <RepositoryUrl>https://github.com/meshmakers/octomesh</RepositoryUrl>
+        <RootNamespace>Meshmakers.Octo.Frontend.ManagementTool</RootNamespace>
+        <RuntimeIdentifier Condition="'$([MSBuild]::IsOsPlatform(Linux))'">linux-x64</RuntimeIdentifier>
+        <RuntimeIdentifier Condition="'$([MSBuild]::IsOsPlatform(OSX))'">osx-x64</RuntimeIdentifier>
+        <RuntimeIdentifier Condition="'$([MSBuild]::IsOsPlatform(Windows))'">win-x64</RuntimeIdentifier>
+        <RuntimeIdentifiers>win-x64;linux-x64;osx-x64</RuntimeIdentifiers>
+        <Version>1.0.0</Version>
+        <_IsPortable>false</_IsPortable>
+        <TargetFramework>net7.0</TargetFramework>
+        <PublishSingleFile>true</PublishSingleFile>
+        <SelfContained>true</SelfContained>
+    </PropertyGroup>
+
+    <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
+        <OutputPath>..\..\bin\Debug\Tool\</OutputPath>
+        <NoWarn>1701;1702;CS8002</NoWarn>
+    </PropertyGroup>
+    <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
+        <OutputPath>..\..\bin\Release\Tool\</OutputPath>
+        <NoWarn>1701;1702;CS8002</NoWarn>
+        <DebugSymbols>false</DebugSymbols>
+        <DebugType>None</DebugType>
+        <PublishReferencesDocumentationFiles>false</PublishReferencesDocumentationFiles>
+        
+    </PropertyGroup>
+    
+    <ItemGroup>
+        <PackageReference Include="Meshmakers.Common.CommandLineParser" Version="4.0.2302.10004" />
+        <PackageReference Include="Meshmakers.Common.Configuration" Version="4.0.2302.10004" />
+        <PackageReference Include="Microsoft.Extensions.Configuration.Binder" Version="7.0.2" />
+        <PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="7.0.0" />
+        <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="7.0.0" />
+        <PackageReference Include="NLog" Version="5.1.1" />
+        <PackageReference Include="NLog.Extensions.Logging" Version="5.2.1" />
+        <PackageReference Include="NLog.Schema" Version="5.1.1" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\octo-plug-sdk\src\sdk\Client\Client.csproj" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <None Update="nlog.config">
+            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+        </None>
+        <None Include="..\..\assets\meshmakers64.png">
+            <Pack>True</Pack>
+            <PackagePath />
+            <Link>meshmakers64.png</Link>
+        </None>
+    </ItemGroup>
+</Project>
