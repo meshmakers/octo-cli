@@ -48,7 +48,7 @@
 
     <ItemGroup>
         <ProjectReference Condition="Exists('..\octo-plug-sdk\src\sdk\Client\Client.csproj')" Include="..\octo-plug-sdk\src\sdk\Client\Client.csproj" />
-        <ProjectReference Condition="Exists('..\..\..\octo-plug-sdk\src\sdk\Client\Client.csproj')" Include="..\..\..\octo-plug-sdk\src\sdk\Client\Client.csproj" />
+        <ProjectReference Condition="Exists('..\..\..\central.repo')" Include="..\..\..\octo-plug-sdk\src\sdk\Client\Client.csproj" />
     </ItemGroup>
 
     <ItemGroup>
