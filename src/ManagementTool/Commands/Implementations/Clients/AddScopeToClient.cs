@@ -43,7 +43,7 @@ public class AddScopeToClient : ServiceClientOctoCommand<IIdentityServicesClient
         await ServiceClient.UpdateClient(clientId, clientDto);
 
         Logger.LogInformation(
-            "ServiceClient \'{ClientId}\' at \'{ServiceClientServiceUri}\' updaded", clientId,
+            "ServiceClient \'{ClientId}\' at \'{ServiceClientServiceUri}\' updated", clientId,
             ServiceClient.ServiceUri);
     }
 }
