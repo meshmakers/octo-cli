@@ -3,5 +3,6 @@
   <component name="VcsDirectoryMappings">
     <mapping directory="" vcs="Git" />
     <mapping directory="$PROJECT_DIR$/src/octo-plug-sdk" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/src/octo-plug-sdk/src/octo-core" vcs="Git" />
   </component>
 </project>
