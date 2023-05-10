@@ -20,6 +20,9 @@ pool:
   name: Gerald-Local-Linux
   
 steps:
+- checkout: self
+  clean: true
+  submodules: true  
 - task: PowerShell@2
   inputs:
     targetType: 'inline'
