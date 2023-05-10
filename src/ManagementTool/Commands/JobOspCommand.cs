@@ -1,3 +1,4 @@
+using System;
 using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
@@ -16,26 +17,30 @@ internal abstract class JobOctoCommand : Command<OctoToolOptions>
 
     protected JobOctoCommand(ILogger<JobOctoCommand> logger, string commandValue, string commandDescription,
         IOptions<OctoToolOptions> options,
-        IBotServicesClient botServicesClient, IAuthenticationService authenticationService)
+        IBotServicesClient botServiceClient, IAuthenticationService authenticationService)
         : base(logger, commandValue, commandDescription, options)
     {
-        ServicesClient = botServicesClient;
+        ServiceClient = botServiceClient;
         _authenticationService = authenticationService;
     }
 
-    protected IBotServicesClient ServicesClient { get; }
+    protected IBotServicesClient ServiceClient { get; }
 
     public override async Task PreValidate()
     {
-        await _authenticationService.EnsureAuthenticated(ServicesClient.AccessToken);
-        ServicesClient.Initialize();
+        if (ServiceClient.AccessToken?.AccessToken == null)
+        {
+            throw new InvalidProgramException("Please use the 'config' command to configure the service client");
+        }
+            
+        await _authenticationService.EnsureAuthenticated(ServiceClient.AccessToken);
     }
 
     protected async Task DownloadJobResultAsync(string id, string filePath)
     {
         Logger.LogInformation("Downloading file of job \'{Id}\'", id);
 
-        var responseContent = await ServicesClient.DownloadExportRtResultAsync(id);
+        var responseContent = await ServiceClient.DownloadExportRtResultAsync(id);
 
         await File.WriteAllBytesAsync(filePath, responseContent);
         Logger.LogInformation("File downloaded at \'{FilePath}\'", filePath);
@@ -48,7 +53,7 @@ internal abstract class JobOctoCommand : Command<OctoToolOptions>
         JobDto? lastJobDto = null;
         while (true)
         {
-            var jobDto = await ServicesClient.GetImportJobStatus(id);
+            var jobDto = await ServiceClient.GetImportJobStatus(id);
             if (jobDto.Status == "Succeeded")
             {
                 Logger.LogInformation("Job id \'{Id}\' has completed at \'{LocalTime}\'", id,

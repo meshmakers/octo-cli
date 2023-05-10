@@ -33,7 +33,7 @@ internal class ImportConstructionKitModel : JobWithWaitOctoCommand
     {
         await base.PreValidate();
 
-        _assetServicesClient.AccessToken.AccessToken = ServicesClient.AccessToken.AccessToken;
+        _assetServicesClient.AccessToken.AccessToken = ServiceClient.AccessToken.AccessToken;
     }
 
     public override async Task Execute()

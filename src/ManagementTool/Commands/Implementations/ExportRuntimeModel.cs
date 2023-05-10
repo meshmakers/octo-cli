@@ -15,11 +15,11 @@ internal class ExportRuntimeModel : JobOctoCommand
     private readonly IArgument _queryIdArg;
 
     public ExportRuntimeModel(ILogger<ExportRuntimeModel> logger, IOptions<OctoToolOptions> options,
-        IAssetServicesClient assetServicesClient, IBotServicesClient botServicesClient,
+        IAssetServicesClient assetServicesClient, IBotServicesClient botServiceClient,
         IAuthenticationService authenticationService)
         : base(logger, "ExportRt",
             "Schedules an export job for runtime files. File is specified using -f argument. The file is downloaded in ZIP-format after job is finished.",
-            options, botServicesClient, authenticationService)
+            options, botServiceClient, authenticationService)
     {
         _assetServicesClient = assetServicesClient;
 
@@ -32,7 +32,7 @@ internal class ExportRuntimeModel : JobOctoCommand
     {
         await base.PreValidate();
 
-        _assetServicesClient.AccessToken.AccessToken = ServicesClient.AccessToken.AccessToken;
+        _assetServicesClient.AccessToken.AccessToken = ServiceClient.AccessToken.AccessToken;
     }
 
     public override async Task Execute()
