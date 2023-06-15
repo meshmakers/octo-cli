@@ -2,7 +2,7 @@
 using Meshmakers.Common.CommandLineParser;
 using Meshmakers.Common.CommandLineParser.Commands;
 using Meshmakers.Octo.Common.Shared.DataTransferObjects;
-using Meshmakers.Octo.Frontend.Client.System;
+using Meshmakers.Octo.Sdk.ServiceClient.IdentityServices;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 

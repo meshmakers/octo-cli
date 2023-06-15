@@ -2,8 +2,8 @@
 using System.Threading.Tasks;
 using Meshmakers.Common.CommandLineParser;
 using Meshmakers.Common.Shared.Services;
-using Meshmakers.Octo.Frontend.Client.System;
 using Meshmakers.Octo.Frontend.ManagementTool.Services;
+using Meshmakers.Octo.Sdk.ServiceClient.IdentityServices;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Newtonsoft.Json;
@@ -18,10 +18,11 @@ internal class GetApiSecretsApiResource : ServiceClientOctoCommand<IIdentityServ
     public GetApiSecretsApiResource(ILogger<GetApiSecretsApiResource> logger, IOptions<OctoToolOptions> options,
         IConsoleService consoleService,
         IIdentityServicesClient identityServicesClient, IAuthenticationService authenticationService)
-        : base(logger, "GetApiSecretsApiResource", "Gets all secrets of an API resource.", options, identityServicesClient, authenticationService)
+        : base(logger, "GetApiSecretsApiResource", "Gets all secrets of an API resource.", options, identityServicesClient,
+            authenticationService)
     {
         _consoleService = consoleService;
-        
+
         _nameArg = CommandArgumentValue.AddArgument("n", "name", new[] { "Name of API resource" },
             true,
             1);
@@ -31,7 +32,8 @@ internal class GetApiSecretsApiResource : ServiceClientOctoCommand<IIdentityServ
     {
         var name = CommandArgumentValue.GetArgumentScalarValue<string>(_nameArg);
 
-        Logger.LogInformation("Getting API secrets for API resource \'{Name}\' from \'{ServiceClientServiceUri}\'", name, ServiceClient.ServiceUri);
+        Logger.LogInformation("Getting API secrets for API resource \'{Name}\' from \'{ServiceClientServiceUri}\'", name,
+            ServiceClient.ServiceUri);
 
         var result = await ServiceClient.GetApiSecretsForApiResource(name);
         if (!result.Any())

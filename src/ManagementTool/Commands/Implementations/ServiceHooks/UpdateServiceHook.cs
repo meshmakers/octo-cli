@@ -5,8 +5,8 @@ using System.Threading.Tasks;
 using GraphQL;
 using Meshmakers.Common.CommandLineParser;
 using Meshmakers.Octo.Common.Shared.DataTransferObjects;
-using Meshmakers.Octo.Frontend.Client.Tenants;
 using Meshmakers.Octo.Frontend.ManagementTool.Services;
+using Meshmakers.Octo.Sdk.ServiceClient.AssetRepositoryServices.Tenants;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Newtonsoft.Json;
@@ -115,7 +115,7 @@ internal class UpdateServiceHook : ServiceClientOctoCommand<ITenantClient>
         };
 
         var getResult = await _tenantClient.SendQueryAsync<RtServiceHookDto>(getQuery);
-        if (!getResult.Items.Any())
+        if (!getResult?.Items.Any() ?? true)
         {
             throw new InvalidOperationException(
                 $"Service Hook with ID '{serviceHookId}' does not exist.");

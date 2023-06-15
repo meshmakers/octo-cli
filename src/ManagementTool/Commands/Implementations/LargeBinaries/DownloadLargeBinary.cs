@@ -2,8 +2,8 @@ using System.IO;
 using System.Threading.Tasks;
 using Meshmakers.Common.CommandLineParser;
 using Meshmakers.Common.Shared;
-using Meshmakers.Octo.Frontend.Client.Tenants;
 using Meshmakers.Octo.Frontend.ManagementTool.Services;
+using Meshmakers.Octo.Sdk.ServiceClient.AssetRepositoryServices.Tenants;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 

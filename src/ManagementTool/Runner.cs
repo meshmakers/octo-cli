@@ -5,8 +5,8 @@ using System.Threading.Tasks;
 using Meshmakers.Common.CommandLineParser;
 using Meshmakers.Common.CommandLineParser.Commands;
 using Meshmakers.Octo.Common.Shared;
-using Meshmakers.Octo.Frontend.Client;
-using Meshmakers.Octo.Frontend.Client.Authentication;
+using Meshmakers.Octo.Sdk.ServiceClient;
+using Meshmakers.Octo.Sdk.ServiceClient.Authentication;
 using Microsoft.Extensions.Logging;
 
 namespace Meshmakers.Octo.Frontend.ManagementTool;

@@ -1,6 +1,6 @@
 using System.Threading.Tasks;
-using Meshmakers.Octo.Frontend.Client;
-using Meshmakers.Octo.Frontend.Client.Authentication;
+using Meshmakers.Octo.Sdk.ServiceClient;
+using Meshmakers.Octo.Sdk.ServiceClient.Authentication;
 
 namespace Meshmakers.Octo.Frontend.ManagementTool.Services;
 

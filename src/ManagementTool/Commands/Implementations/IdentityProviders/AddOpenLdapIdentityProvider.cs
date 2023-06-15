@@ -1,8 +1,8 @@
 ﻿using System.Threading.Tasks;
 using Meshmakers.Common.CommandLineParser;
 using Meshmakers.Octo.Common.Shared.DataTransferObjects;
-using Meshmakers.Octo.Frontend.Client.System;
 using Meshmakers.Octo.Frontend.ManagementTool.Services;
+using Meshmakers.Octo.Sdk.ServiceClient.IdentityServices;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
@@ -10,12 +10,12 @@ namespace Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Ident
 
 internal class AddOpenLdapIdentityProvider : ServiceClientOctoCommand<IIdentityServicesClient>
 {
+    private readonly IArgument _accountName;
+    private readonly IArgument _accountPassword;
     private readonly IArgument _alias;
     private readonly IArgument _enabled;
     private readonly IArgument _host;
     private readonly IArgument _port;
-    private readonly IArgument _accountName;
-    private readonly IArgument _accountPassword;
     private readonly IArgument _userBaseDn;
     private readonly IArgument _userNameAttribute;
 
@@ -51,19 +51,19 @@ internal class AddOpenLdapIdentityProvider : ServiceClientOctoCommand<IIdentityS
         Logger.LogInformation("Creating OpenLDAP identity provider \'{Alias}\' at \'{ServiceClientServiceUri}\'", alias,
             ServiceClient.ServiceUri);
 
-            var identityProviderDto = new OpenLdapProviderDto
-            {
-                IsEnabled = CommandArgumentValue.GetArgumentScalarValue<bool>(_enabled),
-                Host = CommandArgumentValue.GetArgumentScalarValue<string>(_host),
-                Port = CommandArgumentValue.GetArgumentScalarValue<ushort>(_port),
-                UserDistinguishedName = CommandArgumentValue.GetArgumentScalarValue<string>(_accountName),
-                Password = CommandArgumentValue.GetArgumentScalarValue<string>(_accountPassword),
-                UserBaseDn = CommandArgumentValue.GetArgumentScalarValue<string>(_userBaseDn),
-                UserNameAttribute = CommandArgumentValue.GetArgumentScalarValue<string>(_userNameAttribute),
-                Alias = alias
-            };
-            await ServiceClient.CreateIdentityProvider(identityProviderDto);
-        
+        var identityProviderDto = new OpenLdapProviderDto
+        {
+            IsEnabled = CommandArgumentValue.GetArgumentScalarValue<bool>(_enabled),
+            Host = CommandArgumentValue.GetArgumentScalarValue<string>(_host),
+            Port = CommandArgumentValue.GetArgumentScalarValue<ushort>(_port),
+            UserDistinguishedName = CommandArgumentValue.GetArgumentScalarValue<string>(_accountName),
+            Password = CommandArgumentValue.GetArgumentScalarValue<string>(_accountPassword),
+            UserBaseDn = CommandArgumentValue.GetArgumentScalarValue<string>(_userBaseDn),
+            UserNameAttribute = CommandArgumentValue.GetArgumentScalarValue<string>(_userNameAttribute),
+            Alias = alias
+        };
+        await ServiceClient.CreateIdentityProvider(identityProviderDto);
+
         Logger.LogInformation("ServiceClient \'{Alias}\' at \'{ServiceClientServiceUri}\' created", alias,
             ServiceClient.ServiceUri);
     }

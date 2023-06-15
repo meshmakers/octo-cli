@@ -1,7 +1,7 @@
 using System.Threading.Tasks;
 using Meshmakers.Common.Configuration;
-using Meshmakers.Octo.Frontend.Client;
-using Meshmakers.Octo.Frontend.Client.Authentication;
+using Meshmakers.Octo.Sdk.ServiceClient;
+using Meshmakers.Octo.Sdk.ServiceClient.Authentication;
 using Microsoft.Extensions.Options;
 using NLog;
 

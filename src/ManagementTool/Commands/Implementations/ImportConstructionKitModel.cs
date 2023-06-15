@@ -2,8 +2,9 @@
 using Meshmakers.Common.CommandLineParser;
 using Meshmakers.Octo.Common.Shared;
 using Meshmakers.Octo.Common.Shared.DataTransferObjects;
-using Meshmakers.Octo.Frontend.Client.System;
 using Meshmakers.Octo.Frontend.ManagementTool.Services;
+using Meshmakers.Octo.Sdk.ServiceClient.AssetRepositoryServices.Tenants;
+using Meshmakers.Octo.Sdk.ServiceClient.BotServices;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
@@ -33,7 +34,10 @@ internal class ImportConstructionKitModel : JobWithWaitOctoCommand
     {
         await base.PreValidate();
 
-        _assetServicesClient.AccessToken.AccessToken = ServiceClient.AccessToken.AccessToken;
+        if (_assetServicesClient.AccessToken != null)
+        {
+            _assetServicesClient.AccessToken.AccessToken = ServiceClient.AccessToken?.AccessToken;
+        }
     }
 
     public override async Task Execute()

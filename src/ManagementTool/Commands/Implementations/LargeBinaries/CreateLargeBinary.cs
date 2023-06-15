@@ -4,8 +4,8 @@ using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Threading.Tasks;
 using Meshmakers.Common.CommandLineParser;
-using Meshmakers.Octo.Frontend.Client.Tenants;
 using Meshmakers.Octo.Frontend.ManagementTool.Services;
+using Meshmakers.Octo.Sdk.ServiceClient.AssetRepositoryServices.Tenants;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
@@ -13,8 +13,8 @@ namespace Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Large
 
 internal class CreateLargeBinary : ServiceClientOctoCommand<ITenantClient>
 {
-    private readonly IArgument _filePathArg;
     private readonly IArgument _contentTypeArg;
+    private readonly IArgument _filePathArg;
     private readonly ITenantClientAccessToken _tenantClientAccessToken;
 
     public CreateLargeBinary(ILogger<CreateLargeBinary> logger, IOptions<OctoToolOptions> options,
@@ -47,7 +47,7 @@ internal class CreateLargeBinary : ServiceClientOctoCommand<ITenantClient>
 
         var client = new HttpClient();
         client.DefaultRequestHeaders.Add("Authorization", $"bearer {_tenantClientAccessToken.AccessToken}");
-        
+
         var content = new MultipartFormDataContent();
 
         var queryContent = new StringContent(GraphQl.CreateLargeBinary);

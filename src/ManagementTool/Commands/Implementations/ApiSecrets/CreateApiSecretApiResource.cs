@@ -4,6 +4,7 @@ using Meshmakers.Common.CommandLineParser;
 using Meshmakers.Common.Shared.Services;
 using Meshmakers.Octo.Common.Shared.DataTransferObjects;
 using Meshmakers.Octo.Frontend.ManagementTool.Services;
+using Meshmakers.Octo.Sdk.ServiceClient.IdentityServices;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Newtonsoft.Json;
@@ -13,10 +14,10 @@ namespace Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.ApiSe
 internal class CreateApiSecretApiResource : ServiceClientOctoCommand<IIdentityServicesClient>
 {
     private readonly IConsoleService _consoleService;
-    private readonly IArgument _nameArg;
-    private readonly IArgument _expirationArg;
     private readonly IArgument _descriptionArg;
-    
+    private readonly IArgument _expirationArg;
+    private readonly IArgument _nameArg;
+
     public CreateApiSecretApiResource(ILogger<CreateApiSecretApiResource> logger, IOptions<OctoToolOptions> options,
         IConsoleService consoleService,
         IIdentityServicesClient identityServicesClient, IAuthenticationService authenticationService)
@@ -44,15 +45,15 @@ internal class CreateApiSecretApiResource : ServiceClientOctoCommand<IIdentitySe
         var apiSecretDto = new ApiSecretDto
         {
             ExpirationDate = CommandArgumentValue.GetArgumentScalarValueOrDefault<DateTime?>(_expirationArg),
-            Description = CommandArgumentValue.GetArgumentScalarValueOrDefault<string>(_descriptionArg),
+            Description = CommandArgumentValue.GetArgumentScalarValueOrDefault<string>(_descriptionArg)
         };
 
-        ApiSecretDto resultSecret = await ServiceClient.CreateApiSecretForApiResource(name, apiSecretDto);
+        var resultSecret = await ServiceClient.CreateApiSecretForApiResource(name, apiSecretDto);
 
         Logger.LogInformation("API secret \'{ValueEncrypted}\' for client  \'{Name}\' at \'{ServiceClientServiceUri}\' created",
             resultSecret.ValueEncrypted, name,
             ServiceClient.ServiceUri);
-        
+
         var resultString = JsonConvert.SerializeObject(resultSecret, Formatting.Indented);
         _consoleService.WriteLine(resultString);
     }

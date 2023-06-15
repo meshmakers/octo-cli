@@ -1,7 +1,7 @@
 ﻿using System.Threading.Tasks;
 using Meshmakers.Common.CommandLineParser;
-using Meshmakers.Octo.Frontend.Client.System;
 using Meshmakers.Octo.Frontend.ManagementTool.Services;
+using Meshmakers.Octo.Sdk.ServiceClient.IdentityServices;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
@@ -9,11 +9,11 @@ namespace Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.ApiSc
 
 internal class UpdateApiScope : ServiceClientOctoCommand<IIdentityServicesClient>
 {
+    private readonly IArgument _descriptionArg;
+    private readonly IArgument _displayNameArg;
+    private readonly IArgument _isEnabledArg;
     private readonly IArgument _nameArg;
     private readonly IArgument _newNameArg;
-    private readonly IArgument _displayNameArg;
-    private readonly IArgument _descriptionArg;
-    private readonly IArgument _isEnabledArg;
 
     public UpdateApiScope(ILogger<UpdateApiScope> logger, IOptions<OctoToolOptions> options,
         IIdentityServicesClient identityServicesClient, IAuthenticationService authenticationService)
@@ -40,17 +40,17 @@ internal class UpdateApiScope : ServiceClientOctoCommand<IIdentityServicesClient
             ServiceClient.ServiceUri);
 
         var scopeDto = await ServiceClient.GetApiScope(scopeName);
-        
+
         if (CommandArgumentValue.IsArgumentUsed(_newNameArg))
         {
-            scopeDto.Name= CommandArgumentValue.GetArgumentScalarValue<string>(_newNameArg);
+            scopeDto.Name = CommandArgumentValue.GetArgumentScalarValue<string>(_newNameArg);
         }
-        
+
         if (CommandArgumentValue.IsArgumentUsed(_displayNameArg))
         {
             scopeDto.DisplayName = CommandArgumentValue.GetArgumentScalarValue<string>(_displayNameArg);
         }
-        
+
         if (CommandArgumentValue.IsArgumentUsed(_descriptionArg))
         {
             scopeDto.Description = CommandArgumentValue.GetArgumentScalarValue<string>(_descriptionArg);

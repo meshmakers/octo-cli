@@ -1,8 +1,8 @@
 ﻿using System;
 using System.Threading.Tasks;
 using Meshmakers.Common.CommandLineParser;
-using Meshmakers.Octo.Frontend.Client.System;
 using Meshmakers.Octo.Frontend.ManagementTool.Services;
+using Meshmakers.Octo.Sdk.ServiceClient.IdentityServices;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
@@ -11,13 +11,14 @@ namespace Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.ApiSe
 internal class UpdateApiSecretClient : ServiceClientOctoCommand<IIdentityServicesClient>
 {
     private readonly IArgument _clientIdArg;
-    private readonly IArgument _secretValueArg;
-    private readonly IArgument _expirationArg;
     private readonly IArgument _descriptionArg;
+    private readonly IArgument _expirationArg;
+    private readonly IArgument _secretValueArg;
 
     public UpdateApiSecretClient(ILogger<UpdateApiSecretClient> logger, IOptions<OctoToolOptions> options,
         IIdentityServicesClient identityServicesClient, IAuthenticationService authenticationService)
-        : base(logger, "UpdateApiSecretClient", "Updates an API secret for a client.", options, identityServicesClient, authenticationService)
+        : base(logger, "UpdateApiSecretClient", "Updates an API secret for a client.", options, identityServicesClient,
+            authenticationService)
     {
         _clientIdArg = CommandArgumentValue.AddArgument("cid", "clientId", new[] { "ID of client" },
             true,
@@ -36,22 +37,24 @@ internal class UpdateApiSecretClient : ServiceClientOctoCommand<IIdentityService
         var clientId = CommandArgumentValue.GetArgumentScalarValue<string>(_clientIdArg);
         var secretValue = CommandArgumentValue.GetArgumentScalarValue<string>(_secretValueArg);
 
-        Logger.LogInformation("Updating API secret \'{SecretValue}\' for client \'{ClientId}\' at \'{ServiceClientServiceUri}\'", secretValue,clientId,
+        Logger.LogInformation("Updating API secret \'{SecretValue}\' for client \'{ClientId}\' at \'{ServiceClientServiceUri}\'",
+            secretValue, clientId,
             ServiceClient.ServiceUri);
 
         var secretDto = await ServiceClient.GetApiSecretForClient(clientId, secretValue);
         if (secretDto == null)
         {
-            Logger.LogError("API secret \'{SecretValue}\' for client \'{ClientId}\' at \'{ServiceClientServiceUri}\' not found", secretValue,clientId,
+            Logger.LogError("API secret \'{SecretValue}\' for client \'{ClientId}\' at \'{ServiceClientServiceUri}\' not found",
+                secretValue, clientId,
                 ServiceClient.ServiceUri);
             return;
         }
 
         if (CommandArgumentValue.IsArgumentUsed(_expirationArg))
         {
-            secretDto.ExpirationDate= CommandArgumentValue.GetArgumentScalarValue<DateTime?>(_expirationArg);
+            secretDto.ExpirationDate = CommandArgumentValue.GetArgumentScalarValue<DateTime?>(_expirationArg);
         }
-        
+
         if (CommandArgumentValue.IsArgumentUsed(_descriptionArg))
         {
             secretDto.Description = CommandArgumentValue.GetArgumentScalarValue<string>(_descriptionArg);
@@ -59,7 +62,8 @@ internal class UpdateApiSecretClient : ServiceClientOctoCommand<IIdentityService
 
         await ServiceClient.UpdateApiSecretClient(clientId, secretDto);
 
-        Logger.LogInformation("API secret \'{SecretValue}\' for client \'{ClientId}\' at \'{ServiceClientServiceUri}\' updated", secretValue, clientId,
+        Logger.LogInformation("API secret \'{SecretValue}\' for client \'{ClientId}\' at \'{ServiceClientServiceUri}\' updated",
+            secretValue, clientId,
             ServiceClient.ServiceUri);
     }
 }

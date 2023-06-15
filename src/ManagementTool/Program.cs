@@ -7,9 +7,6 @@ using Meshmakers.Common.Configuration;
 using Meshmakers.Common.Shared.Services;
 using Meshmakers.Octo.Common.Shared;
 using Meshmakers.Octo.Common.Shared.Services;
-using Meshmakers.Octo.Frontend.Client.Authentication;
-using Meshmakers.Octo.Frontend.Client.System;
-using Meshmakers.Octo.Frontend.Client.Tenants;
 using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations;
 using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.ApiResources;
 using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.ApiScopes;
@@ -24,19 +21,17 @@ using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.ServiceHo
 using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Tenants;
 using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Users;
 using Meshmakers.Octo.Frontend.ManagementTool.Services;
+using Meshmakers.Octo.Sdk.ServiceClient.AssetRepositoryServices.Tenants;
+using Meshmakers.Octo.Sdk.ServiceClient.Authentication;
+using Meshmakers.Octo.Sdk.ServiceClient.BotServices;
+using Meshmakers.Octo.Sdk.ServiceClient.IdentityServices;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using NLog;
 using NLog.Extensions.Logging;
-using AddAuthorizationCodeClient = Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Clients.AddAuthorizationCodeClient;
-using AddClientCredentialsClient = Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Clients.AddClientCredentialsClient;
-using CreateApiScope = Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.ApiScopes.CreateApiScope;
-using GetApiScopes = Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.ApiScopes.GetApiScopes;
 using LogLevel = Microsoft.Extensions.Logging.LogLevel;
-using UpdateApiScope = Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.ApiScopes.UpdateApiScope;
-using UpdateClient = Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Clients.UpdateClient;
 
 namespace Meshmakers.Octo.Frontend.ManagementTool;
 

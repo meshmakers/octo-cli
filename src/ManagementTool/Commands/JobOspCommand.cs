@@ -4,8 +4,8 @@ using System.Threading;
 using System.Threading.Tasks;
 using Meshmakers.Common.CommandLineParser.Commands;
 using Meshmakers.Octo.Common.Shared.DataTransferObjects;
-using Meshmakers.Octo.Frontend.Client.System;
 using Meshmakers.Octo.Frontend.ManagementTool.Services;
+using Meshmakers.Octo.Sdk.ServiceClient.BotServices;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
@@ -32,7 +32,7 @@ internal abstract class JobOctoCommand : Command<OctoToolOptions>
         {
             throw new InvalidProgramException("Please use the 'config' command to configure the service client");
         }
-            
+
         await _authenticationService.EnsureAuthenticated(ServiceClient.AccessToken);
     }
 

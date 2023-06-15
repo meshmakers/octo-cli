@@ -1,9 +1,9 @@
 using System.Threading.Tasks;
 using Meshmakers.Common.CommandLineParser;
 using Meshmakers.Octo.Common.Shared.DataTransferObjects;
-using Meshmakers.Octo.Frontend.Client;
-using Meshmakers.Octo.Frontend.Client.System;
 using Meshmakers.Octo.Frontend.ManagementTool.Services;
+using Meshmakers.Octo.Sdk.ServiceClient;
+using Meshmakers.Octo.Sdk.ServiceClient.IdentityServices;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
@@ -13,8 +13,8 @@ internal class CreateUser : ServiceClientOctoCommand<IIdentityServicesClient>
 {
     private readonly IArgument _eMailArg;
     private readonly IArgument _nameArg;
-    private readonly IArgument _roleArg;
     private readonly IArgument _passwordArg;
+    private readonly IArgument _roleArg;
 
     public CreateUser(ILogger<CreateUser> logger, IOptions<OctoToolOptions> options,
         IIdentityServicesClient identityServicesClient, IAuthenticationService authenticationService)
@@ -55,7 +55,7 @@ internal class CreateUser : ServiceClientOctoCommand<IIdentityServicesClient>
         }
 
 
-        var userDto = new RegisterUserDto()
+        var userDto = new RegisterUserDto
         {
             Email = eMail,
             Name = name,

@@ -9,10 +9,10 @@ namespace Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations;
 
 internal class ConfigOctoCommand : Command<OctoToolOptions>
 {
-    private readonly IConfigWriter _configWriter;
     private readonly IArgument _assetServicesUriArg;
-    private readonly IArgument _identityServicesUriArg;
     private readonly IArgument _botServicesUriArg;
+    private readonly IConfigWriter _configWriter;
+    private readonly IArgument _identityServicesUriArg;
     private readonly IArgument _tenantIdArg;
 
     public ConfigOctoCommand(ILogger<ConfigOctoCommand> logger, IOptions<OctoToolOptions> options,

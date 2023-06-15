@@ -3,8 +3,8 @@ using System.Threading.Tasks;
 using GraphQL;
 using Meshmakers.Common.Shared.Services;
 using Meshmakers.Octo.Common.Shared.DataTransferObjects;
-using Meshmakers.Octo.Frontend.Client.Tenants;
 using Meshmakers.Octo.Frontend.ManagementTool.Services;
+using Meshmakers.Octo.Sdk.ServiceClient.AssetRepositoryServices.Tenants;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Newtonsoft.Json;
@@ -35,13 +35,13 @@ internal class GetServiceHooks : ServiceClientOctoCommand<ITenantClient>
         };
 
         var getResult = await _tenantClient.SendQueryAsync<RtServiceHookDto>(getQuery);
-        if (!getResult.Items.Any())
+        if (!getResult?.Items.Any() ?? false)
         {
-            Logger.LogInformation("No service hooks has been returned.");
+            Logger.LogInformation("No service hooks has been returned");
             return;
         }
 
-        var resultString = JsonConvert.SerializeObject(getResult.Items, Formatting.Indented);
+        var resultString = JsonConvert.SerializeObject(getResult?.Items, Formatting.Indented);
         _consoleService.WriteLine(resultString);
     }
 }

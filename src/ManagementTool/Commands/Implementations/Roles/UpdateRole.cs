@@ -1,50 +1,49 @@
 using System.Threading.Tasks;
 using Meshmakers.Common.CommandLineParser;
 using Meshmakers.Octo.Common.Shared.DataTransferObjects;
-using Meshmakers.Octo.Frontend.Client.System;
 using Meshmakers.Octo.Frontend.ManagementTool.Services;
+using Meshmakers.Octo.Sdk.ServiceClient.IdentityServices;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
-namespace Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Roles
+namespace Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Roles;
+
+internal class UpdateRole : ServiceClientOctoCommand<IIdentityServicesClient>
 {
-    internal class UpdateRole : ServiceClientOctoCommand<IIdentityServicesClient>
+    private readonly IArgument _nameArg;
+    private readonly IArgument _newNameArg;
+
+    public UpdateRole(ILogger<UpdateRole> logger, IOptions<OctoToolOptions> options,
+        IIdentityServicesClient identityServicesClient, IAuthenticationService authenticationService)
+        : base(logger, "UpdateRole", "Updates a role", options, identityServicesClient, authenticationService)
     {
-        private readonly IArgument _nameArg;
-        private readonly IArgument _newNameArg;
+        _nameArg = CommandArgumentValue.AddArgument("n", "name", new[] { "Name of role" }, true,
+            1);
+        _newNameArg = CommandArgumentValue.AddArgument("nn", "newRoleName",
+            new[] { "New name of role" }, false,
+            1);
+    }
 
-        public UpdateRole(ILogger<UpdateRole> logger, IOptions<OctoToolOptions> options,
-            IIdentityServicesClient identityServicesClient, IAuthenticationService authenticationService)
-            : base(logger, "UpdateRole", "Updates a role", options, identityServicesClient, authenticationService)
+    public override async Task Execute()
+    {
+        var name = CommandArgumentValue.GetArgumentScalarValue<string>(_nameArg).ToLower();
+
+        string? newRoleName = null;
+        if (CommandArgumentValue.IsArgumentUsed(_newNameArg))
         {
-            _nameArg = CommandArgumentValue.AddArgument("n", "name", new[] { "Name of role" }, true,
-                1);
-            _newNameArg = CommandArgumentValue.AddArgument("nn", "newRoleName",
-                new[] { "New name of role" }, false,
-                1);
+            newRoleName = CommandArgumentValue.GetArgumentScalarValue<string>(_newNameArg).ToLower();
         }
 
-        public override async Task Execute()
+        Logger.LogInformation("Updating role \'{Name}\' at \'{ServiceClientServiceUri}\'", name,
+            ServiceClient.ServiceUri);
+
+        var roleDto = new RoleDto
         {
-            var name = CommandArgumentValue.GetArgumentScalarValue<string>(_nameArg).ToLower();
+            Name = newRoleName
+        };
 
-            string? newRoleName = null;
-            if (CommandArgumentValue.IsArgumentUsed(_newNameArg))
-            {
-                newRoleName = CommandArgumentValue.GetArgumentScalarValue<string>(_newNameArg).ToLower();
-            }
+        await ServiceClient.UpdateRole(name, roleDto);
 
-            Logger.LogInformation("Updating role \'{Name}\' at \'{ServiceClientServiceUri}\'", name,
-                ServiceClient.ServiceUri);
-
-            var roleDto = new RoleDto
-            {
-                Name = newRoleName,
-            };
-
-            await ServiceClient.UpdateRole(name, roleDto);
-
-            Logger.LogInformation("Role \'{Name}\' updated", name);
-        }
+        Logger.LogInformation("Role \'{Name}\' updated", name);
     }
 }

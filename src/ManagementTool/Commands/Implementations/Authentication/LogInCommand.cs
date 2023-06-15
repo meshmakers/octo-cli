@@ -4,8 +4,8 @@ using System.Threading.Tasks;
 using Meshmakers.Common.CommandLineParser;
 using Meshmakers.Common.CommandLineParser.Commands;
 using Meshmakers.Octo.Common.Shared;
-using Meshmakers.Octo.Frontend.Client.Authentication;
 using Meshmakers.Octo.Frontend.ManagementTool.Services;
+using Meshmakers.Octo.Sdk.ServiceClient.Authentication;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
@@ -39,6 +39,7 @@ internal class LogInCommand : Command<OctoToolOptions>
         {
             apiScopes |= CommonConstants.ApiScopes.BotApiFullAccess;
         }
+
         if (!string.IsNullOrWhiteSpace(Options.Value.AssetServiceUrl))
         {
             apiScopes |= CommonConstants.ApiScopes.AssetSystemApiFullAccess;
@@ -58,7 +59,10 @@ internal class LogInCommand : Command<OctoToolOptions>
         if (isInteractive)
         {
             Logger.LogInformation("Opening default browser...");
-            Process.Start(new ProcessStartInfo(response.VerificationUriComplete) { UseShellExecute = true });
+            if (response.VerificationUriComplete != null)
+            {
+                Process.Start(new ProcessStartInfo(response.VerificationUriComplete) { UseShellExecute = true });
+            }
         }
 
 
@@ -67,17 +71,21 @@ internal class LogInCommand : Command<OctoToolOptions>
             Logger.LogInformation("Waiting for device authentication...");
             Thread.Sleep(response.PollingInterval * 1000);
 
-            var authenticationData = await _authenticatorClient.RequestDeviceTokenAsync(response.DeviceCode);
-            if (authenticationData.IsAuthenticationPending)
+            if (response.DeviceCode != null)
             {
-                Thread.Sleep(response.PollingInterval * 1000);
-                continue;
+                var authenticationData = await _authenticatorClient.RequestDeviceTokenAsync(response.DeviceCode);
+                if (authenticationData.IsAuthenticationPending)
+                {
+                    Thread.Sleep(response.PollingInterval * 1000);
+                    continue;
+                }
+
+                _authenticationService.SaveAuthenticationData(authenticationData);
+
+                Logger.LogInformation("Device log-in successful. Token expires at \'{AuthenticationDataExpiresAt}\'",
+                    authenticationData.ExpiresAt);
             }
 
-            _authenticationService.SaveAuthenticationData(authenticationData);
-
-            Logger.LogInformation("Device log-in successful. Token expires at \'{AuthenticationDataExpiresAt}\'",
-                authenticationData.ExpiresAt);
             break;
         }
     }

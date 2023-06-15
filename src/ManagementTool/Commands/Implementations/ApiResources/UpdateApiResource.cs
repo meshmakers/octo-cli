@@ -2,8 +2,8 @@ using System;
 using System.Threading.Tasks;
 using Meshmakers.Common.CommandLineParser;
 using Meshmakers.Octo.Common.Shared.DataTransferObjects;
-using Meshmakers.Octo.Frontend.Client.System;
 using Meshmakers.Octo.Frontend.ManagementTool.Services;
+using Meshmakers.Octo.Sdk.ServiceClient.IdentityServices;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
@@ -11,9 +11,9 @@ namespace Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.ApiRe
 
 internal class UpdateApiResource : ServiceClientOctoCommand<IIdentityServicesClient>
 {
-    private readonly IArgument _nameArg;
-    private readonly IArgument _displayNameArg;
     private readonly IArgument _descriptionArg;
+    private readonly IArgument _displayNameArg;
+    private readonly IArgument _nameArg;
     private readonly IArgument _scopesArg;
 
     public UpdateApiResource(ILogger<UpdateApiResource> logger, IOptions<OctoToolOptions> options,
@@ -24,13 +24,13 @@ internal class UpdateApiResource : ServiceClientOctoCommand<IIdentityServicesCli
         _nameArg = CommandArgumentValue.AddArgument("n", "name", new[] { "Name of resource, must be unique" },
             true,
             1);
-        
+
         _displayNameArg =
             CommandArgumentValue.AddArgument("dn", "displayName", new[] { "Display name of resource" }, false, 1);
-        
+
         _descriptionArg =
             CommandArgumentValue.AddArgument("d", "description", new[] { "Description of scope resource" }, false, 1);
-        
+
         _scopesArg =
             CommandArgumentValue.AddArgument("s", "scopes", new[] { "Scopes to add to resource. Split them with ," }, false, 1);
     }
@@ -45,7 +45,7 @@ internal class UpdateApiResource : ServiceClientOctoCommand<IIdentityServicesCli
         var scopes = CommandArgumentValue.GetArgumentScalarValueOrDefault<string>(_scopesArg)?
             .Split(",", StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
 
-        var apiScopeDto = new ApiResourceDto()
+        var apiScopeDto = new ApiResourceDto
         {
             Name = resourceName,
             DisplayName = CommandArgumentValue.GetArgumentScalarValueOrDefault<string>(_displayNameArg),

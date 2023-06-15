@@ -1,7 +1,7 @@
 using System.Threading.Tasks;
 using Meshmakers.Common.CommandLineParser.Commands;
-using Meshmakers.Octo.Frontend.Client.Authentication;
 using Meshmakers.Octo.Frontend.ManagementTool.Services;
+using Meshmakers.Octo.Sdk.ServiceClient.Authentication;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
@@ -31,14 +31,19 @@ internal class AuthStatusCommand : Command<OctoToolOptions>
         var result = await TestAuthenticationStatus();
         if (!result)
         {
-            Logger.LogInformation("Refreshing token.");
-            var authenticationData =
-                await _authenticatorClient.RefreshTokenAsync(_authenticationOptions.Value.RefreshToken);
+            Logger.LogInformation("Refreshing token");
 
-            _authenticationService.SaveAuthenticationData(authenticationData);
+            if (_authenticationOptions.Value.RefreshToken != null)
+            {
+                var authenticationData =
+                    await _authenticatorClient.RefreshTokenAsync(_authenticationOptions.Value.RefreshToken);
 
-            Logger.LogInformation("Refresh successful. Token expires at \'{AuthenticationDataExpiresAt}\'",
-                authenticationData.ExpiresAt);
+                _authenticationService.SaveAuthenticationData(authenticationData);
+
+                Logger.LogInformation("Refresh successful. Token expires at \'{AuthenticationDataExpiresAt}\'",
+                    authenticationData.ExpiresAt);
+            }
+
             await TestAuthenticationStatus();
         }
     }
@@ -49,10 +54,14 @@ internal class AuthStatusCommand : Command<OctoToolOptions>
 
         if (userInfoData.IsAuthenticated)
         {
-            Logger.LogInformation("Access token is valid.");
-            foreach (var claim in userInfoData.Claims)
+            Logger.LogInformation("Access token is valid");
+
+            if (userInfoData.Claims != null)
             {
-                Logger.LogInformation("\\t{ClaimType}: {ClaimValue}", claim.Type, claim.Value);
+                foreach (var claim in userInfoData.Claims)
+                {
+                    Logger.LogInformation("\\t{ClaimType}: {ClaimValue}", claim.Type, claim.Value);
+                }
             }
 
             Logger.LogInformation("\\tAccess Token: {ValueAccessToken}", _authenticationOptions.Value.AccessToken);

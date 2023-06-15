@@ -2,8 +2,8 @@
 using System.Threading.Tasks;
 using Meshmakers.Common.CommandLineParser;
 using Meshmakers.Common.Shared.Services;
-using Meshmakers.Octo.Frontend.Client.System;
 using Meshmakers.Octo.Frontend.ManagementTool.Services;
+using Meshmakers.Octo.Sdk.ServiceClient.IdentityServices;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Newtonsoft.Json;
@@ -12,8 +12,8 @@ namespace Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.ApiSe
 
 internal class GetApiSecretsClient : ServiceClientOctoCommand<IIdentityServicesClient>
 {
-    private readonly IConsoleService _consoleService;
     private readonly IArgument _clientIdArg;
+    private readonly IConsoleService _consoleService;
 
     public GetApiSecretsClient(ILogger<GetApiSecretsClient> logger, IOptions<OctoToolOptions> options,
         IConsoleService consoleService,
@@ -21,7 +21,7 @@ internal class GetApiSecretsClient : ServiceClientOctoCommand<IIdentityServicesC
         : base(logger, "GetApiSecretsClient", "Gets all secrets of a client.", options, identityServicesClient, authenticationService)
     {
         _consoleService = consoleService;
-        
+
         _clientIdArg = CommandArgumentValue.AddArgument("cid", "clientId", new[] { "ID of client" },
             true,
             1);
@@ -31,7 +31,8 @@ internal class GetApiSecretsClient : ServiceClientOctoCommand<IIdentityServicesC
     {
         var clientId = CommandArgumentValue.GetArgumentScalarValue<string>(_clientIdArg);
 
-        Logger.LogInformation("Getting API secrets for client \'{ClientId}\' from \'{ServiceClientServiceUri}\'", clientId, ServiceClient.ServiceUri);
+        Logger.LogInformation("Getting API secrets for client \'{ClientId}\' from \'{ServiceClientServiceUri}\'", clientId,
+            ServiceClient.ServiceUri);
 
         var result = await ServiceClient.GetApiSecretsForClient(clientId);
         if (!result.Any())

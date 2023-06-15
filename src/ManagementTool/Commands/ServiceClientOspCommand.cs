@@ -1,8 +1,8 @@
 using System;
 using System.Threading.Tasks;
 using Meshmakers.Common.CommandLineParser.Commands;
-using Meshmakers.Octo.Frontend.Client;
 using Meshmakers.Octo.Frontend.ManagementTool.Services;
+using Meshmakers.Octo.Sdk.ServiceClient;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
@@ -31,7 +31,7 @@ public abstract class ServiceClientOctoCommand<TServiceClientType> : Command<Oct
         {
             throw new InvalidProgramException("Please use the 'config' command to configure the service client");
         }
-        
+
         await _authenticationService.EnsureAuthenticated(ServiceClient.AccessToken);
     }
 }

@@ -1,8 +1,8 @@
 ﻿using System.Threading.Tasks;
 using Meshmakers.Common.CommandLineParser;
 using Meshmakers.Octo.Common.Shared.DataTransferObjects;
-using Meshmakers.Octo.Frontend.Client.System;
 using Meshmakers.Octo.Frontend.ManagementTool.Services;
+using Meshmakers.Octo.Sdk.ServiceClient.IdentityServices;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
@@ -10,11 +10,11 @@ namespace Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.ApiSc
 
 internal class CreateApiScope : ServiceClientOctoCommand<IIdentityServicesClient>
 {
-    private readonly IArgument _nameArg;
-    private readonly IArgument _displayNameArg;
     private readonly IArgument _descriptionArg;
+    private readonly IArgument _displayNameArg;
     private readonly IArgument _isEnabledArg;
-    
+    private readonly IArgument _nameArg;
+
     public CreateApiScope(ILogger<CreateApiScope> logger, IOptions<OctoToolOptions> options,
         IIdentityServicesClient identityServicesClient, IAuthenticationService authenticationService)
         : base(logger, "CreateApiScope", "Adds a new client using grant type 'ClientCredentials'.", options,
@@ -40,7 +40,8 @@ internal class CreateApiScope : ServiceClientOctoCommand<IIdentityServicesClient
 
         var apiScopeDto = new ApiScopeDto
         {
-            IsEnabled = !CommandArgumentValue.IsArgumentUsed(_isEnabledArg) || CommandArgumentValue.GetArgumentScalarValueOrDefault<bool>(_isEnabledArg),
+            IsEnabled = !CommandArgumentValue.IsArgumentUsed(_isEnabledArg) ||
+                        CommandArgumentValue.GetArgumentScalarValueOrDefault<bool>(_isEnabledArg),
             Name = scopeName,
             DisplayName = CommandArgumentValue.GetArgumentScalarValueOrDefault<string>(_displayNameArg),
             Description = CommandArgumentValue.GetArgumentScalarValueOrDefault<string>(_descriptionArg),
