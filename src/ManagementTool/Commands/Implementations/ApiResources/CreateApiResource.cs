@@ -2,8 +2,6 @@ using System;
 using System.Threading.Tasks;
 using Meshmakers.Common.CommandLineParser;
 using Meshmakers.Octo.Common.Shared.DataTransferObjects;
-using Meshmakers.Octo.Frontend.Client.System;
-using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.ApiScopes;
 using Meshmakers.Octo.Frontend.ManagementTool.Services;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
