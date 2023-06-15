@@ -5,6 +5,8 @@ using Meshmakers.Common.CommandLineParser;
 using Meshmakers.Common.CommandLineParser.Commands;
 using Meshmakers.Common.Configuration;
 using Meshmakers.Common.Shared.Services;
+using Meshmakers.Octo.Common.Shared;
+using Meshmakers.Octo.Common.Shared.Services;
 using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations;
 using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.ApiResources;
 using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.ApiScopes;
