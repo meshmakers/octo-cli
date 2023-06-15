@@ -5,8 +5,6 @@ using Meshmakers.Common.CommandLineParser;
 using Meshmakers.Common.CommandLineParser.Commands;
 using Meshmakers.Common.Configuration;
 using Meshmakers.Common.Shared.Services;
-using Meshmakers.Octo.Common.Shared;
-using Meshmakers.Octo.Common.Shared.Services;
 using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations;
 using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.ApiResources;
 using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.ApiScopes;
@@ -21,6 +19,7 @@ using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.ServiceHo
 using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Tenants;
 using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Users;
 using Meshmakers.Octo.Frontend.ManagementTool.Services;
+using Meshmakers.Octo.Sdk.ServiceClient.AssetRepositoryServices.System;
 using Meshmakers.Octo.Sdk.ServiceClient.AssetRepositoryServices.Tenants;
 using Meshmakers.Octo.Sdk.ServiceClient.Authentication;
 using Meshmakers.Octo.Sdk.ServiceClient.BotServices;
@@ -51,7 +50,6 @@ internal static class Program
         }
         catch (Exception ex)
         {
-            // NLog: catch any exception and log it.
             logger.Error(ex, "Stopped program because of exception");
             return -100;
         }
