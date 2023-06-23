@@ -1,4 +1,3 @@
-using System;
 using System.Threading.Tasks;
 using Meshmakers.Common.CommandLineParser.Commands;
 using Meshmakers.Octo.Frontend.ManagementTool.Services;
@@ -27,11 +26,6 @@ public abstract class ServiceClientOctoCommand<TServiceClientType> : Command<Oct
 
     public override async Task PreValidate()
     {
-        if (ServiceClient.AccessToken?.AccessToken == null)
-        {
-            throw new InvalidProgramException("Please use the 'config' command to configure the service client");
-        }
-
         await _authenticationService.EnsureAuthenticated(ServiceClient.AccessToken);
     }
 }
