@@ -2,7 +2,7 @@
 using Meshmakers.Common.CommandLineParser;
 using Meshmakers.Octo.Common.Shared;
 using Meshmakers.Octo.Frontend.ManagementTool.Services;
-using Meshmakers.Octo.Sdk.ServiceClient.AssetRepositoryServices.System;
+using Meshmakers.Octo.Sdk.ServiceClient.AssetRepositoryServices.Tenants;
 using Meshmakers.Octo.Sdk.ServiceClient.BotServices;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
