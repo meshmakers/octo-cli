@@ -64,4 +64,10 @@ steps:
     targetType: 'inline'
     script: |
       New-Item $(build.artifactstagingdirectory)/versioninfo.txt
-      Set-Content $(build.artifactstagingdirectory)/versioninfo.txt $(Build.BuildNumber)    
+      Set-Content $(build.artifactstagingdirectory)/versioninfo.txt $(Build.BuildNumber)
+- task: PublishBuildArtifacts@1
+  displayName: Publish versioninfo.txt
+  inputs:
+    PathtoPublish: $(build.artifactstagingdirectory)/versioninfo.txt
+    ArtifactName: 'octo-cli'
+    publishLocation: 'Container'      
