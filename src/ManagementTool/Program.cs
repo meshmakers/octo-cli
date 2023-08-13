@@ -161,6 +161,7 @@ internal static class Program
         services.AddTransient<ICommand, GetClients>();
         services.AddTransient<ICommand, AddAuthorizationCodeClient>();
         services.AddTransient<ICommand, AddClientCredentialsClient>();
+        services.AddTransient<ICommand, AddDeviceCodeClient>();
         services.AddTransient<ICommand, UpdateClient>();
         services.AddTransient<ICommand, DeleteClient>();
 
