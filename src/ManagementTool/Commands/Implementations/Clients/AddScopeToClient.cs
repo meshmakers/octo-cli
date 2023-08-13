@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 using Meshmakers.Common.CommandLineParser;
 using Meshmakers.Octo.Common.Shared.DataTransferObjects;
@@ -34,9 +36,11 @@ public class AddScopeToClient : ServiceClientOctoCommand<IIdentityServicesClient
         Logger.LogInformation("Allowing scope \'{ScopeName}\' for client \'{ClientId}\' at \'{ServiceClientServiceUri}\'",
             scopeName, clientId, ServiceClient.ServiceUri);
 
+        var client = await ServiceClient.GetClient(clientId);
+
         var clientDto = new ClientDto
         {
-            AllowedScopes = new[] { scopeName }
+            AllowedScopes = (client.AllowedScopes ?? new List<string>()).Append(scopeName)
         };
 
         await ServiceClient.UpdateClient(clientId, clientDto);
