@@ -20,8 +20,8 @@ steps:
         $updatedContent = $content -replace '__VERSION__', $(Build.BuildNumber)
         Set-Content -Path $file -Value $updatedContent
   - task: PublishBuildArtifacts@1
-    displayName: Publish ${{ parameters.exeName }} ${{ parameters.runtime }}
+    displayName: Publish metadata for package managers
     inputs:
       PathtoPublish: '$(Build.ArtifactStagingDirectory)/packages/'
-      ArtifactName: 'octo-cli'
+      ArtifactName: 'octo-cli-packages'
       publishLocation: 'Container'
