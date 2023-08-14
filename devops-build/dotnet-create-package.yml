@@ -5,19 +5,22 @@ steps:
       targetType: 'inline'
       script: |
         Write-Host "Source path $Env:BUILD_SOURCESDIRECTORY"
-        $sourcesDir = $Env:BUILD_SOURCESDIRECTORY
-        $file = "$sourcesDir/src/publishDefinitions/chocolatey/octo-cli/octo-cli.nuspec"
+        $sourcesDir = "$sourcesDir/src/publishDefinitions/chocolatey/"
+        $destinationDir = '$(Build.ArtifactStagingDirectory)/packages/chocolatey/'
+        Copy-Item -Path $sourcesDir -Destination $destinationDir -Recurse
+        
+        $file = "$destinationDir/octo-cli/octo-cli.nuspec"
         $content = Get-Content -Path $file
         $updatedContent = $content -replace '__VERSION__', $(Build.BuildNumber)
         Set-Content -Path $file -Value $updatedContent
 
-        $file = "$sourcesDir/src/publishDefinitions/chocolatey/octo-cli/tools/chocolateyinstall.ps1"
+        $file = "$destinationDir/octo-cli/tools/chocolateyinstall.ps1"
         $content = Get-Content -Path $file
         $updatedContent = $content -replace '__VERSION__', $(Build.BuildNumber)
         Set-Content -Path $file -Value $updatedContent
   - task: PublishBuildArtifacts@1
     displayName: Publish ${{ parameters.exeName }} ${{ parameters.runtime }}
     inputs:
-      PathtoPublish: '$(Build.ArtifactStagingDirectory)/packages/octo-cli-$(Build.BuildNumber)'
+      PathtoPublish: '$(Build.ArtifactStagingDirectory)/packages/'
       ArtifactName: 'octo-cli'
       publishLocation: 'Container'

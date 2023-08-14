@@ -43,6 +43,7 @@ steps:
       }
   displayName: 'Set build number'  
 - template: setversion.yml
+- template: dotnet-create-package.yml 
 - template: dotnet-publish-to-zip.yml
   parameters:
     exeName: 'octo-cli'
