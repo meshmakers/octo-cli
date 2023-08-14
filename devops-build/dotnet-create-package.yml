@@ -4,8 +4,9 @@ steps:
     inputs:
       targetType: 'inline'
       script: |
-        Write-Host "Source path $Env:BUILD_SOURCESDIRECTORY"
-        $sourcesDir = "$sourcesDir/src/publishDefinitions/chocolatey/"
+        Write-Host "Source path $(Build.SourcesDirectory)"
+        Write-Host "Artifacts path $(Build.ArtifactStagingDirectory)"
+        $sourcesDir = "$(Build.SourcesDirectory)/src/publishDefinitions/chocolatey/"
         $destinationDir = '$(Build.ArtifactStagingDirectory)/packages/chocolatey/'
         Copy-Item -Path $sourcesDir -Destination $destinationDir -Recurse
         
