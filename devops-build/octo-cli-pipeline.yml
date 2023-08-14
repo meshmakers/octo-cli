@@ -58,8 +58,7 @@ steps:
   parameters:
     exeName: 'octo-cli'
     runtime: 'win-x64'
-    project: 'src/ManagementTool/*.csproj'
-- template: dotnet-create-package.yml    
+    project: 'src/ManagementTool/*.csproj' 
 - task: PowerShell@2
   displayName: 'Create versioninfo file'
   inputs:
