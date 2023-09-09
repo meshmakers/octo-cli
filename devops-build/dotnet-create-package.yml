@@ -18,7 +18,7 @@ steps:
         $file = "$(Build.ArtifactStagingDirectory)/octo-cli-$(Build.BuildNumber)-win-x64"
         $sha512Checksum = Get-FileHash -Algorithm SHA512 -Path $file
         $sha512Hash = $sha512Checksum.Hash
-        Write-Host "SHA-512 Checksum for $file:"
+        Write-Host "SHA-512 Checksum for $file"
         Write-Host $sha512Hash
 
         $file = "$destinationDir/octo-cli/tools/chocolateyinstall.ps1"
