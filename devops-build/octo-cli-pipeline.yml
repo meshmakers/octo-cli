@@ -43,7 +43,6 @@ steps:
       }
   displayName: 'Set build number'  
 - template: setversion.yml
-- template: dotnet-create-package.yml 
 - template: dotnet-publish-to-zip.yml
   parameters:
     exeName: 'octo-cli'
@@ -66,6 +65,7 @@ steps:
     script: |
       New-Item $(build.artifactstagingdirectory)/versioninfo.txt
       Set-Content $(build.artifactstagingdirectory)/versioninfo.txt $(Build.BuildNumber)
+- template: dotnet-create-package.yml
 - task: PublishBuildArtifacts@1
   displayName: Publish versioninfo.txt
   inputs:
