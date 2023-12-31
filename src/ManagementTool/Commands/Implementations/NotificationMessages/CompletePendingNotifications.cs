@@ -1,8 +1,6 @@
-using System;
-using System.Threading.Tasks;
 using Meshmakers.Common.CommandLineParser;
-using Meshmakers.Octo.Common.Shared.DataTransferObjects;
-using Meshmakers.Octo.Common.Shared.Services;
+using Meshmakers.Octo.Communication.Contracts.DataTransferObjects;
+using Meshmakers.Octo.Communication.Contracts.Services;
 using Meshmakers.Octo.Frontend.ManagementTool.Services;
 using Meshmakers.Octo.Sdk.ServiceClient.AssetRepositoryServices.Tenants;
 using Microsoft.Extensions.Logging;
@@ -52,6 +50,6 @@ internal class CompletePendingNotifications : ServiceClientOctoCommand<ITenantCl
 
         await _notificationRepository.StoreNotificationMessages(Options.Value.TenantId, result.List);
 
-        Logger.LogInformation("Notification message completed.");
+        Logger.LogInformation("Notification message completed");
     }
 }

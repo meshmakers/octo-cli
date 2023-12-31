@@ -1,11 +1,7 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
 using GraphQL;
 using Meshmakers.Common.CommandLineParser;
-using Meshmakers.Octo.Common.Shared.DataTransferObjects;
-using Meshmakers.Octo.Common.Shared.Services;
+using Meshmakers.Octo.Communication.Contracts.DataTransferObjects;
+using Meshmakers.Octo.Communication.Contracts.Services;
 using Meshmakers.Octo.Frontend.ManagementTool.Services;
 using Meshmakers.Octo.Sdk.ServiceClient.AssetRepositoryServices.Tenants;
 using Microsoft.Extensions.Logging;
@@ -66,7 +62,7 @@ internal class ResetNotificationsInError : ServiceClientOctoCommand<ITenantClien
         };
 
         var getResult = await _tenantClient.SendQueryAsync<NotificationMessageDto>(getQuery);
-        if (!getResult.Items.Any())
+        if (getResult?.Items == null || !getResult.Items.Any())
         {
             Logger.LogInformation("No notifications in error has been returned");
             return;

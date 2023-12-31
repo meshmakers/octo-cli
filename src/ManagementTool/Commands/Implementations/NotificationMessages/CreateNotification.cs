@@ -1,9 +1,7 @@
-using System;
-using System.Threading.Tasks;
 using Meshmakers.Common.CommandLineParser;
-using Meshmakers.Octo.Common.Shared;
-using Meshmakers.Octo.Common.Shared.DataTransferObjects;
-using Meshmakers.Octo.Common.Shared.Services;
+using Meshmakers.Octo.Communication.Contracts.DataTransferObjects;
+using Meshmakers.Octo.Communication.Contracts.Services;
+using Meshmakers.Octo.ConstructionKit.Contracts;
 using Meshmakers.Octo.Frontend.ManagementTool.Services;
 using Meshmakers.Octo.Sdk.ServiceClient.AssetRepositoryServices.Tenants;
 using Microsoft.Extensions.Logging;
@@ -83,6 +81,11 @@ internal class CreateNotification : ServiceClientOctoCommand<ITenantClient>
                 await _notificationRepository.AddShortMessageAsync(Options.Value.TenantId, recipient, body, rtEntityId);
                 break;
             case NotificationTypesDto.EMail:
+                if (string.IsNullOrWhiteSpace(subject))
+                {
+                    Logger.LogError("Subject is missing");
+                    return;
+                }
                 await _notificationRepository.AddEMailMessageAsync(Options.Value.TenantId, recipient, subject, body,
                     rtEntityId);
                 break;
@@ -90,6 +93,6 @@ internal class CreateNotification : ServiceClientOctoCommand<ITenantClient>
                 throw new NotImplementedException();
         }
 
-        Logger.LogInformation("Notification message added.");
+        Logger.LogInformation("Notification message added");
     }
 }

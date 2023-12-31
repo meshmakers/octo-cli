@@ -1,9 +1,6 @@
-using System;
-using System.Linq;
-using System.Threading.Tasks;
 using GraphQL;
 using Meshmakers.Common.CommandLineParser;
-using Meshmakers.Octo.Common.Shared.DataTransferObjects;
+using Meshmakers.Octo.Communication.Contracts.DataTransferObjects;
 using Meshmakers.Octo.Frontend.ManagementTool.Services;
 using Meshmakers.Octo.Sdk.ServiceClient.AssetRepositoryServices.Tenants;
 using Microsoft.Extensions.Logging;
@@ -43,7 +40,7 @@ internal class DeleteServiceHook : ServiceClientOctoCommand<ITenantClient>
         };
 
         var getResult = await _tenantClient.SendQueryAsync<RtServiceHookDto>(getQuery);
-        if (!getResult?.Items.Any() ?? true)
+        if (getResult?.Items == null || !getResult.Items.Any())
         {
             throw new InvalidOperationException(
                 $"Service Hook with ID '{serviceHookId}' does not exist.");

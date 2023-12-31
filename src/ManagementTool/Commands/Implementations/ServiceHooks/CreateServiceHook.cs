@@ -1,10 +1,6 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
 using GraphQL;
 using Meshmakers.Common.CommandLineParser;
-using Meshmakers.Octo.Common.Shared.DataTransferObjects;
+using Meshmakers.Octo.Communication.Contracts.DataTransferObjects;
 using Meshmakers.Octo.Frontend.ManagementTool.Services;
 using Meshmakers.Octo.Sdk.ServiceClient.AssetRepositoryServices.Tenants;
 using Microsoft.Extensions.Logging;
@@ -96,7 +92,7 @@ internal class CreateServiceHook : ServiceClientOctoCommand<ITenantClient>
         {
             Enabled = isEnabled,
             Name = name,
-            QueryCkId = ckId,
+            QueryCkTypeId = ckId,
             FieldFilter = JsonConvert.SerializeObject(fieldFilters),
             ServiceHookBaseUri = serviceHookBaseUri,
             ServiceHookAction = serviceHookAction,

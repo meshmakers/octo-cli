@@ -5,28 +5,22 @@
         <AssemblyName>octo-cli</AssemblyName>
         <GeneratePackageOnBuild>false</GeneratePackageOnBuild>
         <OutputType>Exe</OutputType>
-        <PackageIcon>meshmakers64.png</PackageIcon>
         <PackageId>Meshmakers.Octo.Frontend.ManagementTool</PackageId>
         <PackageLicenseFile>LICENSE</PackageLicenseFile>
         <PublishProtocol>FileSystem</PublishProtocol>
-        <RepositoryUrl>https://github.com/meshmakers/octomesh</RepositoryUrl>
         <RootNamespace>Meshmakers.Octo.Frontend.ManagementTool</RootNamespace>
         <RuntimeIdentifier Condition="'$([MSBuild]::IsOsPlatform(Linux))'">linux-x64</RuntimeIdentifier>
         <RuntimeIdentifier Condition="'$([MSBuild]::IsOsPlatform(OSX))'">osx-x64</RuntimeIdentifier>
         <RuntimeIdentifier Condition="'$([MSBuild]::IsOsPlatform(Windows))'">win-x64</RuntimeIdentifier>
         <RuntimeIdentifiers>win-x64;linux-x64;osx-x64</RuntimeIdentifiers>
-        <Version>1.0.0</Version>
         <_IsPortable>false</_IsPortable>
-        <TargetFramework>net7.0</TargetFramework>
+        <Configurations>Debug;Release;DebugL</Configurations>
+        <Platforms>AnyCPU</Platforms>
+        <OutputPath>..\..\bin\$(Configuration)\</OutputPath>
+        <NoWarn>1701;1702;CS8002</NoWarn>
     </PropertyGroup>
 
-    <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
-        <OutputPath>..\..\bin\Debug\Tool\</OutputPath>
-        <NoWarn>1701;1702;CS8002</NoWarn>
-    </PropertyGroup>
     <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
-        <OutputPath>..\..\bin\Release\Tool\</OutputPath>
-        <NoWarn>1701;1702;CS8002</NoWarn>
         <DebugSymbols>false</DebugSymbols>
         <DebugType>None</DebugType>
         <PublishReferencesDocumentationFiles>false</PublishReferencesDocumentationFiles>
@@ -34,16 +28,26 @@
         <SelfContained>true</SelfContained>
     </PropertyGroup>
 
+    <ItemGroup Condition="'$(Configuration)'!='DebugL'">
+        <PackageReference Include="Meshmakers.Common.CommandLineParser" Version="4.0.2312.30002" />
+        <PackageReference Include="Meshmakers.Common.Configuration" Version="4.0.2312.30002" />
+        <PackageReference Include="Meshmakers.Octo.Sdk.ServiceClient" Version="3.0.8" />
+    </ItemGroup>
+
+    <ItemGroup Condition="'$(Configuration)'=='DebugL'">
+        <PackageReference Include="Meshmakers.Common.CommandLineParser" Version="999.0.0" />
+        <PackageReference Include="Meshmakers.Common.Configuration" Version="999.0.0" />
+        <PackageReference Include="Meshmakers.Octo.Sdk.ServiceClient" Version="999.0.0" />
+    </ItemGroup>
+
     <ItemGroup>
-        <PackageReference Include="Meshmakers.Common.CommandLineParser" Version="4.0.2305.5002" />
-        <PackageReference Include="Meshmakers.Common.Configuration" Version="4.0.2305.5002" />
-        <PackageReference Include="Meshmakers.Octo.Sdk.ServiceClient" Version="0.0.2306.23003" />
-        <PackageReference Include="Microsoft.Extensions.Configuration.Binder" Version="7.0.4" />
-        <PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="7.0.0" />
-        <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="7.0.0" />
-        <PackageReference Include="NLog" Version="5.2.0" />
-        <PackageReference Include="NLog.Extensions.Logging" Version="5.3.0" />
-        <PackageReference Include="NLog.Schema" Version="5.2.0" />
+      
+        <PackageReference Include="Microsoft.Extensions.Configuration.Binder" Version="8.0.0" />
+        <PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="8.0.0" />
+        <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="8.0.0" />
+        <PackageReference Include="NLog" Version="5.2.8" />
+        <PackageReference Include="NLog.Extensions.Logging" Version="5.3.8" />
+        <PackageReference Include="NLog.Schema" Version="5.2.8" />
     </ItemGroup>
 
     <ItemGroup>

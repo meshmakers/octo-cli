@@ -1,12 +1,9 @@
-﻿using System;
-using System.IO;
-using System.Threading.Tasks;
-using Meshmakers.Common.CommandLineParser;
+﻿using Meshmakers.Common.CommandLineParser;
 using Meshmakers.Common.CommandLineParser.Commands;
 using Meshmakers.Common.Configuration;
 using Meshmakers.Common.Shared.Services;
-using Meshmakers.Octo.Common.Shared;
-using Meshmakers.Octo.Common.Shared.Services;
+using Meshmakers.Octo.Communication.Contracts;
+using Meshmakers.Octo.Communication.Contracts.Services;
 using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations;
 using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.ApiResources;
 using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.ApiScopes;
@@ -21,6 +18,7 @@ using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.ServiceHo
 using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Tenants;
 using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Users;
 using Meshmakers.Octo.Frontend.ManagementTool.Services;
+using Meshmakers.Octo.Sdk.ServiceClient.AssetRepositoryServices.System;
 using Meshmakers.Octo.Sdk.ServiceClient.AssetRepositoryServices.Tenants;
 using Meshmakers.Octo.Sdk.ServiceClient.Authentication;
 using Meshmakers.Octo.Sdk.ServiceClient.BotServices;
@@ -109,7 +107,7 @@ internal static class Program
             .Configure<IOptions<OctoToolOptions>>(
                 (options, toolOptions) =>
                 {
-                    options.IssuerUri = toolOptions.Value.IdentityServiceUrl;
+                    options.IssuerUri = toolOptions.Value.IdentityServiceUrl ?? string.Empty;
                     options.ClientId = CommonConstants.OctoToolClientId;
                     options.ClientSecret = CommonConstants.OctoToolClientSecret;
                 });
@@ -118,7 +116,7 @@ internal static class Program
             .Configure<IOptions<OctoToolOptions>>(
                 (options, toolOptions) =>
                 {
-                    options.TenantId = toolOptions.Value.TenantId;
+                    options.TenantId = toolOptions.Value.TenantId ?? string.Empty;
                     options.EndpointUri = toolOptions.Value.AssetServiceUrl;
                 });
 

@@ -1,4 +1,3 @@
-using System.Threading.Tasks;
 using Meshmakers.Octo.Sdk.ServiceClient;
 using Meshmakers.Octo.Sdk.ServiceClient.Authentication;
 

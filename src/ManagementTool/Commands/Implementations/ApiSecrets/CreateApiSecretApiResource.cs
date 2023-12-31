@@ -1,8 +1,6 @@
-﻿using System;
-using System.Threading.Tasks;
-using Meshmakers.Common.CommandLineParser;
+﻿using Meshmakers.Common.CommandLineParser;
 using Meshmakers.Common.Shared.Services;
-using Meshmakers.Octo.Common.Shared.DataTransferObjects;
+using Meshmakers.Octo.Communication.Contracts.DataTransferObjects;
 using Meshmakers.Octo.Frontend.ManagementTool.Services;
 using Meshmakers.Octo.Sdk.ServiceClient.IdentityServices;
 using Microsoft.Extensions.Logging;

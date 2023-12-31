@@ -1,4 +1,3 @@
-using System.Threading.Tasks;
 using Meshmakers.Common.CommandLineParser.Commands;
 using Meshmakers.Octo.Frontend.ManagementTool.Services;
 using Meshmakers.Octo.Sdk.ServiceClient.Authentication;
@@ -50,26 +49,33 @@ internal class AuthStatusCommand : Command<OctoToolOptions>
 
     private async Task<bool> TestAuthenticationStatus()
     {
-        var userInfoData = await _authenticatorClient.GetUserInfoAsync(_authenticationOptions.Value.AccessToken);
-
-        if (userInfoData.IsAuthenticated)
+        if (!string.IsNullOrWhiteSpace(_authenticationOptions.Value.AccessToken))
         {
-            Logger.LogInformation("Access token is valid");
+            var userInfoData = await _authenticatorClient.GetUserInfoAsync(_authenticationOptions.Value.AccessToken);
 
-            if (userInfoData.Claims != null)
+            if (userInfoData.IsAuthenticated)
             {
-                foreach (var claim in userInfoData.Claims)
+                Logger.LogInformation("Access token is valid");
+
+                if (userInfoData.Claims != null)
                 {
-                    Logger.LogInformation("\\t{ClaimType}: {ClaimValue}", claim.Type, claim.Value);
+                    foreach (var claim in userInfoData.Claims)
+                    {
+                        Logger.LogInformation("\\t{ClaimType}: {ClaimValue}", claim.Type, claim.Value);
+                    }
                 }
+
+                Logger.LogInformation("\\tAccess Token: {ValueAccessToken}", _authenticationOptions.Value.AccessToken);
+
+                return true;
             }
 
-            Logger.LogInformation("\\tAccess Token: {ValueAccessToken}", _authenticationOptions.Value.AccessToken);
-
-            return true;
+            Logger.LogInformation("Access token is INVALID");
         }
-
-        Logger.LogInformation("Access token is INVALID");
+        else
+        {
+            Logger.LogInformation("Access token is not set");
+        }
 
         return false;
     }
