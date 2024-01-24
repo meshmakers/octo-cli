@@ -16,7 +16,7 @@ internal class CleanTenant : ServiceClientOctoCommand<IAssetServicesClient>
             "Resets a tenant to factory defaults by deleting the construction kit and runtime model.", options,
             assetServicesClient, authenticationServices)
     {
-        _tenantIdArg = CommandArgumentValue.AddArgument("tid", "tenantId", new[] { "Id of tenant" },
+        _tenantIdArg = CommandArgumentValue.AddArgument("tid", "tenantId", ["Id of tenant"],
             true, 1);
     }
 

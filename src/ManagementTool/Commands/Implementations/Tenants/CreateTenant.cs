@@ -15,9 +15,9 @@ internal class CreateTenant : ServiceClientOctoCommand<IAssetServicesClient>
         IAssetServicesClient assetServicesClient, IAuthenticationService authenticationService)
         : base(logger, "Create", "Creates a new tenant.", options, assetServicesClient, authenticationService)
     {
-        _tenantIdArg = CommandArgumentValue.AddArgument("tid", "tenantId", new[] { "Id of tenant" },
+        _tenantIdArg = CommandArgumentValue.AddArgument("tid", "tenantId", ["Id of tenant"],
             true, 1);
-        _databaseArg = CommandArgumentValue.AddArgument("db", "database", new[] { "Name of database" }, true,
+        _databaseArg = CommandArgumentValue.AddArgument("db", "database", ["Name of database"], true,
             1);
     }
 

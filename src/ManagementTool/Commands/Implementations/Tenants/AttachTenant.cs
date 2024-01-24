@@ -16,9 +16,9 @@ internal class AttachTenant : ServiceClientOctoCommand<IAssetServicesClient>
         : base(logger, "Attach", "Attach an existing database to a tenant.", options, assetServicesClient,
             authenticationService)
     {
-        _tenantIdArg = CommandArgumentValue.AddArgument("tid", "tenantId", new[] { "Id of tenant" },
+        _tenantIdArg = CommandArgumentValue.AddArgument("tid", "tenantId", ["Id of tenant"],
             true, 1);
-        _databaseArg = CommandArgumentValue.AddArgument("db", "database", new[] { "Name of database" }, true,
+        _databaseArg = CommandArgumentValue.AddArgument("db", "database", ["Name of database"], true,
             1);
     }
 

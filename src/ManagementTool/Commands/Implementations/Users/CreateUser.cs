@@ -20,13 +20,13 @@ internal class CreateUser : ServiceClientOctoCommand<IIdentityServicesClient>
         : base(logger, "CreateUser", "Create a new user account", options, identityServicesClient,
             authenticationService)
     {
-        _eMailArg = CommandArgumentValue.AddArgument("e", "eMail", new[] { "E-Mail of user" },
+        _eMailArg = CommandArgumentValue.AddArgument("e", "eMail", ["E-Mail of user"],
             true, 1);
-        _nameArg = CommandArgumentValue.AddArgument("un", "userName", new[] { "User name" }, true,
+        _nameArg = CommandArgumentValue.AddArgument("un", "userName", ["User name"], true,
             1);
-        _roleArg = CommandArgumentValue.AddArgument("r", "role", new[] { "Role of user" }, true,
+        _roleArg = CommandArgumentValue.AddArgument("r", "role", ["Role of user"], true,
             1);
-        _passwordArg = CommandArgumentValue.AddArgument("p", "password", new[] { "Password" }, false,
+        _passwordArg = CommandArgumentValue.AddArgument("p", "password", ["Password"], false,
             0);
     }
 

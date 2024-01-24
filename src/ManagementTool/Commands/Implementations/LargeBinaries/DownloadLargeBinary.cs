@@ -20,10 +20,10 @@ internal class DownloadLargeBinary : ServiceClientOctoCommand<ITenantClient>
             authenticationService)
     {
         _filePathArg = CommandArgumentValue.AddArgument("f", "file",
-            new[] { "Path to the download location of the file." },
+            ["Path to the download location of the file."],
             true, 1);
         _idArg = CommandArgumentValue.AddArgument("id", "largeBinaryId",
-            new[] { "id of the binary to be downloaded." },
+            ["id of the binary to be downloaded."],
             true, 1);
     }
 

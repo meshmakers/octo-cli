@@ -24,13 +24,13 @@ internal class CreateApiSecretClient : ServiceClientOctoCommand<IIdentityService
     {
         _consoleService = consoleService;
 
-        _clientIdArg = CommandArgumentValue.AddArgument("cid", "clientId", new[] { "ID of client" },
+        _clientIdArg = CommandArgumentValue.AddArgument("cid", "clientId", ["ID of client"],
             true,
             1);
         _expirationArg =
-            CommandArgumentValue.AddArgument("e", "expirationDate", new[] { "Expiration date of secret" }, false, 1);
+            CommandArgumentValue.AddArgument("e", "expirationDate", ["Expiration date of secret"], false, 1);
         _descriptionArg =
-            CommandArgumentValue.AddArgument("d", "description", new[] { "Description of scope scope" }, false, 1);
+            CommandArgumentValue.AddArgument("d", "description", ["Description of scope scope"], false, 1);
     }
 
     public override async Task Execute()

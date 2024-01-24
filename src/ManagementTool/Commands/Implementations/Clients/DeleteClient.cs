@@ -15,7 +15,7 @@ internal class DeleteClient : ServiceClientOctoCommand<IIdentityServicesClient>
         IIdentityServicesClient identityServicesClient, IAuthenticationService authenticationService)
         : base(logger, "DeleteClient", "Deletes a client.", options, identityServicesClient, authenticationService)
     {
-        _clientId = CommandArgumentValue.AddArgument("id", "clientId", new[] { "ServiceClient ID, must be unique" },
+        _clientId = CommandArgumentValue.AddArgument("id", "clientId", ["ServiceClient ID, must be unique"],
             true,
             1);
     }

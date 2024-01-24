@@ -22,7 +22,7 @@ internal class ImportRuntimeModel : JobWithWaitOctoCommand
     {
         _assetServicesClient = assetServicesClient;
 
-        _fileArg = CommandArgumentValue.AddArgument("f", "file", new[] { "File to import" }, true, 1);
+        _fileArg = CommandArgumentValue.AddArgument("f", "file", ["File to import"], true, 1);
     }
 
     public override async Task PreValidate()

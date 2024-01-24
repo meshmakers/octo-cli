@@ -23,7 +23,7 @@ internal class GetApiSecretsApiResource : ServiceClientOctoCommand<IIdentityServ
     {
         _consoleService = consoleService;
 
-        _nameArg = CommandArgumentValue.AddArgument("n", "name", new[] { "Name of API resource" },
+        _nameArg = CommandArgumentValue.AddArgument("n", "name", ["Name of API resource"],
             true,
             1);
     }

@@ -25,9 +25,9 @@ internal class CreateLargeBinary : ServiceClientOctoCommand<ITenantClient>
     {
         _tenantClientAccessToken = tenantClientAccessToken;
 
-        _filePathArg = CommandArgumentValue.AddArgument("f", "file", new[] { "Path to file that is uploaded." },
+        _filePathArg = CommandArgumentValue.AddArgument("f", "file", ["Path to file that is uploaded."],
             true, 1);
-        _contentTypeArg = CommandArgumentValue.AddArgument("ct", "contentType", new[] { "Content type of the file." },
+        _contentTypeArg = CommandArgumentValue.AddArgument("ct", "contentType", ["Content type of the file."],
             true, 1);
     }
 

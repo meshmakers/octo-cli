@@ -19,7 +19,7 @@ internal class DeleteServiceHook : ServiceClientOctoCommand<ITenantClient>
     {
         _tenantClient = tenantClient;
 
-        _serviceHookIdArg = CommandArgumentValue.AddArgument("id", "serviceHookId", new[] { "ID of the service hook" },
+        _serviceHookIdArg = CommandArgumentValue.AddArgument("id", "serviceHookId", ["ID of the service hook"],
             true, 1);
     }
 

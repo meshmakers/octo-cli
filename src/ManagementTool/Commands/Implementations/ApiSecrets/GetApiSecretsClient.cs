@@ -22,7 +22,7 @@ internal class GetApiSecretsClient : ServiceClientOctoCommand<IIdentityServicesC
     {
         _consoleService = consoleService;
 
-        _clientIdArg = CommandArgumentValue.AddArgument("cid", "clientId", new[] { "ID of client" },
+        _clientIdArg = CommandArgumentValue.AddArgument("cid", "clientId", ["ID of client"],
             true,
             1);
     }

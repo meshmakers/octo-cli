@@ -14,7 +14,7 @@ internal class DetachTenant : ServiceClientOctoCommand<IAssetServicesClient>
         IAssetServicesClient assetServicesClient, IAuthenticationService authenticationService)
         : base(logger, "Detach", "Detach tenant.", options, assetServicesClient, authenticationService)
     {
-        _tenantIdArg = CommandArgumentValue.AddArgument("tid", "tenantId", new[] { "Id of tenant" },
+        _tenantIdArg = CommandArgumentValue.AddArgument("tid", "tenantId", ["Id of tenant"],
             true, 1);
     }
 

@@ -29,9 +29,9 @@
     </PropertyGroup>
 
     <ItemGroup Condition="'$(Configuration)'!='DebugL'">
-        <PackageReference Include="Meshmakers.Common.CommandLineParser" Version="4.0.2401.15001" />
-        <PackageReference Include="Meshmakers.Common.Configuration" Version="4.0.2401.15001" />
-        <PackageReference Include="Meshmakers.Octo.Sdk.ServiceClient" Version="3.0.28" />
+        <PackageReference Include="Meshmakers.Common.CommandLineParser" Version="4.0.2401.17001" />
+        <PackageReference Include="Meshmakers.Common.Configuration" Version="4.0.2401.17001" />
+        <PackageReference Include="Meshmakers.Octo.Sdk.ServiceClient" Version="3.0.35" />
     </ItemGroup>
 
     <ItemGroup Condition="'$(Configuration)'=='DebugL'">

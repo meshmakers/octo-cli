@@ -16,7 +16,7 @@ internal class UpdateSystemCkModelTenant : ServiceClientOctoCommand<IAssetServic
             "Updates the system construction kit model of a tenant to the latest version.", options, assetServicesClient,
             authenticationServices)
     {
-        _tenantIdArg = CommandArgumentValue.AddArgument("tid", "tenantId", new[] { "Id of tenant" },
+        _tenantIdArg = CommandArgumentValue.AddArgument("tid", "tenantId", ["Id of tenant"],
             true, 1);
     }
 

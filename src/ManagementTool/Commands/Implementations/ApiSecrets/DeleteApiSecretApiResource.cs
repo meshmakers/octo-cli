@@ -17,10 +17,10 @@ internal class DeleteApiSecretApiResource : ServiceClientOctoCommand<IIdentitySe
         : base(logger, "DeleteApiSecretApiResource", "Deletes a secret of an API resource.", options, identityServicesClient,
             authenticationService)
     {
-        _nameArg = CommandArgumentValue.AddArgument("n", "name", new[] { "Name of API resource" },
+        _nameArg = CommandArgumentValue.AddArgument("n", "name", ["Name of API resource"],
             true,
             1);
-        _secretValueArg = CommandArgumentValue.AddArgument("s", "secretValue", new[] { "Value (sha256) of secret" },
+        _secretValueArg = CommandArgumentValue.AddArgument("s", "secretValue", ["Value (sha256) of secret"],
             true,
             1);
     }

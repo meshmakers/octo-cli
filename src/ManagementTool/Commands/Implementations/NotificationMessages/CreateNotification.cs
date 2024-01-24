@@ -29,24 +29,24 @@ internal class CreateNotification : ServiceClientOctoCommand<ITenantClient>
         _notificationRepository = notificationRepository;
 
         _type = CommandArgumentValue.AddArgument("t", "type",
-            new[] { "Type of notification message, available is 'email' or 'sms'" }, true,
+            ["Type of notification message, available is 'email' or 'sms'"], true,
             1);
 
         _recipient = CommandArgumentValue.AddArgument("r", "recipient",
-            new[] { "Address of recipient (for example e-mail address or phone number)'" }, true,
+            ["Address of recipient (for example e-mail address or phone number)'"], true,
             1);
 
-        _subject = CommandArgumentValue.AddArgument("s", "subject", new[] { "Subject of notification message." },
+        _subject = CommandArgumentValue.AddArgument("s", "subject", ["Subject of notification message."],
             false, 1);
 
-        _body = CommandArgumentValue.AddArgument("b", "body", new[] { "Body of notification message" },
+        _body = CommandArgumentValue.AddArgument("b", "body", ["Body of notification message"],
             true, 1);
 
         _associationCkId = CommandArgumentValue.AddArgument("ackid", "associationCkId",
-            new[] { "Association construction kit ID of related entity" },
+            ["Association construction kit ID of related entity"],
             false, 1);
         _associationRtId = CommandArgumentValue.AddArgument("artid", "associationRtId",
-            new[] { "Association runtime ID of related entity" },
+            ["Association runtime ID of related entity"],
             false, 1);
     }
 

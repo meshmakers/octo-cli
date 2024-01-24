@@ -36,7 +36,7 @@ internal class Runner
             _parser.ShowUsageInformation(Constants.OctoExeName);
             return -1;
         }
-        catch (InvalidProgramException ex)
+        catch (InvalidParameterException ex)
         {
             _logger.LogError("{Message}", ex.Message);
             _parser.ShowUsageInformation(Constants.OctoExeName);

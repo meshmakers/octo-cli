@@ -11,7 +11,7 @@ internal class AddOpenLdapIdentityProvider : ServiceClientOctoCommand<IIdentityS
 {
     private readonly IArgument _accountName;
     private readonly IArgument _accountPassword;
-    private readonly IArgument _alias;
+    private readonly IArgument _name;
     private readonly IArgument _enabled;
     private readonly IArgument _host;
     private readonly IArgument _port;
@@ -23,31 +23,31 @@ internal class AddOpenLdapIdentityProvider : ServiceClientOctoCommand<IIdentityS
         : base(logger, "AddOpenLdapIdentityProvider", "Adds a new identity provider for Open LDAP.", options, identityServicesClient,
             authenticationService)
     {
-        _alias = CommandArgumentValue.AddArgument("a", "alias", new[] { "Alias of identity provider, must be unique" },
+        _name = CommandArgumentValue.AddArgument("n", "name", ["Name of identity provider, must be unique"],
             true,
             1);
         _enabled = CommandArgumentValue.AddArgument("e", "enabled",
-            new[] { "True if identity provider should be enabled, otherwise false" }, true,
+            ["True if identity provider should be enabled, otherwise false"], true,
             1);
         _host = CommandArgumentValue.AddArgument("h", "host",
-            new[] { "Host" }, true, 1);
+            ["Host"], true, 1);
         _port = CommandArgumentValue.AddArgument("p", "port",
-            new[] { "Host" }, true, 1);
+            ["Host"], true, 1);
         _accountName = CommandArgumentValue.AddArgument("u", "userDistinguishedName",
-            new[] { "DN for machine account for authentication" }, true, 1);
+            ["DN for machine account for authentication"], true, 1);
         _accountPassword = CommandArgumentValue.AddArgument("psw", "password",
-            new[] { "Password for machine account for authentication" }, true, 1);
+            ["Password for machine account for authentication"], true, 1);
         _userBaseDn = CommandArgumentValue.AddArgument("ubdn", "userBaseDn",
-            new[] { "User base DN, e. g. cn=users,dc=meshmakers,dc=cloud" }, true, 1);
+            ["User base DN, e. g. cn=users,dc=meshmakers,dc=cloud"], true, 1);
         _userNameAttribute = CommandArgumentValue.AddArgument("uan", "userAttributeName",
-            new[] { "User name attribute name, e. g. uid" }, true, 1);
+            ["User name attribute name, e. g. uid"], true, 1);
     }
 
     public override async Task Execute()
     {
-        var alias = CommandArgumentValue.GetArgumentScalarValue<string>(_alias);
+        var name = CommandArgumentValue.GetArgumentScalarValue<string>(_name);
 
-        Logger.LogInformation("Creating OpenLDAP identity provider \'{Alias}\' at \'{ServiceClientServiceUri}\'", alias,
+        Logger.LogInformation("Creating OpenLDAP identity provider \'{Name}\' at \'{ServiceClientServiceUri}\'", name,
             ServiceClient.ServiceUri);
 
         var identityProviderDto = new OpenLdapProviderDto
@@ -59,11 +59,11 @@ internal class AddOpenLdapIdentityProvider : ServiceClientOctoCommand<IIdentityS
             Password = CommandArgumentValue.GetArgumentScalarValue<string>(_accountPassword),
             UserBaseDn = CommandArgumentValue.GetArgumentScalarValue<string>(_userBaseDn),
             UserNameAttribute = CommandArgumentValue.GetArgumentScalarValue<string>(_userNameAttribute),
-            Alias = alias
+            Name = name
         };
         await ServiceClient.CreateIdentityProvider(identityProviderDto);
 
-        Logger.LogInformation("ServiceClient \'{Alias}\' at \'{ServiceClientServiceUri}\' created", alias,
+        Logger.LogInformation("ServiceClient \'{Name}\' at \'{ServiceClientServiceUri}\' created", name,
             ServiceClient.ServiceUri);
     }
 }

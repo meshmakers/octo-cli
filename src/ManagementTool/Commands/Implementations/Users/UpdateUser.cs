@@ -1,7 +1,6 @@
 using Meshmakers.Common.CommandLineParser;
 using Meshmakers.Octo.Communication.Contracts.DataTransferObjects;
 using Meshmakers.Octo.Frontend.ManagementTool.Services;
-using Meshmakers.Octo.Sdk.ServiceClient;
 using Meshmakers.Octo.Sdk.ServiceClient.IdentityServices;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -13,20 +12,17 @@ internal class UpdateUser : ServiceClientOctoCommand<IIdentityServicesClient>
     private readonly IArgument _eMailArg;
     private readonly IArgument _nameArg;
     private readonly IArgument _newNameArg;
-    private readonly IArgument _roleArg;
 
     public UpdateUser(ILogger<UpdateUser> logger, IOptions<OctoToolOptions> options,
         IIdentityServicesClient identityServicesClient, IAuthenticationService authenticationService)
         : base(logger, "UpdateUser", "Updates an user", options, identityServicesClient, authenticationService)
     {
-        _eMailArg = CommandArgumentValue.AddArgument("e", "eMail", new[] { "E-Mail of user" },
+        _eMailArg = CommandArgumentValue.AddArgument("e", "eMail", ["E-Mail of user"],
             false, 1);
-        _nameArg = CommandArgumentValue.AddArgument("un", "userName", new[] { "User name" }, true,
+        _nameArg = CommandArgumentValue.AddArgument("un", "userName", ["User name"], true,
             1);
         _newNameArg = CommandArgumentValue.AddArgument("nun", "newUserName",
-            new[] { "New user name, if the user name has to be changed" }, false,
-            1);
-        _roleArg = CommandArgumentValue.AddArgument("r", "role", new[] { "Role of user" }, false,
+            ["New user name, if the user name has to be changed"], false,
             1);
     }
 
@@ -38,12 +34,6 @@ internal class UpdateUser : ServiceClientOctoCommand<IIdentityServicesClient>
         if (CommandArgumentValue.IsArgumentUsed(_newNameArg))
         {
             newUserName = CommandArgumentValue.GetArgumentScalarValue<string>(_newNameArg).ToLower();
-        }
-
-        string? roleName = null;
-        if (CommandArgumentValue.IsArgumentUsed(_roleArg))
-        {
-            roleName = CommandArgumentValue.GetArgumentScalarValue<string>(_roleArg).ToLower();
         }
 
         string? eMail = null;
@@ -59,25 +49,7 @@ internal class UpdateUser : ServiceClientOctoCommand<IIdentityServicesClient>
         {
             Email = eMail,
             Name = newUserName,
-            Roles = new List<RoleDto>()
         };
-
-        if (!string.IsNullOrWhiteSpace(roleName))
-        {
-            RoleDto roleDto;
-            try
-            {
-                roleDto = await ServiceClient.GetRoleByName(roleName);
-            }
-            catch (ServiceClientResultException)
-            {
-                Logger.LogError("Role \'{RoleName}\' does not exist at Service \'{ClientServiceUriUri}\'", roleName,
-                    ServiceClient.ServiceUri);
-                return;
-            }
-
-            userDto.Roles = new[] { roleDto };
-        }
 
         await ServiceClient.UpdateUser(name, userDto);
 

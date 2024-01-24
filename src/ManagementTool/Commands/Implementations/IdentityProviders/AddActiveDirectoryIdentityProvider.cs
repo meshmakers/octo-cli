@@ -1,4 +1,5 @@
-﻿using Meshmakers.Common.CommandLineParser;
+﻿using System.Text.Json;
+using Meshmakers.Common.CommandLineParser;
 using Meshmakers.Octo.Communication.Contracts.DataTransferObjects;
 using Meshmakers.Octo.Frontend.ManagementTool.Services;
 using Meshmakers.Octo.Sdk.ServiceClient.IdentityServices;
@@ -11,7 +12,7 @@ internal class AddActiveDirectoryIdentityProvider : ServiceClientOctoCommand<IId
 {
     private readonly IArgument _accountName;
     private readonly IArgument _accountPassword;
-    private readonly IArgument _alias;
+    private readonly IArgument _name;
     private readonly IArgument _enabled;
     private readonly IArgument _host;
     private readonly IArgument _port;
@@ -21,27 +22,27 @@ internal class AddActiveDirectoryIdentityProvider : ServiceClientOctoCommand<IId
         : base(logger, "AddAdIdentityProvider", "Adds a new identity provider for active directory.", options, identityServicesClient,
             authenticationService)
     {
-        _alias = CommandArgumentValue.AddArgument("a", "alias", new[] { "Alias of identity provider, must be unique" },
+        _name = CommandArgumentValue.AddArgument("n", "name", ["Name of identity provider, must be unique"],
             true,
             1);
         _enabled = CommandArgumentValue.AddArgument("e", "enabled",
-            new[] { "True if identity provider should be enabled, otherwise false" }, true,
+            ["True if identity provider should be enabled, otherwise false"], true,
             1);
         _host = CommandArgumentValue.AddArgument("h", "host",
-            new[] { "Host" }, true, 1);
+            ["Host"], true, 1);
         _port = CommandArgumentValue.AddArgument("p", "port",
-            new[] { "Host" }, true, 1);
+            ["Host"], true, 1);
         _accountName = CommandArgumentValue.AddArgument("u", "userPrincipalName",
-            new[] { "Name for machine account for authentication" }, true, 1);
+            ["Name for machine account for authentication"], true, 1);
         _accountPassword = CommandArgumentValue.AddArgument("psw", "password",
-            new[] { "Password for machine account for authentication" }, true, 1);
+            ["Password for machine account for authentication"], true, 1);
     }
 
     public override async Task Execute()
     {
-        var alias = CommandArgumentValue.GetArgumentScalarValue<string>(_alias);
+        var name = CommandArgumentValue.GetArgumentScalarValue<string>(_name);
 
-        Logger.LogInformation("Creating Active Directory identity provider \'{Alias}\' at \'{ServiceClientServiceUri}\'", alias,
+        Logger.LogInformation("Creating Active Directory identity provider \'{Name}\' at \'{ServiceClientServiceUri}\'", name,
             ServiceClient.ServiceUri);
 
         var identityProviderDto = new MicrosoftAdProviderDto
@@ -51,11 +52,12 @@ internal class AddActiveDirectoryIdentityProvider : ServiceClientOctoCommand<IId
             Port = CommandArgumentValue.GetArgumentScalarValue<ushort>(_port),
             UserPrincipalName = CommandArgumentValue.GetArgumentScalarValue<string>(_accountName),
             Password = CommandArgumentValue.GetArgumentScalarValue<string>(_accountPassword),
-            Alias = alias
+            Name = name
         };
+        var json = JsonSerializer.Serialize<IdentityProviderDto>(identityProviderDto);
         await ServiceClient.CreateIdentityProvider(identityProviderDto);
 
-        Logger.LogInformation("ServiceClient \'{Alias}\' at \'{ServiceClientServiceUri}\' created", alias,
+        Logger.LogInformation("ServiceClient \'{Name}\' at \'{ServiceClientServiceUri}\' created", name,
             ServiceClient.ServiceUri);
     }
 }

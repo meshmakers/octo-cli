@@ -20,9 +20,9 @@ internal class SetupCommand : Command<OctoToolOptions>
         _identityServicesSetupClient = identityServicesSetupClient;
 
         _eMailArg = CommandArgumentValue.AddArgument("e", "email",
-            new[] { "E-Mail of admin" }, 1);
+            ["E-Mail of admin"], 1);
         _passwordArg = CommandArgumentValue.AddArgument("p", "password",
-            new[] { "Password of admin" }, 1);
+            ["Password of admin"], 1);
     }
 
     public override async Task Execute()

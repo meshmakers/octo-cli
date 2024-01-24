@@ -15,7 +15,7 @@ internal class DeleteApiResource : ServiceClientOctoCommand<IIdentityServicesCli
         IIdentityServicesClient identityServicesClient, IAuthenticationService authenticationService)
         : base(logger, "DeleteApiResource", "Deletes an api resource.", options, identityServicesClient, authenticationService)
     {
-        _name = CommandArgumentValue.AddArgument("n", "name", new[] { "Name of resource" },
+        _name = CommandArgumentValue.AddArgument("n", "name", ["Name of resource"],
             true,
             1);
     }

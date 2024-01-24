@@ -1,5 +1,6 @@
 ﻿using System.Threading.Tasks;
 using Meshmakers.Common.CommandLineParser;
+using Meshmakers.Octo.ConstructionKit.Contracts;
 using Meshmakers.Octo.Frontend.ManagementTool.Services;
 using Meshmakers.Octo.Sdk.ServiceClient.IdentityServices;
 using Microsoft.Extensions.Logging;
@@ -16,21 +17,21 @@ internal class DeleteIdentityProvider : ServiceClientOctoCommand<IIdentityServic
         : base(logger, "DeleteIdentityProvider", "Deletes an identity provider.", options, identityServicesClient,
             authenticationService)
     {
-        _id = CommandArgumentValue.AddArgument("id", "identifier", new[] { "ID of identity provider, must be unique" },
+        _id = CommandArgumentValue.AddArgument("id", "identifier", ["ID of identity provider, must be unique"],
             true,
             1);
     }
 
     public override async Task Execute()
     {
-        var id = CommandArgumentValue.GetArgumentScalarValue<string>(_id);
+        var rtId = CommandArgumentValue.GetArgumentScalarValue<OctoObjectId>(_id);
 
 
-        Logger.LogInformation("Deleting identity provider \'{Id}\' from \'{ServiceClientServiceUri}\'", id,
+        Logger.LogInformation("Deleting identity provider \'{RtId}\' from \'{ServiceClientServiceUri}\'", rtId,
             ServiceClient.ServiceUri);
 
-        await ServiceClient.DeleteIdentityProvider(id);
+        await ServiceClient.DeleteIdentityProvider(rtId);
 
-        Logger.LogInformation("Identity provider \'{Id}\' deleted", id);
+        Logger.LogInformation("Identity provider \'{RtId}\' deleted", rtId);
     }
 }

@@ -16,10 +16,10 @@ internal class DeleteApiSecretClient : ServiceClientOctoCommand<IIdentityService
         IIdentityServicesClient identityServicesClient, IAuthenticationService authenticationService)
         : base(logger, "DeleteApiSecretClient", "Deletes a secret of a client.", options, identityServicesClient, authenticationService)
     {
-        _clientIdArg = CommandArgumentValue.AddArgument("cid", "clientId", new[] { "ID of client" },
+        _clientIdArg = CommandArgumentValue.AddArgument("cid", "clientId", ["ID of client"],
             true,
             1);
-        _secretValueArg = CommandArgumentValue.AddArgument("s", "secretValue", new[] { "Value (sha256) of secret" },
+        _secretValueArg = CommandArgumentValue.AddArgument("s", "secretValue", ["Value (sha256) of secret"],
             true,
             1);
     }

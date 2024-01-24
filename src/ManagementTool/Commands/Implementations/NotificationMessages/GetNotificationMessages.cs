@@ -27,7 +27,7 @@ internal class GetNotificationMessages : ServiceClientOctoCommand<ITenantClient>
         _notificationRepository = notificationRepository;
 
         _type = CommandArgumentValue.AddArgument("t", "type",
-            new[] { "Type of notification message, available is 'email' or 'sms'" }, true,
+            ["Type of notification message, available is 'email' or 'sms'"], true,
             1);
     }
 

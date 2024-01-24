@@ -24,9 +24,9 @@ internal class ExportRuntimeModel : JobOctoCommand
     {
         _assetServicesClient = assetServicesClient;
 
-        _fileArg = CommandArgumentValue.AddArgument("f", "file", new[] { "File to export" }, true, 1);
+        _fileArg = CommandArgumentValue.AddArgument("f", "file", ["File to export"], true, 1);
         _queryIdArg =
-            CommandArgumentValue.AddArgument("q", "queryId", new[] { "Query ID that is used for export" }, true, 1);
+            CommandArgumentValue.AddArgument("q", "queryId", ["Query ID that is used for export"], true, 1);
     }
 
     public override async Task PreValidate()

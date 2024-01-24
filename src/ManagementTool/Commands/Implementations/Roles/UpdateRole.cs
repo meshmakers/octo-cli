@@ -16,10 +16,10 @@ internal class UpdateRole : ServiceClientOctoCommand<IIdentityServicesClient>
         IIdentityServicesClient identityServicesClient, IAuthenticationService authenticationService)
         : base(logger, "UpdateRole", "Updates a role", options, identityServicesClient, authenticationService)
     {
-        _nameArg = CommandArgumentValue.AddArgument("n", "name", new[] { "Name of role" }, true,
+        _nameArg = CommandArgumentValue.AddArgument("n", "name", ["Name of role"], true,
             1);
         _newNameArg = CommandArgumentValue.AddArgument("nn", "newRoleName",
-            new[] { "New name of role" }, false,
+            ["New name of role"], false,
             1);
     }
 

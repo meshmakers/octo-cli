@@ -17,9 +17,9 @@ internal class ResetPassword : ServiceClientOctoCommand<IIdentityServicesClient>
         : base(logger, "ResetPassword", "Resets the password of a user", options, identityServicesClient,
             authenticationService)
     {
-        _nameArg = CommandArgumentValue.AddArgument("un", "userName", new[] { "User name" }, true,
+        _nameArg = CommandArgumentValue.AddArgument("un", "userName", ["User name"], true,
             1);
-        _passwordArg = CommandArgumentValue.AddArgument("p", "password", new[] { "New password of user" }, true,
+        _passwordArg = CommandArgumentValue.AddArgument("p", "password", ["New password of user"], true,
             1);
     }
 

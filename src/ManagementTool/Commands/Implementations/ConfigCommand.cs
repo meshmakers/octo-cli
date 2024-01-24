@@ -22,13 +22,13 @@ internal class ConfigOctoCommand : Command<OctoToolOptions>
         _configWriter = configWriter;
 
         _assetServicesUriArg = CommandArgumentValue.AddArgument("asu", "assetServicesUri",
-            new[] { "URI of asset repository services (e. g. 'https://localhost:5001/')" }, 1);
+            ["URI of asset repository services (e. g. 'https://localhost:5001/')"], 1);
         _botServicesUriArg = CommandArgumentValue.AddArgument("bsu", "bobServicesUri",
-            new[] { "URI of bot services (e. g. 'https://localhost:5009/')" }, 1);
+            ["URI of bot services (e. g. 'https://localhost:5009/')"], 1);
         _identityServicesUriArg = CommandArgumentValue.AddArgument("isu", "identityServicesUri",
-            new[] { "URI of identity services (e. g. 'https://localhost:5003/')" }, true, 1);
+            ["URI of identity services (e. g. 'https://localhost:5003/')"], true, 1);
         _tenantIdArg = CommandArgumentValue.AddArgument("tid", "tenantId",
-            new[] { "Id of tenant (e. g. 'myService')" }, 1);
+            ["Id of tenant (e. g. 'myService')"], 1);
     }
 
     public override Task Execute()

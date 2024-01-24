@@ -15,7 +15,7 @@ internal class DeleteRole : ServiceClientOctoCommand<IIdentityServicesClient>
         IIdentityServicesClient identityServicesClient, IAuthenticationService authenticationService)
         : base(logger, "DeleteRole", "Deletes a role", options, identityServicesClient, authenticationService)
     {
-        _nameArg = CommandArgumentValue.AddArgument("n", "name", new[] { "Name of role" }, true,
+        _nameArg = CommandArgumentValue.AddArgument("n", "name", ["Name of role"], true,
             1);
     }
 

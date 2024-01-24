@@ -20,16 +20,16 @@ internal class UpdateApiSecretApiResource : ServiceClientOctoCommand<IIdentitySe
         : base(logger, "UpdateApiSecretApiResource", "Updates an API secret for an API resource.", options, identityServicesClient,
             authenticationService)
     {
-        _nameArg = CommandArgumentValue.AddArgument("n", "name", new[] { "Name of API resource" },
+        _nameArg = CommandArgumentValue.AddArgument("n", "name", ["Name of API resource"],
             true,
             1);
-        _secretValueArg = CommandArgumentValue.AddArgument("s", "secretValue", new[] { "Value sha256 encoded of the secret" },
+        _secretValueArg = CommandArgumentValue.AddArgument("s", "secretValue", ["Value sha256 encoded of the secret"],
             true,
             1);
         _expirationArg =
-            CommandArgumentValue.AddArgument("e", "expirationDate", new[] { "Expiration date of secret" }, false, 1);
+            CommandArgumentValue.AddArgument("e", "expirationDate", ["Expiration date of secret"], false, 1);
         _descriptionArg =
-            CommandArgumentValue.AddArgument("d", "description", new[] { "Description of scope scope" }, false, 1);
+            CommandArgumentValue.AddArgument("d", "description", ["Description of scope scope"], false, 1);
     }
 
     public override async Task Execute()

@@ -14,7 +14,7 @@ internal class ClearTenantCache : ServiceClientOctoCommand<IAssetServicesClient>
         IAssetServicesClient assetServicesClient, IAuthenticationService authenticationService)
         : base(logger, "ClearCache", "Clears the cache of a tenant", options, assetServicesClient, authenticationService)
     {
-        _tenantIdArg = CommandArgumentValue.AddArgument("tid", "tenantId", new[] { "Id of tenant" },
+        _tenantIdArg = CommandArgumentValue.AddArgument("tid", "tenantId", ["Id of tenant"],
             true, 1);
     }
 

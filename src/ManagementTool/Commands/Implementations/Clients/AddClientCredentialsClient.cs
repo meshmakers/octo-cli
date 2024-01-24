@@ -20,14 +20,14 @@ internal class AddClientCredentialsClient : ServiceClientOctoCommand<IIdentitySe
         : base(logger, "AddClientCredentialsClient", "Adds a new client using grant type 'ClientCredentials'.", options,
             identityServicesClient, authenticationService)
     {
-        _clientId = CommandArgumentValue.AddArgument("id", "clientId", new[] { "ServiceClient ID, must be unique" },
+        _clientId = CommandArgumentValue.AddArgument("id", "clientId", ["ServiceClient ID, must be unique"],
             true,
             1);
-        _clientName = CommandArgumentValue.AddArgument("n", "name", new[] { "Display name of client used for grants" },
+        _clientName = CommandArgumentValue.AddArgument("n", "name", ["Display name of client used for grants"],
             true,
             1);
         _clientSecret = CommandArgumentValue.AddArgument("s", "secret",
-            new[] { "ApiSecret that is used for client credential authentication" }, true,
+            ["ApiSecret that is used for client credential authentication"], true,
             1);
     }
 

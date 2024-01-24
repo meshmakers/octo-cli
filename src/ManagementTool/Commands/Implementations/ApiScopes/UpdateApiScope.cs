@@ -19,17 +19,17 @@ internal class UpdateApiScope : ServiceClientOctoCommand<IIdentityServicesClient
         IIdentityServicesClient identityServicesClient, IAuthenticationService authenticationService)
         : base(logger, "UpdateApiScope", "Updates an API scope.", options, identityServicesClient, authenticationService)
     {
-        _nameArg = CommandArgumentValue.AddArgument("n", "name", new[] { "Name of scope, must be unique" },
+        _nameArg = CommandArgumentValue.AddArgument("n", "name", ["Name of scope, must be unique"],
             true,
             1);
         _isEnabledArg = CommandArgumentValue.AddArgument("e", "enabled",
-            new[] { "false for disabled, true for enabled." }, false, 1);
-        _newNameArg = CommandArgumentValue.AddArgument("nn", "newName", new[] { "New name of scope, must be unique" },
+            ["false for disabled, true for enabled."], false, 1);
+        _newNameArg = CommandArgumentValue.AddArgument("nn", "newName", ["New name of scope, must be unique"],
             false, 1);
         _displayNameArg =
-            CommandArgumentValue.AddArgument("dn", "displayName", new[] { "Display name of scope" }, false, 1);
+            CommandArgumentValue.AddArgument("dn", "displayName", ["Display name of scope"], false, 1);
         _descriptionArg =
-            CommandArgumentValue.AddArgument("d", "description", new[] { "Description of scope scope" }, false, 1);
+            CommandArgumentValue.AddArgument("d", "description", ["Description of scope scope"], false, 1);
     }
 
     public override async Task Execute()

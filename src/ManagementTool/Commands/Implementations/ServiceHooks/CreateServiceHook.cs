@@ -23,32 +23,31 @@ internal class CreateServiceHook : ServiceClientOctoCommand<ITenantClient>
         ITenantClient tenantClient, IAuthenticationService authenticationService)
         : base(logger, "CreateServiceHook", "Create a new service hook", options, tenantClient, authenticationService)
     {
-        _isEnabledArg = CommandArgumentValue.AddArgument("e", "enabled", new[] { "Enabled state of service hook" },
+        _isEnabledArg = CommandArgumentValue.AddArgument("e", "enabled", ["Enabled state of service hook"],
             true, 1);
-        _nameArg = CommandArgumentValue.AddArgument("n", "name", new[] { "Display name of service hook" },
+        _nameArg = CommandArgumentValue.AddArgument("n", "name", ["Display name of service hook"],
             true, 1);
         _ckIdArg = CommandArgumentValue.AddArgument("ck", "ckId",
-            new[] { "The construction kit id key the service hook is applied to" },
+            ["The construction kit id key the service hook is applied to"],
             true, 1);
-        _filterArg = CommandArgumentValue.AddArgument("f", "filter", new[]
-            {
+        _filterArg = CommandArgumentValue.AddArgument("f", "filter", [
                 "Filter arguments in form \"'{AttributeName}' {Operator} '{Value}'\"",
                 "Sample: \"'State' Equals '2'\"",
                 "Attribute name must be a valid argument of the defined entity",
                 $"Possible operators: {string.Join(", ", Enum.GetNames(typeof(FieldFilterOperatorDto)))} ",
                 "Value must be a string, integer, double, boolean, DateTime"
-            },
+            ],
             true, 1, true);
         _serviceHookBaseUriArg = CommandArgumentValue.AddArgument("u", "uri",
-            new[] { "The base uri of the service hook" },
+            ["The base uri of the service hook"],
             false, 1);
 
         _serviceHookActionArg = CommandArgumentValue.AddArgument("a", "action",
-            new[] { "The action uri of the service hook" },
+            ["The action uri of the service hook"],
             false, 1);
 
         _serviceHookApiKeyArg = CommandArgumentValue.AddArgument("k", "apiKey",
-            new[] { "An optional api key for the service hook, transferred in HTTP header" },
+            ["An optional api key for the service hook, transferred in HTTP header"],
             false, 1);
     }
 

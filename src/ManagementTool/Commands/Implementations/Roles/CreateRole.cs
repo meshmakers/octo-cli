@@ -16,7 +16,7 @@ internal class CreateRole : ServiceClientOctoCommand<IIdentityServicesClient>
         : base(logger, "CreateRole", "Create a new role", options, identityServicesClient,
             authenticationService)
     {
-        _nameArg = CommandArgumentValue.AddArgument("n", "name", new[] { "Name of role" }, true,
+        _nameArg = CommandArgumentValue.AddArgument("n", "name", ["Name of role"], true,
             1);
     }
 

@@ -23,7 +23,7 @@ internal class LogInCommand : Command<OctoToolOptions>
         _authenticationService = authenticationService;
 
         _interactiveArg = CommandArgumentValue.AddArgument("i", "interactive",
-            new[] { "Interactive by opening a browser for device log-In" }, false);
+            ["Interactive by opening a browser for device log-In"], false);
     }
 
     public override async Task Execute()

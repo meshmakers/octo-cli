@@ -17,10 +17,10 @@ public class AddScopeToClient : ServiceClientOctoCommand<IIdentityServicesClient
         : base(logger, "AddScopeToClient", "Grants the access to a client for a scope .", options,
             identityServicesClient, authenticationService)
     {
-        _clientId = CommandArgumentValue.AddArgument("id", "clientId", new[] { "ServiceClient ID, must be unique" },
+        _clientId = CommandArgumentValue.AddArgument("id", "clientId", ["ServiceClient ID, must be unique"],
             true,
             1);
-        _scopeName = CommandArgumentValue.AddArgument("n", "name", new[] { "Scope name" },
+        _scopeName = CommandArgumentValue.AddArgument("n", "name", ["Scope name"],
             true,
             1);
     }

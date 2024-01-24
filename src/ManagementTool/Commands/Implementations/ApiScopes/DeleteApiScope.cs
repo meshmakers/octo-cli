@@ -15,7 +15,7 @@ internal class DeleteApiScope : ServiceClientOctoCommand<IIdentityServicesClient
         IIdentityServicesClient identityServicesClient, IAuthenticationService authenticationService)
         : base(logger, "DeleteApiScope", "Deletes a client.", options, identityServicesClient, authenticationService)
     {
-        _name = CommandArgumentValue.AddArgument("n", "name", new[] { "Name of scope, must be unique" },
+        _name = CommandArgumentValue.AddArgument("n", "name", ["Name of scope, must be unique"],
             true,
             1);
     }

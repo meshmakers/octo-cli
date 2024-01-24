@@ -14,7 +14,7 @@ internal class DeleteTenant : ServiceClientOctoCommand<IAssetServicesClient>
         IAssetServicesClient assetServicesClient, IAuthenticationService authenticationService)
         : base(logger, "Delete", "Deletes an existing tenant.", options, assetServicesClient, authenticationService)
     {
-        _tenantIdArg = CommandArgumentValue.AddArgument("tid", "tenantId", new[] { "Id of tenant" },
+        _tenantIdArg = CommandArgumentValue.AddArgument("tid", "tenantId", ["Id of tenant"],
             true, 1);
     }
 

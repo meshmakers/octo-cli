@@ -17,7 +17,7 @@ internal abstract class JobWithWaitOctoCommand : JobOctoCommand
         : base(logger, commandValue, commandDescription, options, botServicesClient, authenticationService)
     {
         _waitForJobArg = CommandArgumentValue.AddArgument("w", "wait",
-            new[] { "Wait for a import job to complete" }, false, 0);
+            ["Wait for a import job to complete"], false, 0);
     }
 
     protected override async Task WaitForJob(string id)

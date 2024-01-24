@@ -15,7 +15,7 @@ internal class DeleteUser : ServiceClientOctoCommand<IIdentityServicesClient>
         IIdentityServicesClient identityServicesClient, IAuthenticationService authenticationService)
         : base(logger, "DeleteUser", "Deletes an user", options, identityServicesClient, authenticationService)
     {
-        _nameArg = CommandArgumentValue.AddArgument("un", "userName", new[] { "User name" }, true,
+        _nameArg = CommandArgumentValue.AddArgument("un", "userName", ["User name"], true,
             1);
     }
 

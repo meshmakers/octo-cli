@@ -22,14 +22,14 @@ internal class AddAuthorizationCodeClient : ServiceClientOctoCommand<IIdentitySe
         : base(logger, "AddAuthorizationCodeClient", "Adds a new client using grant type 'AuthorizationCode'.", options,
             identityServicesClient, authenticationService)
     {
-        _clientUri = CommandArgumentValue.AddArgument("u", "clientUri", new[] { "URI of client" },
+        _clientUri = CommandArgumentValue.AddArgument("u", "clientUri", ["URI of client"],
             true, 1);
         _redirectUri = CommandArgumentValue.AddArgument("ru", "redirectUri",
-            new[] { "Redirect URI for login procedure" }, false, 1);
-        _clientId = CommandArgumentValue.AddArgument("id", "clientId", new[] { "ServiceClient ID, must be unique" },
+            ["Redirect URI for login procedure"], false, 1);
+        _clientId = CommandArgumentValue.AddArgument("id", "clientId", ["ServiceClient ID, must be unique"],
             true,
             1);
-        _clientName = CommandArgumentValue.AddArgument("n", "name", new[] { "Display name of client used for grants" },
+        _clientName = CommandArgumentValue.AddArgument("n", "name", ["Display name of client used for grants"],
             true,
             1);
     }
