@@ -65,7 +65,7 @@ internal class AddOAuthIdentityProvider : ServiceClientOctoCommand<IIdentityServ
             await ServiceClient.CreateIdentityProvider(identityProviderDto);
         }
 
-        Logger.LogInformation("ServiceClient \'{Name}\' at \'{ServiceClientServiceUri}\' created", name,
+        Logger.LogInformation("Identity provider \'{Name}\' at \'{ServiceClientServiceUri}\' created", name,
             ServiceClient.ServiceUri);
     }
 }

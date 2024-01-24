@@ -167,6 +167,7 @@ internal static class Program
         services.AddTransient<ICommand, AddOAuthIdentityProvider>();
         services.AddTransient<ICommand, AddOpenLdapIdentityProvider>();
         services.AddTransient<ICommand, AddActiveDirectoryIdentityProvider>();
+        services.AddTransient<ICommand, AddAzureEntryIdIdentityProvider>();
         services.AddTransient<ICommand, UpdateIdentityProvider>();
         services.AddTransient<ICommand, DeleteIdentityProvider>();
 
