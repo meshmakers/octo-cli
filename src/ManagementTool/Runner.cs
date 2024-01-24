@@ -3,6 +3,7 @@ using Meshmakers.Common.CommandLineParser;
 using Meshmakers.Common.CommandLineParser.Commands;
 using Meshmakers.Octo.Sdk.ServiceClient;
 using Meshmakers.Octo.Sdk.ServiceClient.Authentication;
+using Meshmakers.Octo.Sdk.ServiceClient.Authorization;
 using Microsoft.Extensions.Logging;
 
 namespace Meshmakers.Octo.Frontend.ManagementTool;
@@ -33,13 +34,11 @@ internal class Runner
         catch (MandatoryArgumentsMissingException ex)
         {
             _logger.LogError("{Message}", ex.Message);
-            _parser.ShowUsageInformation(Constants.OctoExeName);
             return -1;
         }
         catch (InvalidParameterException ex)
         {
             _logger.LogError("{Message}", ex.Message);
-            _parser.ShowUsageInformation(Constants.OctoExeName);
             return -1;
         }
         catch (ServiceConfigurationMissingException ex)
@@ -57,9 +56,15 @@ internal class Runner
             _logger.LogError("{Message}", ex.Message);
             return -3;
         }
+        catch (AuthorizationFailedException ex)
+        {
+            _logger.LogError("Authorization failed: {Message}", ex.Message);
+
+            return -4;
+        }
         catch (AuthenticationFailedException ex)
         {
-            _logger.LogError(ex, "Authentication failed: {Message}", ex.Message);
+            _logger.LogError("Authentication failed: {Message}", ex.Message);
 
             return -4;
         }
