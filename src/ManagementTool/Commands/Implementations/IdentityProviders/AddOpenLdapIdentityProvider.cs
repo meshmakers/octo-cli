@@ -9,8 +9,6 @@ namespace Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Ident
 
 internal class AddOpenLdapIdentityProvider : ServiceClientOctoCommand<IIdentityServicesClient>
 {
-    private readonly IArgument _accountName;
-    private readonly IArgument _accountPassword;
     private readonly IArgument _name;
     private readonly IArgument _enabled;
     private readonly IArgument _host;
@@ -32,11 +30,7 @@ internal class AddOpenLdapIdentityProvider : ServiceClientOctoCommand<IIdentityS
         _host = CommandArgumentValue.AddArgument("h", "host",
             ["Host"], true, 1);
         _port = CommandArgumentValue.AddArgument("p", "port",
-            ["Host"], true, 1);
-        _accountName = CommandArgumentValue.AddArgument("u", "userDistinguishedName",
-            ["DN for machine account for authentication"], true, 1);
-        _accountPassword = CommandArgumentValue.AddArgument("psw", "password",
-            ["Password for machine account for authentication"], true, 1);
+            ["Port of host"], true, 1);
         _userBaseDn = CommandArgumentValue.AddArgument("ubdn", "userBaseDn",
             ["User base DN, e. g. cn=users,dc=meshmakers,dc=cloud"], true, 1);
         _userNameAttribute = CommandArgumentValue.AddArgument("uan", "userAttributeName",
@@ -55,8 +49,6 @@ internal class AddOpenLdapIdentityProvider : ServiceClientOctoCommand<IIdentityS
             IsEnabled = CommandArgumentValue.GetArgumentScalarValue<bool>(_enabled),
             Host = CommandArgumentValue.GetArgumentScalarValue<string>(_host),
             Port = CommandArgumentValue.GetArgumentScalarValue<ushort>(_port),
-            UserDistinguishedName = CommandArgumentValue.GetArgumentScalarValue<string>(_accountName),
-            Password = CommandArgumentValue.GetArgumentScalarValue<string>(_accountPassword),
             UserBaseDn = CommandArgumentValue.GetArgumentScalarValue<string>(_userBaseDn),
             UserNameAttribute = CommandArgumentValue.GetArgumentScalarValue<string>(_userNameAttribute),
             Name = name
