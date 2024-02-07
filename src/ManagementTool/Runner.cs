@@ -34,6 +34,8 @@ internal class Runner
         catch (MandatoryArgumentsMissingException ex)
         {
             _logger.LogError("{Message}", ex.Message);
+            
+            _parser.ShowUsageInformation(Constants.OctoExeName);
             return -1;
         }
         catch (InvalidParameterException ex)
