@@ -1,7 +1,6 @@
 ﻿using System.Diagnostics;
 using Meshmakers.Common.CommandLineParser;
 using Meshmakers.Common.CommandLineParser.Commands;
-using Meshmakers.Octo.Communication.Contracts;
 using Meshmakers.Octo.Frontend.ManagementTool.Services;
 using Meshmakers.Octo.Sdk.ServiceClient.Authentication;
 using Microsoft.Extensions.Logging;
@@ -32,15 +31,15 @@ internal class LogInCommand : Command<OctoToolOptions>
 
         Logger.LogInformation("Device log-in at \'{ValueIdentityServiceUrl}\' in progress...", Options.Value.IdentityServiceUrl);
 
-        var apiScopes = CommonConstants.ApiScopes.IdentityApiFullAccess;
+        var apiScopes = Communication.Contracts.ApiScopes.IdentityApiFullAccess;
         if (!string.IsNullOrWhiteSpace(Options.Value.BotServiceUrl))
         {
-            apiScopes |= CommonConstants.ApiScopes.BotApiFullAccess;
+            apiScopes |= Communication.Contracts.ApiScopes.BotApiFullAccess;
         }
 
         if (!string.IsNullOrWhiteSpace(Options.Value.AssetServiceUrl))
         {
-            apiScopes |= CommonConstants.ApiScopes.AssetSystemApiFullAccess;
+            apiScopes |= Communication.Contracts.ApiScopes.AssetSystemApiFullAccess;
         }
 
         var response = await _authenticatorClient.RequestDeviceAuthorizationAsync(apiScopes);
