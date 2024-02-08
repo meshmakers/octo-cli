@@ -31,15 +31,15 @@ internal class LogInCommand : Command<OctoToolOptions>
 
         Logger.LogInformation("Device log-in at \'{ValueIdentityServiceUrl}\' in progress...", Options.Value.IdentityServiceUrl);
 
-        var apiScopes = Communication.Contracts.ApiScopes.IdentityApiFullAccess;
+        var apiScopes = Meshmakers.Octo.Communication.Contracts.ApiScopes.IdentityApiFullAccess;
         if (!string.IsNullOrWhiteSpace(Options.Value.BotServiceUrl))
         {
-            apiScopes |= Communication.Contracts.ApiScopes.BotApiFullAccess;
+            apiScopes |= Meshmakers.Octo.Communication.Contracts.ApiScopes.BotApiFullAccess;
         }
 
         if (!string.IsNullOrWhiteSpace(Options.Value.AssetServiceUrl))
         {
-            apiScopes |= Communication.Contracts.ApiScopes.AssetSystemApiFullAccess;
+            apiScopes |= Meshmakers.Octo.Communication.Contracts.ApiScopes.AssetSystemApiFullAccess;
         }
 
         var response = await _authenticatorClient.RequestDeviceAuthorizationAsync(apiScopes);

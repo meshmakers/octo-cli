@@ -10,6 +10,7 @@ using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.ApiScopes
 using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.ApiSecrets;
 using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Authentication;
 using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Clients;
+using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Communication;
 using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.IdentityProviders;
 using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.LargeBinaries;
 using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.NotificationMessages;
@@ -22,6 +23,7 @@ using Meshmakers.Octo.Sdk.ServiceClient.AssetRepositoryServices.System;
 using Meshmakers.Octo.Sdk.ServiceClient.AssetRepositoryServices.Tenants;
 using Meshmakers.Octo.Sdk.ServiceClient.Authentication;
 using Meshmakers.Octo.Sdk.ServiceClient.BotServices;
+using Meshmakers.Octo.Sdk.ServiceClient.CommunicationControllerServices;
 using Meshmakers.Octo.Sdk.ServiceClient.IdentityServices;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -127,6 +129,10 @@ internal static class Program
         services.AddOptions<BotServiceClientOptions>()
             .Configure<IOptions<OctoToolOptions>>(
                 (options, toolOptions) => { options.EndpointUri = toolOptions.Value.BotServiceUrl; });
+        
+        services.AddOptions<CommunicationServiceClientOptions>()
+            .Configure<IOptions<OctoToolOptions>>(
+                (options, toolOptions) => { options.EndpointUri = toolOptions.Value.CommunicationServiceUrl; });
 
         services.AddOptions<IdentityServiceClientOptions>()
             .Configure<IOptions<OctoToolOptions>>(
@@ -136,12 +142,14 @@ internal static class Program
         services.AddSingleton<IBotServiceClientAccessToken, ServiceClientAccessToken>();
         services.AddSingleton<IIdentityServiceClientAccessToken, ServiceClientAccessToken>();
         services.AddSingleton<IAssetServiceClientAccessToken, ServiceClientAccessToken>();
+        services.AddSingleton<ICommunicationServiceClientAccessToken, ServiceClientAccessToken>();
 
         services.AddSingleton<ITenantClient, TenantClient>();
         services.AddSingleton<IAssetServicesClient, AssetServicesClient>();
         services.AddSingleton<IIdentityServicesClient, IdentityServicesClient>();
         services.AddSingleton<IIdentityServicesSetupClient, IdentityServicesSetupClient>();
         services.AddSingleton<IBotServicesClient, BotServicesClient>();
+        services.AddSingleton<ICommunicationServicesClient, CommunicationServicesClient>();
         services.AddSingleton<IAuthenticatorClient, AuthenticatorClient>();
         services.AddSingleton<IAuthenticationService, AuthenticationService>();
         services.AddSingleton<INotificationRepository, WsNotificationRepository>();
@@ -223,6 +231,9 @@ internal static class Program
         services.AddTransient<ICommand, CreateApiResource>();
         services.AddTransient<ICommand, DeleteApiResource>();
         services.AddTransient<ICommand, UpdateApiResource>();
+        
+        services.AddTransient<ICommand, EnableCommunicationCommand>();
+        services.AddTransient<ICommand, DisableCommunicationCommand>();
 
         var serviceProvider = services.BuildServiceProvider();
         return serviceProvider;
