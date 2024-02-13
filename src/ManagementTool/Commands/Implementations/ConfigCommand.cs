@@ -28,9 +28,9 @@ internal class ConfigOctoCommand : Command<OctoToolOptions>
         _identityServicesUriArg = CommandArgumentValue.AddArgument("isu", "identityServicesUri",
             ["URI of identity services (e. g. 'https://localhost:5003/')"], true, 1);
         _communicationServicesUriArg = CommandArgumentValue.AddArgument("csu", "communicationServicesUri",
-            ["URI of communication services (e. g. 'https://localhost:5015/')"], true, 1);
+            ["URI of communication services (e. g. 'https://localhost:5015/')"], 1);
         _tenantIdArg = CommandArgumentValue.AddArgument("tid", "tenantId",
-            ["Id of tenant (e. g. 'myService')"], 1);
+            ["Id of tenant (e. g. 'meshtest')"], 1);
     }
 
     public override Task Execute()
