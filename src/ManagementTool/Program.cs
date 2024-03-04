@@ -245,8 +245,8 @@ internal static class Program
         services.AddTransient<ICommand, EnableCommunicationCommand>();
         services.AddTransient<ICommand, DisableCommunicationCommand>();
 
-        services.AddTransient<ICommand, EnableTimeseriesCommand>();
-        services.AddTransient<ICommand, DisableTimeseriesCommand>();
+        services.AddTransient<ICommand, EnableTimeSeriesCommand>();
+        services.AddTransient<ICommand, DisableTimeSeriesCommand>();
 
         var serviceProvider = services.BuildServiceProvider();
         return serviceProvider;

@@ -5,12 +5,12 @@ using Microsoft.Extensions.Options;
 
 namespace Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.TimeSeries;
 
-public class EnableTimeseriesCommand : ServiceClientOctoCommand<ITimeSeriesServicesClient>
+public class DisableTimeSeriesCommand : ServiceClientOctoCommand<ITimeSeriesServicesClient>
 {
-    public EnableTimeseriesCommand(ILogger<ServiceClientOctoCommand<ITimeSeriesServicesClient>> logger,
+    public DisableTimeSeriesCommand(ILogger<DisableTimeSeriesCommand> logger,
         IOptions<OctoToolOptions> options, ITimeSeriesServicesClient serviceClient,
-        IAuthenticationService authenticationService) : base(logger, "EnableTimeseries",
-        "Enable timeseries services for the current tenant.", options,
+        IAuthenticationService authenticationService) : base(logger, "DisableTimeSeries",
+        "Disable time series services for the current tenant.", options,
         serviceClient, authenticationService)
     {
     }
@@ -24,13 +24,13 @@ public class EnableTimeseriesCommand : ServiceClientOctoCommand<ITimeSeriesServi
         }
 
         
-        Logger.LogInformation("Enable timeseries for tenant \'{TenantId}\' at \'{ServiceClientServiceUri}\'",
+        Logger.LogInformation("Disable time series for tenant \'{TenantId}\' at \'{ServiceClientServiceUri}\'",
             Options.Value.TenantId,
             ServiceClient.ServiceUri);
 
-        await ServiceClient.EnableAsync(Options.Value.TenantId);
+        await ServiceClient.DisableAsync(Options.Value.TenantId);
 
-        Logger.LogInformation("Timeseries for tenant \'{ClientId}\' at \'{ServiceClientServiceUri}\' enabled",
+        Logger.LogInformation("Time series for tenant \'{ClientId}\' at \'{ServiceClientServiceUri}\' disabled",
             Options.Value.TenantId,
             ServiceClient.ServiceUri);
     }
