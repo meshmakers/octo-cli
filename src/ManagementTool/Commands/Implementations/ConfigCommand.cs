@@ -14,7 +14,6 @@ internal class ConfigOctoCommand : Command<OctoToolOptions>
     private readonly IConfigWriter _configWriter;
     private readonly IArgument _identityServicesUriArg;
     private readonly IArgument _tenantIdArg;
-    private readonly IArgument _timeSeriesSerrvicesUriArg;
 
     public ConfigOctoCommand(ILogger<ConfigOctoCommand> logger, IOptions<OctoToolOptions> options,
         IConfigWriter configWriter)
@@ -30,8 +29,6 @@ internal class ConfigOctoCommand : Command<OctoToolOptions>
             ["URI of identity services (e. g. 'https://localhost:5003/')"], true, 1);
         _communicationServicesUriArg = CommandArgumentValue.AddArgument("csu", "communicationServicesUri",
             ["URI of communication services (e. g. 'https://localhost:5015/')"], 1);
-        _timeSeriesSerrvicesUriArg = CommandArgumentValue.AddArgument("tsu", "timeSeriesServicesUri",
-            ["URI of timeseries services (e. g. 'https://localhost:5013/')"], 1);
         _tenantIdArg = CommandArgumentValue.AddArgument("tid", "tenantId",
             ["Id of tenant (e. g. 'meshtest')"], 1);
     }
@@ -52,10 +49,6 @@ internal class ConfigOctoCommand : Command<OctoToolOptions>
         Options.Value.CommunicationServiceUrl = CommandArgumentValue.IsArgumentUsed(_communicationServicesUriArg) ? 
             CommandArgumentValue.GetArgumentScalarValue<string>(_communicationServicesUriArg).ToLower() : null;
         
-        Options.Value.TimeSeriesUrl = CommandArgumentValue.IsArgumentUsed(_timeSeriesSerrvicesUriArg) ?
-            CommandArgumentValue.GetArgumentScalarValue<string>(_timeSeriesSerrvicesUriArg).ToLower() : null;
-
-
         if (CommandArgumentValue.IsArgumentUsed(_identityServicesUriArg))
         {
             Options.Value.IdentityServiceUrl =
