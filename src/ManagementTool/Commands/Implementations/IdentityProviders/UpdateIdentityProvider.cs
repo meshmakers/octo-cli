@@ -51,15 +51,20 @@ internal class UpdateIdentityProvider : ServiceClientOctoCommand<IIdentityServic
             return;
         }
 
+        var isEnabled = CommandArgumentValue.GetArgumentScalarValue<bool>(_enabled);
+        var clientId = CommandArgumentValue.GetArgumentScalarValue<string>(_clientId);
+        var clientSecret = CommandArgumentValue.GetArgumentScalarValueOrDefault<string>(_clientSecret);
+        var name = CommandArgumentValue.GetArgumentScalarValue<string>(_name);
+        
+
         if (identityProviderDto is GoogleIdentityProviderDto)
         {
             var newIdentityProviderDto = new GoogleIdentityProviderDto
             {
-                RtId = identityProviderDto.RtId,
-                IsEnabled = CommandArgumentValue.GetArgumentScalarValue<bool>(_enabled),
-                ClientId = CommandArgumentValue.GetArgumentScalarValue<string>(_clientId),
-                ClientSecret = CommandArgumentValue.GetArgumentScalarValueOrDefault<string>(_clientSecret),
-                Name = CommandArgumentValue.GetArgumentScalarValue<string>(_name)
+                IsEnabled = isEnabled,
+                ClientId = clientId,
+                ClientSecret = clientSecret,
+                Name = name,
             };
             await ServiceClient.UpdateIdentityProvider(rtId, newIdentityProviderDto);
         }
@@ -67,10 +72,20 @@ internal class UpdateIdentityProvider : ServiceClientOctoCommand<IIdentityServic
         {
             var newIdentityProviderDto = new MicrosoftIdentityProviderDto
             {
-                IsEnabled = CommandArgumentValue.GetArgumentScalarValue<bool>(_enabled),
-                ClientId = CommandArgumentValue.GetArgumentScalarValue<string>(_clientId),
-                ClientSecret = CommandArgumentValue.GetArgumentScalarValueOrDefault<string>(_clientSecret),
-                Name = CommandArgumentValue.GetArgumentScalarValue<string>(_name)
+                IsEnabled = isEnabled,
+                ClientId = clientId,
+                ClientSecret = clientSecret,
+                Name = name,
+            };
+            await ServiceClient.UpdateIdentityProvider(rtId, newIdentityProviderDto);
+        }else if (identityProviderDto is FacebookIdentityProviderDto)
+        {
+            var newIdentityProviderDto = new FacebookIdentityProviderDto()
+            {
+                IsEnabled = isEnabled,
+                ClientId = clientId,
+                ClientSecret = clientSecret,
+                Name = name,
             };
             await ServiceClient.UpdateIdentityProvider(rtId, newIdentityProviderDto);
         }

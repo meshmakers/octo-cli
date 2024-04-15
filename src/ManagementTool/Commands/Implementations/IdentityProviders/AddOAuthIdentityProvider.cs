@@ -31,13 +31,16 @@ internal class AddOAuthIdentityProvider : ServiceClientOctoCommand<IIdentityServ
         _clientSecret = CommandArgumentValue.AddArgument("cs", "clientSecret",
             ["ServiceClient secret, provided by provider"], true, 1);
         _type = CommandArgumentValue.AddArgument("t", "type",
-            ["Type of provider, available is 'google', 'microsoft'"], true, 1);
+            ["Type of provider, available are 'google', 'microsoft', 'facebook'"], true, 1);
     }
 
     public override async Task Execute()
     {
         var name = CommandArgumentValue.GetArgumentScalarValue<string>(_name);
         var type = CommandArgumentValue.GetArgumentScalarValue<IdentityProviderTypesDto>(_type);
+        var isEnabled = CommandArgumentValue.GetArgumentScalarValue<bool>(_enabled);
+        var clientId = CommandArgumentValue.GetArgumentScalarValue<string>(_clientId);
+        var clientSecret = CommandArgumentValue.GetArgumentScalarValueOrDefault<string>(_clientSecret);
 
         Logger.LogInformation("Creating OAuth identity provider \'{Name}\' at \'{ServiceClientServiceUri}\'", name,
             ServiceClient.ServiceUri);
@@ -46,9 +49,9 @@ internal class AddOAuthIdentityProvider : ServiceClientOctoCommand<IIdentityServ
         {
             var identityProviderDto = new GoogleIdentityProviderDto
             {
-                IsEnabled = CommandArgumentValue.GetArgumentScalarValue<bool>(_enabled),
-                ClientId = CommandArgumentValue.GetArgumentScalarValue<string>(_clientId),
-                ClientSecret = CommandArgumentValue.GetArgumentScalarValueOrDefault<string>(_clientSecret),
+                IsEnabled = isEnabled,
+                ClientId = clientId,
+                ClientSecret = clientSecret,
                 Name = name
             };
             await ServiceClient.CreateIdentityProvider(identityProviderDto);
@@ -57,9 +60,20 @@ internal class AddOAuthIdentityProvider : ServiceClientOctoCommand<IIdentityServ
         {
             var identityProviderDto = new MicrosoftIdentityProviderDto
             {
-                IsEnabled = CommandArgumentValue.GetArgumentScalarValue<bool>(_enabled),
-                ClientId = CommandArgumentValue.GetArgumentScalarValue<string>(_clientId),
-                ClientSecret = CommandArgumentValue.GetArgumentScalarValueOrDefault<string>(_clientSecret),
+                IsEnabled = isEnabled,
+                ClientId = clientId,
+                ClientSecret = clientSecret,
+                Name = name
+            };
+            await ServiceClient.CreateIdentityProvider(identityProviderDto);
+        }
+        else if (type == IdentityProviderTypesDto.Facebook)
+        {
+            var identityProviderDto = new FacebookIdentityProviderDto
+            {
+                IsEnabled = isEnabled,
+                ClientId = clientId,
+                ClientSecret = clientSecret,
                 Name = name
             };
             await ServiceClient.CreateIdentityProvider(identityProviderDto);
