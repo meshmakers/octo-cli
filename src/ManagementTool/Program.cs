@@ -26,7 +26,7 @@ using Meshmakers.Octo.Sdk.ServiceClient.Authentication;
 using Meshmakers.Octo.Sdk.ServiceClient.BotServices;
 using Meshmakers.Octo.Sdk.ServiceClient.CommunicationControllerServices;
 using Meshmakers.Octo.Sdk.ServiceClient.IdentityServices;
-using Meshmakers.Octo.Sdk.ServiceClient.TimeSeries;
+using Meshmakers.Octo.Sdk.ServiceClient.AssetRepositoryServices.StreamData;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -140,9 +140,9 @@ internal static class Program
             .Configure<IOptions<OctoToolOptions>>(
                 (options, toolOptions) => { options.EndpointUri = toolOptions.Value.IdentityServiceUrl; });
 
-        services.AddOptions<TimeSeriesServiceClientOptions>()
+        services.AddOptions<StreamDataServiceClientOptions>()
             .Configure<IOptions<OctoToolOptions>>(
-                (options, toolOptions) => options.EndpointUri = toolOptions.Value.TimeSeriesUrl
+                (options, toolOptions) => options.EndpointUri = toolOptions.Value.AssetServiceUrl
             );
 
 
@@ -151,7 +151,7 @@ internal static class Program
         services.AddSingleton<IIdentityServiceClientAccessToken, ServiceClientAccessToken>();
         services.AddSingleton<IAssetServiceClientAccessToken, ServiceClientAccessToken>();
         services.AddSingleton<ICommunicationServiceClientAccessToken, ServiceClientAccessToken>();
-        services.AddSingleton<ITimeSeriesServiceClientAccessToken, ServiceClientAccessToken>();
+        services.AddSingleton<IStreamDataServiceClientAccessToken, ServiceClientAccessToken>();
 
         services.AddSingleton<ITenantClient, TenantClient>();
         services.AddSingleton<IAssetServicesClient, AssetServicesClient>();
@@ -162,7 +162,7 @@ internal static class Program
         services.AddSingleton<IAuthenticatorClient, AuthenticatorClient>();
         services.AddSingleton<IAuthenticationService, AuthenticationService>();
         services.AddSingleton<INotificationRepository, WsNotificationRepository>();
-        services.AddSingleton<ITimeSeriesServicesClient, TimeSeriesServicesClient>();
+        services.AddSingleton<IStreamDataServicesClient, StreamDataServicesClient>();
 
         services.AddTransient<ICommand, ConfigOctoCommand>();
         services.AddTransient<ICommand, SetupCommand>();
@@ -245,8 +245,8 @@ internal static class Program
         services.AddTransient<ICommand, EnableCommunicationCommand>();
         services.AddTransient<ICommand, DisableCommunicationCommand>();
 
-        services.AddTransient<ICommand, EnableTimeSeriesCommand>();
-        services.AddTransient<ICommand, DisableTimeSeriesCommand>();
+        services.AddTransient<ICommand, EnableStreamDataCommand>();
+        services.AddTransient<ICommand, DisableStreamDataCommand>();
 
         var serviceProvider = services.BuildServiceProvider();
         return serviceProvider;

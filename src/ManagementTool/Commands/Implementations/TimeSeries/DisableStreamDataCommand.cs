@@ -1,16 +1,16 @@
 ﻿using Meshmakers.Octo.Frontend.ManagementTool.Services;
-using Meshmakers.Octo.Sdk.ServiceClient.TimeSeries;
+using Meshmakers.Octo.Sdk.ServiceClient.AssetRepositoryServices.StreamData;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
 namespace Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.TimeSeries;
 
-public class DisableTimeSeriesCommand : ServiceClientOctoCommand<ITimeSeriesServicesClient>
+public class DisableStreamDataCommand : ServiceClientOctoCommand<IStreamDataServicesClient>
 {
-    public DisableTimeSeriesCommand(ILogger<DisableTimeSeriesCommand> logger,
-        IOptions<OctoToolOptions> options, ITimeSeriesServicesClient serviceClient,
-        IAuthenticationService authenticationService) : base(logger, "DisableTimeSeries",
-        "Disable time series services for the current tenant.", options,
+    public DisableStreamDataCommand(ILogger<DisableStreamDataCommand> logger,
+        IOptions<OctoToolOptions> options, IStreamDataServicesClient serviceClient,
+        IAuthenticationService authenticationService) : base(logger, "DisableStreamData",
+        "Disable stream data services for the current tenant.", options,
         serviceClient, authenticationService)
     {
     }
@@ -24,13 +24,13 @@ public class DisableTimeSeriesCommand : ServiceClientOctoCommand<ITimeSeriesServ
         }
 
         
-        Logger.LogInformation("Disable time series for tenant \'{TenantId}\' at \'{ServiceClientServiceUri}\'",
+        Logger.LogInformation("Disable stream data for tenant \'{TenantId}\' at \'{ServiceClientServiceUri}\'",
             Options.Value.TenantId,
             ServiceClient.ServiceUri);
 
         await ServiceClient.DisableAsync(Options.Value.TenantId);
 
-        Logger.LogInformation("Time series for tenant \'{ClientId}\' at \'{ServiceClientServiceUri}\' disabled",
+        Logger.LogInformation("Stream data for tenant \'{ClientId}\' at \'{ServiceClientServiceUri}\' disabled",
             Options.Value.TenantId,
             ServiceClient.ServiceUri);
     }
