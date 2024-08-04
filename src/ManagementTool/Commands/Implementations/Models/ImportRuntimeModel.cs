@@ -47,7 +47,7 @@ internal class ImportRuntimeModel : JobWithWaitOctoCommand
 
         Logger.LogInformation("Importing runtime model \'{RtModelFilePath}\'", rtModelFilePath);
 
-        var id = await _assetServicesClient.ImportRtModel(tenantId, rtModelFilePath);
+        var id = await _assetServicesClient.ImportRtModelAsync(tenantId, rtModelFilePath);
         Logger.LogInformation("Runtime model import id \'{Id}\' has been started", id);
         await WaitForJob(id);
     }

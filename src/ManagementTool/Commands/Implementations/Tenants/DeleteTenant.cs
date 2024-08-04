@@ -25,7 +25,7 @@ internal class DeleteTenant : ServiceClientOctoCommand<IAssetServicesClient>
         Logger.LogInformation("Deleting tenant \'{TenantId}\' on at \'{ServiceClientServiceUri}\'", tenantId,
             ServiceClient.ServiceUri);
 
-        await ServiceClient.DeleteTenant(tenantId);
+        await ServiceClient.DeleteTenantAsync(tenantId);
 
         Logger.LogInformation("Tenant \'{TenantId}\' on at \'{ServiceClientServiceUri}\' deleted", tenantId,
             ServiceClient.ServiceUri);

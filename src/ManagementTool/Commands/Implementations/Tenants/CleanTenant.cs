@@ -27,7 +27,7 @@ internal class CleanTenant : ServiceClientOctoCommand<IAssetServicesClient>
         Logger.LogInformation("Cleaning tenant \'{TenantId}\' on at \'{ServiceClientServiceUri}\'", tenantId,
             ServiceClient.ServiceUri);
 
-        await ServiceClient.CleanTenant(tenantId);
+        await ServiceClient.CleanTenantAsync(tenantId);
 
         Logger.LogInformation("Tenant \'{TenantId}\' on at \'{ServiceClientServiceUri}\' cleaned", tenantId,
             ServiceClient.ServiceUri);

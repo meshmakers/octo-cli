@@ -44,7 +44,7 @@ internal class ImportConstructionKitModel : JobWithWaitOctoCommand
 
         Logger.LogInformation("Importing construction kit model \'{CkModelFilePath}\'", ckModelFilePath);
 
-        var id = await _assetServicesClient.ImportCkModel(tenantId, ckModelFilePath);
+        var id = await _assetServicesClient.ImportCkModelAsync(tenantId, ckModelFilePath);
         Logger.LogInformation("Construction kit model import id \'{Id}\' has been started", id);
         await WaitForJob(id);
     }

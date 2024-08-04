@@ -31,7 +31,7 @@ internal class AttachTenant : ServiceClientOctoCommand<IAssetServicesClient>
             "Attach tenant \'{TenantId}\' (database \'{DatabaseName}\') at \'{ServiceClientServiceUri}\'", tenantId,
             databaseName, ServiceClient.ServiceUri);
 
-        await ServiceClient.AttachTenant(tenantId, databaseName);
+        await ServiceClient.AttachTenantAsync(tenantId, databaseName);
 
         Logger.LogInformation(
             "Tenant \'{TenantId}\' (database \'{DatabaseName}\') at \'{ServiceClientServiceUri}\' added", tenantId,

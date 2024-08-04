@@ -25,7 +25,7 @@ internal class DetachTenant : ServiceClientOctoCommand<IAssetServicesClient>
         Logger.LogInformation("Detach tenant \'{TenantId}\' at \'{ServiceClientServiceUri}\'", tenantId,
             ServiceClient.ServiceUri);
 
-        await ServiceClient.DetachTenant(tenantId);
+        await ServiceClient.DetachTenantAsync(tenantId);
 
         Logger.LogInformation("Tenant \'{TenantId}\' at \'{ServiceClientServiceUri}\' detached", tenantId,
             ServiceClient.ServiceUri);

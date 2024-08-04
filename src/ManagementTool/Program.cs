@@ -13,6 +13,7 @@ using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Clients;
 using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Communication;
 using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.IdentityProviders;
 using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.LargeBinaries;
+using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Models;
 using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.NotificationMessages;
 using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Roles;
 using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.ServiceHooks;
@@ -172,7 +173,8 @@ internal static class Program
 
         services.AddTransient<ICommand, ImportConstructionKitModel>();
         services.AddTransient<ICommand, ImportRuntimeModel>();
-        services.AddTransient<ICommand, ExportRuntimeModel>();
+        services.AddTransient<ICommand, ExportRuntimeModelByQuery>();
+        services.AddTransient<ICommand, ExportRuntimeModelByDeepGraph>();
 
         services.AddTransient<ICommand, GetClients>();
         services.AddTransient<ICommand, AddAuthorizationCodeClient>();

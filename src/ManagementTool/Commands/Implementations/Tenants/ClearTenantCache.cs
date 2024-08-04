@@ -25,7 +25,7 @@ internal class ClearTenantCache : ServiceClientOctoCommand<IAssetServicesClient>
         Logger.LogInformation("Clearing cache tenant \'{TenantId}\' on at \'{ServiceClientServiceUri}\'", tenantId,
             ServiceClient.ServiceUri);
 
-        await ServiceClient.ClearTenantCache(tenantId);
+        await ServiceClient.ClearTenantCacheAsync(tenantId);
 
         Logger.LogInformation("Tenant cache \'{TenantId}\' on at \'{ServiceClientServiceUri}\' cleared", tenantId,
             ServiceClient.ServiceUri);

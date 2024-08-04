@@ -30,7 +30,7 @@ internal class CreateTenant : ServiceClientOctoCommand<IAssetServicesClient>
             "Creating tenant \'{TenantId}\' (database \'{DatabaseName}\') at \'{ServiceClientServiceUri}\'", tenantId,
             databaseName, ServiceClient.ServiceUri);
 
-        await ServiceClient.CreateTenant(tenantId, databaseName);
+        await ServiceClient.CreateTenantAsync(tenantId, databaseName);
 
         Logger.LogInformation(
             "Tenant \'{TenantId}\' (database \'{DatabaseName}\') at \'{ServiceClientServiceUri}\' created", tenantId,

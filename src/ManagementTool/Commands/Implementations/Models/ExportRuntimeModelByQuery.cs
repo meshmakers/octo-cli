@@ -7,19 +7,19 @@ using Meshmakers.Octo.Sdk.ServiceClient.BotServices;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
-namespace Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations;
+namespace Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Models;
 
-internal class ExportRuntimeModel : JobOctoCommand
+internal class ExportRuntimeModelByQuery : JobOctoCommand
 {
     private readonly IAssetServicesClient _assetServicesClient;
     private readonly IArgument _fileArg;
     private readonly IArgument _queryIdArg;
 
-    public ExportRuntimeModel(ILogger<ExportRuntimeModel> logger, IOptions<OctoToolOptions> options,
+    public ExportRuntimeModelByQuery(ILogger<ExportRuntimeModelByQuery> logger, IOptions<OctoToolOptions> options,
         IAssetServicesClient assetServicesClient, IBotServicesClient botServiceClient,
         IAuthenticationService authenticationService)
-        : base(logger, "ExportRt",
-            "Schedules an export job for runtime files. File is specified using -f argument. The file is downloaded in ZIP-format after job is finished.",
+        : base(logger, "ExportRtByQuery",
+            "Schedules a job to export runtime models using a query. File is specified using -f argument. The file is downloaded in ZIP-format after job is finished.",
             options, botServiceClient, authenticationService)
     {
         _assetServicesClient = assetServicesClient;
@@ -33,10 +33,7 @@ internal class ExportRuntimeModel : JobOctoCommand
     {
         await base.PreValidate();
 
-        if (_assetServicesClient.AccessToken != null && ServiceClient.AccessToken != null)
-        {
-            _assetServicesClient.AccessToken.AccessToken = ServiceClient.AccessToken.AccessToken;
-        }
+        _assetServicesClient.AccessToken.AccessToken = ServiceClient.AccessToken.AccessToken;
     }
 
     public override async Task Execute()
@@ -53,7 +50,7 @@ internal class ExportRuntimeModel : JobOctoCommand
         Logger.LogInformation("Exporting runtime data of query \'{QueryId}\' to \'{RtModelFilePath}\'", queryId,
             rtModelFilePath);
 
-        var id = await _assetServicesClient.ExportRtModel(tenantId, queryId);
+        var id = await _assetServicesClient.ExportRtModelByQueryAsync(tenantId, queryId);
         Logger.LogInformation("Runtime model export id \'{Id}\' has been started", id);
         await WaitForJob(id);
 
