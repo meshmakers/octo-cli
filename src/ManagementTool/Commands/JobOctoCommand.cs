@@ -27,14 +27,14 @@ internal abstract class JobOctoCommand : Command<OctoToolOptions>
         await _authenticationService.EnsureAuthenticated(ServiceClient.AccessToken);
     }
 
-    protected async Task DownloadJobResultAsync(string id, string filePath)
+    protected async Task DownloadJobResultAsync(string tenantId, string id, string filePath)
     {
-        Logger.LogInformation("Downloading file of job \'{Id}\'", id);
+        Logger.LogInformation("[{TenantId}] Downloading file of job \'{Id}\'", tenantId, id);
 
-        var responseContent = await ServiceClient.DownloadExportRtResultAsync(id);
+        var responseContent = await ServiceClient.DownloadExportRtResultAsync(tenantId, id);
 
         await File.WriteAllBytesAsync(filePath, responseContent);
-        Logger.LogInformation("File downloaded at \'{FilePath}\'", filePath);
+        Logger.LogInformation("[{TenantId}] File downloaded at \'{FilePath}\'", tenantId, filePath);
     }
 
     protected virtual async Task WaitForJob(string id)

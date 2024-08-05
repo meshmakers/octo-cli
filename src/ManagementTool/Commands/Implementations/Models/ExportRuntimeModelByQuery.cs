@@ -54,6 +54,6 @@ internal class ExportRuntimeModelByQuery : JobOctoCommand
         Logger.LogInformation("Runtime model export id \'{Id}\' has been started", id);
         await WaitForJob(id);
 
-        await DownloadJobResultAsync(id, rtModelFilePath);
+        await DownloadJobResultAsync(tenantId, id, rtModelFilePath);
     }
 }
