@@ -9,6 +9,7 @@ using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.ApiResour
 using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.ApiScopes;
 using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.ApiSecrets;
 using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Authentication;
+using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Certificates;
 using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Clients;
 using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Communication;
 using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.IdentityProviders;
@@ -249,6 +250,8 @@ internal static class Program
 
         services.AddTransient<ICommand, EnableStreamDataCommand>();
         services.AddTransient<ICommand, DisableStreamDataCommand>();
+        
+        services.AddTransient<ICommand, GenerateOperatorCertificatesCommand>();
 
         var serviceProvider = services.BuildServiceProvider();
         return serviceProvider;
