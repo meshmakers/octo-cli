@@ -26,7 +26,7 @@
         <OctoVersion Condition="'$(Configuration)'=='DebugL'">999.0.0</OctoVersion>
         <OctoVersion Condition="'$(OctoNugetPrivateServer)'!='' And '$(OctoVersion)'==''">0.0.*</OctoVersion>
         <OctoVersion Condition="'$(OctoNugetPrivateServer)'=='' And '$(OctoVersion)'==''">3.1.*</OctoVersion>
-        <MeshmakerVersion>4.0.2408.8001</MeshmakerVersion>
+        <MeshmakerVersion>4.0.2408.21007</MeshmakerVersion>
         <MeshmakerVersion Condition="'$(Configuration)'=='DebugL'">999.0.0</MeshmakerVersion>
         <Version Condition="'$(Configuration)'=='DebugL'">999.0.0</Version>
         <PackageVersion Condition="'$(Configuration)'=='DebugL'">999.0.0</PackageVersion>
