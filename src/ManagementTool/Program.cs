@@ -23,6 +23,7 @@ using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Tenants;
 using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.TimeSeries;
 using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Users;
 using Meshmakers.Octo.Frontend.ManagementTool.Services;
+using Meshmakers.Octo.Sdk.ServiceClient.AdminPanel.System;
 using Meshmakers.Octo.Sdk.ServiceClient.AssetRepositoryServices.System;
 using Meshmakers.Octo.Sdk.ServiceClient.AssetRepositoryServices.Tenants;
 using Meshmakers.Octo.Sdk.ServiceClient.Authentication;
@@ -148,11 +149,15 @@ internal static class Program
                 (options, toolOptions) => options.EndpointUri = toolOptions.Value.AssetServiceUrl
             );
 
+        services.AddOptions<AdminPanelClientOptions>()
+            .Configure<IOptions<OctoToolOptions>>(
+                (options, toolOptions) => { options.EndpointUri = toolOptions.Value.AdminPanelUrl; });
 
         services.AddSingleton<ITenantClientAccessToken, ServiceClientAccessToken>();
         services.AddSingleton<IBotServiceClientAccessToken, ServiceClientAccessToken>();
         services.AddSingleton<IIdentityServiceClientAccessToken, ServiceClientAccessToken>();
         services.AddSingleton<IAssetServiceClientAccessToken, ServiceClientAccessToken>();
+        services.AddSingleton<IAdminPanelClientAccessToken, ServiceClientAccessToken>();
         services.AddSingleton<ICommunicationServiceClientAccessToken, ServiceClientAccessToken>();
         services.AddSingleton<IStreamDataServiceClientAccessToken, ServiceClientAccessToken>();
 
@@ -166,6 +171,7 @@ internal static class Program
         services.AddSingleton<IAuthenticationService, AuthenticationService>();
         services.AddSingleton<INotificationRepository, WsNotificationRepository>();
         services.AddSingleton<IStreamDataServicesClient, StreamDataServicesClient>();
+        services.AddSingleton<IAdminPanelClient, AdminPanelClient>();
 
         services.AddTransient<ICommand, ConfigOctoCommand>();
         services.AddTransient<ICommand, SetupCommand>();
@@ -254,7 +260,7 @@ internal static class Program
         
         services.AddTransient<ICommand, GenerateOperatorCertificatesCommand>();
         
-        services.AddTransient<ICommand, ReconfigureMinLogLevel>();
+        services.AddTransient<ICommand, ReconfigureLogLevel>();
 
         var serviceProvider = services.BuildServiceProvider();
         return serviceProvider;
