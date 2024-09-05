@@ -12,6 +12,7 @@ using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Authentic
 using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Certificates;
 using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Clients;
 using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Communication;
+using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Diagnostics;
 using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.IdentityProviders;
 using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.LargeBinaries;
 using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Models;
@@ -252,6 +253,8 @@ internal static class Program
         services.AddTransient<ICommand, DisableStreamDataCommand>();
         
         services.AddTransient<ICommand, GenerateOperatorCertificatesCommand>();
+        
+        services.AddTransient<ICommand, ReconfigureMinLogLevel>();
 
         var serviceProvider = services.BuildServiceProvider();
         return serviceProvider;

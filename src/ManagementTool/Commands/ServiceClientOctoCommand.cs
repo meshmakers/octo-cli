@@ -1,4 +1,3 @@
-using System.Threading.Tasks;
 using Meshmakers.Common.CommandLineParser.Commands;
 using Meshmakers.Octo.Frontend.ManagementTool.Services;
 using Meshmakers.Octo.Sdk.ServiceClient;
@@ -7,25 +6,20 @@ using Microsoft.Extensions.Options;
 
 namespace Meshmakers.Octo.Frontend.ManagementTool.Commands;
 
-public abstract class ServiceClientOctoCommand<TServiceClientType> : Command<OctoToolOptions>
+public abstract class ServiceClientOctoCommand<TServiceClientType>(
+    ILogger<ServiceClientOctoCommand<TServiceClientType>> logger,
+    string commandValue,
+    string commandDescription,
+    IOptions<OctoToolOptions> options,
+    TServiceClientType serviceClient,
+    IAuthenticationService authenticationService)
+    : Command<OctoToolOptions>(logger, commandValue, commandDescription, options)
     where TServiceClientType : IServiceClient
 {
-    private readonly IAuthenticationService _authenticationService;
-
-
-    protected ServiceClientOctoCommand(ILogger<ServiceClientOctoCommand<TServiceClientType>> logger,
-        string commandValue, string commandDescription, IOptions<OctoToolOptions> options,
-        TServiceClientType serviceClient, IAuthenticationService authenticationService)
-        : base(logger, commandValue, commandDescription, options)
-    {
-        _authenticationService = authenticationService;
-        ServiceClient = serviceClient;
-    }
-
-    protected TServiceClientType ServiceClient { get; }
+    protected TServiceClientType ServiceClient { get; } = serviceClient;
 
     public override async Task PreValidate()
     {
-        await _authenticationService.EnsureAuthenticated(ServiceClient.AccessToken);
+        await authenticationService.EnsureAuthenticated(ServiceClient.AccessToken);
     }
 }
