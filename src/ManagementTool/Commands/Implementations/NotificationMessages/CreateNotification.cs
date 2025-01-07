@@ -1,12 +1,11 @@
 using Meshmakers.Common.CommandLineParser;
 using Meshmakers.Octo.Communication.Contracts.DataTransferObjects;
-using Meshmakers.Octo.Communication.Contracts.Services;
 using Meshmakers.Octo.ConstructionKit.Contracts;
 using Meshmakers.Octo.Frontend.ManagementTool.Services;
 using Meshmakers.Octo.Sdk.ServiceClient.AssetRepositoryServices.Tenants;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-
+/*
 namespace Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.NotificationMessages;
 
 internal class CreateNotification : ServiceClientOctoCommand<ITenantClient>
@@ -96,3 +95,4 @@ internal class CreateNotification : ServiceClientOctoCommand<ITenantClient>
         Logger.LogInformation("Notification message added");
     }
 }
+*/

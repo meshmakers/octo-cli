@@ -1,13 +1,12 @@
 using Meshmakers.Common.CommandLineParser;
 using Meshmakers.Common.Shared.Services;
 using Meshmakers.Octo.Communication.Contracts.DataTransferObjects;
-using Meshmakers.Octo.Communication.Contracts.Services;
 using Meshmakers.Octo.Frontend.ManagementTool.Services;
 using Meshmakers.Octo.Sdk.ServiceClient.AssetRepositoryServices.Tenants;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Newtonsoft.Json;
-
+/*
 namespace Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.NotificationMessages;
 
 internal class GetNotificationMessages : ServiceClientOctoCommand<ITenantClient>
@@ -56,3 +55,4 @@ internal class GetNotificationMessages : ServiceClientOctoCommand<ITenantClient>
         _consoleService.WriteLine(resultString);
     }
 }
+*/

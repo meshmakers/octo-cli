@@ -3,7 +3,6 @@ using Meshmakers.Common.CommandLineParser.Commands;
 using Meshmakers.Common.Configuration;
 using Meshmakers.Common.Shared.Services;
 using Meshmakers.Octo.Communication.Contracts;
-using Meshmakers.Octo.Communication.Contracts.Services;
 using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations;
 using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.ApiResources;
 using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.ApiScopes;
@@ -16,7 +15,6 @@ using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Diagnosti
 using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.IdentityProviders;
 using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.LargeBinaries;
 using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Models;
-using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.NotificationMessages;
 using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Roles;
 using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.ServiceHooks;
 using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Tenants;
@@ -169,7 +167,7 @@ internal static class Program
         services.AddSingleton<ICommunicationServicesClient, CommunicationServicesClient>();
         services.AddSingleton<IAuthenticatorClient, AuthenticatorClient>();
         services.AddSingleton<IAuthenticationService, AuthenticationService>();
-        services.AddSingleton<INotificationRepository, WsNotificationRepository>();
+        //services.AddSingleton<INotificationRepository, WsNotificationRepository>();
         services.AddSingleton<IStreamDataServicesClient, StreamDataServicesClient>();
         services.AddSingleton<IAdminPanelClient, AdminPanelClient>();
 
@@ -238,12 +236,12 @@ internal static class Program
         services.AddTransient<ICommand, CreateServiceHook>();
         services.AddTransient<ICommand, UpdateServiceHook>();
         services.AddTransient<ICommand, DeleteServiceHook>();
-
+/*
         services.AddTransient<ICommand, GetNotificationMessages>();
         services.AddTransient<ICommand, CreateNotification>();
         services.AddTransient<ICommand, CompletePendingNotifications>();
         services.AddTransient<ICommand, ResetNotificationsInError>();
-
+*/
         services.AddTransient<ICommand, CreateLargeBinary>();
         services.AddTransient<ICommand, DownloadLargeBinary>();
 
