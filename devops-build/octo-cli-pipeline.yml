@@ -12,8 +12,6 @@ trigger:
 
 variables:
   - group: ApiKeys
-  - group: GitSSHGroup
-  - group: ApiKeys
   - group: OctoDefault
   - name: isRelease
     value: ${{ startsWith(variables['Build.SourceBranch'], 'refs/tags/r') }}
@@ -27,7 +25,6 @@ steps:
 - template: update-build-number.yml
 - checkout: self
   clean: true
-  submodules: recursive  
 - template: set-version.yml
 - template: dotnet-publish-to-zip.yml
   parameters:
