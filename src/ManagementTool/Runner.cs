@@ -26,6 +26,7 @@ internal class Runner
             _logger.LogInformation("Octo Mesh Management Tool, Version {ProductVersion}",
                 GetProductVersion());
             _logger.LogInformation("{Copyright}", GetCopyright());
+            _logger.LogInformation("Executable directory: {BinDirectory}", GetBinDirectory());
 
             await _parser.ParseAndValidateAsync();
 
@@ -103,5 +104,10 @@ internal class Runner
             return "Development version";
         }
         return attribute.Copyright;
+    }
+    
+    private static string GetBinDirectory()
+    {
+        return AppContext.BaseDirectory;
     }
 }
