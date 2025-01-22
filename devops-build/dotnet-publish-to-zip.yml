@@ -17,9 +17,3 @@ steps:
     zipAfterPublish: true
     modifyOutputPath: false
 
-- task: PublishBuildArtifacts@1
-  displayName: Publish ${{ parameters.exeName }} ${{ parameters.runtime }}
-  inputs:
-    PathtoPublish: '$(Build.ArtifactStagingDirectory)/octo-cli-$(Build.BuildNumber)-${{ parameters.runtime }}'
-    ArtifactName: local
-    publishLocation: 'Container'
