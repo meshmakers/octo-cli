@@ -21,5 +21,5 @@ steps:
   displayName: Publish ${{ parameters.exeName }} ${{ parameters.runtime }}
   inputs:
     PathtoPublish: '$(Build.ArtifactStagingDirectory)/octo-cli-$(Build.BuildNumber)-${{ parameters.runtime }}'
-    ArtifactName: 'octo-cli'
+    ArtifactName: local
     publishLocation: 'Container'

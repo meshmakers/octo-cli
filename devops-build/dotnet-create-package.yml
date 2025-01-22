@@ -30,5 +30,5 @@ steps:
     displayName: Publish metadata for package managers
     inputs:
       PathtoPublish: '$(Build.ArtifactStagingDirectory)/packages/'
-      ArtifactName: 'octo-cli'
+      ArtifactName: local
       publishLocation: 'Container'
