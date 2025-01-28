@@ -13,7 +13,7 @@ steps:
     command: 'publish'
     publishWebProjects: false
     projects: ${{ parameters.project }}
-    arguments: '-c Release -r ${{ parameters.runtime }} /p:OctoNugetPrivateServer=$(nugetPrivateServer) /p:DebugType=None /p:DebugSymbols=false --output $(Build.ArtifactStagingDirectory)/${{ parameters.exeName }}-$(Build.BuildNumber)-${{ parameters.runtime }}'
+    arguments: '-c Release -r ${{ parameters.runtime }} /p:OctoNugetPrivateServer=$(nugetPrivateServer) /p:DebugType=None /p:DebugSymbols=false --output $(Build.ArtifactStagingDirectory)/setup/${{ parameters.exeName }}-$(Build.BuildNumber)-${{ parameters.runtime }}'
     zipAfterPublish: true
     modifyOutputPath: false
 

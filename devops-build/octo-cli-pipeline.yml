@@ -41,5 +41,5 @@ steps:
     exeName: 'octo-cli'
     runtime: 'win-x64'
     project: 'src/ManagementTool/*.csproj' 
-- template: dotnet-create-package.yml
+#- template: dotnet-create-package.yml
 - template: handle-artifacts.yml
