@@ -16,4 +16,14 @@ steps:
     arguments: '-c Release -r ${{ parameters.runtime }} /p:OctoNugetPrivateServer=$(nugetPrivateServer) /p:DebugType=None /p:DebugSymbols=false --output $(Build.ArtifactStagingDirectory)/setup/${{ parameters.exeName }}-$(Build.BuildNumber)-${{ parameters.runtime }}'
     zipAfterPublish: true
     modifyOutputPath: false
+- task: CopyFiles@2
+  inputs:
+    SourceFolder: $(Build.ArtifactStagingDirectory)/setup/${{ parameters.exeName }}-$(Build.BuildNumber)-${{ parameters.runtime }}
+    Contents: '*.zip' 
+    TargetFolder: $(Build.ArtifactStagingDirectory)/setup/
+- task: DeleteFiles@1
+  inputs:
+    SourceFolder: $(Build.ArtifactStagingDirectory)/setup/
+    Contents: ${{ parameters.exeName }}-$(Build.BuildNumber)-${{ parameters.runtime }}
+
 
