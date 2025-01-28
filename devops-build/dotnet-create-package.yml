@@ -14,7 +14,7 @@ steps:
         $file = "$destinationDir/octo-cli/octo-cli.nuspec"
         $content = Get-Content -Path $file
         $updatedContent = $content -replace '__VERSION__', "$(Build.BuildNumber)"
-        $updatedContent = $content -replace '__YEAR__', $year
+        $updatedContent = $updatedContent -replace '__YEAR__', $year
         Set-Content -Path $file -Value $updatedContent
         
         $file = "$(Build.ArtifactStagingDirectory)/setup/octo-cli-$(Build.BuildNumber)-win-x64.zip"
