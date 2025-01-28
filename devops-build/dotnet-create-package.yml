@@ -15,7 +15,7 @@ steps:
         $updatedContent = $content -replace '__VERSION__', "$(Build.BuildNumber)"
         Set-Content -Path $file -Value $updatedContent
         
-        $file = "$(Build.ArtifactStagingDirectory)/octo-cli-$(Build.BuildNumber)-win-x64/octo-cli-$(Build.BuildNumber)-win-x64.zip"
+        $file = "$(Build.ArtifactStagingDirectory)/setup/octo-cli-$(Build.BuildNumber)-win-x64.zip"
         $sha512Checksum = Get-FileHash -Algorithm SHA512 -Path $file
         $sha512Hash = $sha512Checksum.Hash
         Write-Host "SHA-512 Checksum for $file"
@@ -26,9 +26,3 @@ steps:
         $updatedContent = $content -replace '__VERSION__', "$(Build.BuildNumber)"
         $updatedContent = $updatedContent -replace '__CHECKSUM__', "$sha512Hash"
         Set-Content -Path $file -Value $updatedContent
-  - task: PublishBuildArtifacts@1
-    displayName: Publish metadata for package managers
-    inputs:
-      PathtoPublish: '$(Build.ArtifactStagingDirectory)/packages/'
-      ArtifactName: local
-      publishLocation: 'Container'
