@@ -17,11 +17,13 @@ steps:
     zipAfterPublish: true
     modifyOutputPath: false
 - task: CopyFiles@2
+  displayName: Collecting zip files for ${{ parameters.exeName }} ${{ parameters.runtime }}
   inputs:
     SourceFolder: $(Build.ArtifactStagingDirectory)/setup/${{ parameters.exeName }}-$(Build.BuildNumber)-${{ parameters.runtime }}
     Contents: '*.zip' 
     TargetFolder: $(Build.ArtifactStagingDirectory)/setup/
 - task: DeleteFiles@1
+  displayName: Cleaning output folder ${{ parameters.exeName }} ${{ parameters.runtime }}
   inputs:
     SourceFolder: $(Build.ArtifactStagingDirectory)/setup/
     Contents: ${{ parameters.exeName }}-$(Build.BuildNumber)-${{ parameters.runtime }}
