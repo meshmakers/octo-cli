@@ -10,9 +10,11 @@ steps:
         $destinationDir = '$(Build.ArtifactStagingDirectory)/packages/chocolatey/'
         Copy-Item -Path $sourcesDir -Destination $destinationDir -Recurse
         
+        $year = (Get-Date).Year;
         $file = "$destinationDir/octo-cli/octo-cli.nuspec"
         $content = Get-Content -Path $file
         $updatedContent = $content -replace '__VERSION__', "$(Build.BuildNumber)"
+        $updatedContent = $content -replace '__YEAR__', $year
         Set-Content -Path $file -Value $updatedContent
         
         $file = "$(Build.ArtifactStagingDirectory)/setup/octo-cli-$(Build.BuildNumber)-win-x64.zip"

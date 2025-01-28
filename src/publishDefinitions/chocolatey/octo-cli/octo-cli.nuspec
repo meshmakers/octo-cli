@@ -10,7 +10,7 @@
         <projectUrl>https://www.meshmakers.io</projectUrl>
         <bugTrackerUrl>https://github.com/meshmakers/octo-cli/issues</bugTrackerUrl>
         <iconUrl>https://meshdownload.blob.core.windows.net/assets/meshmakers64.png</iconUrl>
-        <copyright>2023 meshmakers GmbH and Contributors</copyright>
+        <copyright>__YEAR__ meshmakers GmbH and Contributors</copyright>
         <licenseUrl>https://meshdownload.blob.core.windows.net/assets/LICENSE</licenseUrl>
         <requireLicenseAcceptance>true</requireLicenseAcceptance>
         <projectSourceUrl>https://github.com/meshmakers/octo-cli/</projectSourceUrl>
