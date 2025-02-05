@@ -41,7 +41,7 @@ internal class UpdateServiceHook : ServiceClientOctoCommand<ITenantClient>
         _filterArg = CommandArgumentValue.AddArgument("f", "filter", [
                 "Filter arguments in form \"'{AttributeName}' {Operator} '{Value}'\"",
                 "Sample: \"'State' Equals '2'\"",
-                "Attribute name must be a valid argument of the defined entity",
+                "Attribute path must be a valid argument of the defined entity",
                 $"Possible operators: {string.Join(", ", Enum.GetNames(typeof(FieldFilterOperatorDto)))} ",
                 "Value must be a string, integer, double, boolean, DateTime"
             ],
@@ -96,7 +96,7 @@ internal class UpdateServiceHook : ServiceClientOctoCommand<ITenantClient>
                 var comparisionValue = terms[2].Trim('\'');
 
                 fieldFilters.Add(new FieldFilterDto
-                    { AttributeName = attribute, Operator = operatorDto, ComparisonValue = comparisionValue });
+                    { AttributePath = attribute, Operator = operatorDto, ComparisonValue = comparisionValue });
             }
         }
 

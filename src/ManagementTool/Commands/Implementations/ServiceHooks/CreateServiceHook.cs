@@ -84,7 +84,7 @@ internal class CreateServiceHook : ServiceClientOctoCommand<ITenantClient>
             var comparisionValue = terms[2].Trim('\'');
 
             fieldFilters.Add(new FieldFilterDto
-                { AttributeName = attribute, Operator = operatorDto, ComparisonValue = comparisionValue });
+                { AttributePath = attribute, Operator = operatorDto, ComparisonValue = comparisionValue });
         }
 
         var createServiceHookDto = new ServiceHookMutationDto
