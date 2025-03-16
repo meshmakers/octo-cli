@@ -15,6 +15,7 @@ using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Diagnosti
 using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.IdentityProviders;
 using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.LargeBinaries;
 using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Models;
+using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Reporting;
 using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Roles;
 using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.ServiceHooks;
 using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Tenants;
@@ -29,6 +30,7 @@ using Meshmakers.Octo.Sdk.ServiceClient.BotServices;
 using Meshmakers.Octo.Sdk.ServiceClient.CommunicationControllerServices;
 using Meshmakers.Octo.Sdk.ServiceClient.IdentityServices;
 using Meshmakers.Octo.Sdk.ServiceClient.AssetRepositoryServices.StreamData;
+using Meshmakers.Octo.Sdk.ServiceClient.ReportingServices;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -151,6 +153,10 @@ internal static class Program
             .Configure<IOptions<OctoToolOptions>>(
                 (options, toolOptions) => { options.EndpointUri = toolOptions.Value.AdminPanelUrl; });
 
+        services.AddOptions<ReportingServicesClientOptions>()
+            .Configure<IOptions<OctoToolOptions>>(
+                (options, toolOptions) => { options.EndpointUri = toolOptions.Value.ReportingServiceUrl; });
+
         services.AddSingleton<ITenantClientAccessToken, ServiceClientAccessToken>();
         services.AddSingleton<IBotServiceClientAccessToken, ServiceClientAccessToken>();
         services.AddSingleton<IIdentityServiceClientAccessToken, ServiceClientAccessToken>();
@@ -158,18 +164,19 @@ internal static class Program
         services.AddSingleton<IAdminPanelClientAccessToken, ServiceClientAccessToken>();
         services.AddSingleton<ICommunicationServiceClientAccessToken, ServiceClientAccessToken>();
         services.AddSingleton<IStreamDataServiceClientAccessToken, ServiceClientAccessToken>();
+        services.AddSingleton<IReportingServicesClientAccessToken, ServiceClientAccessToken>();
 
         services.AddSingleton<ITenantClient, TenantClient>();
         services.AddSingleton<IAssetServicesClient, AssetServicesClient>();
         services.AddSingleton<IIdentityServicesClient, IdentityServicesClient>();
         services.AddSingleton<IIdentityServicesSetupClient, IdentityServicesSetupClient>();
         services.AddSingleton<IBotServicesClient, BotServicesClient>();
-        services.AddSingleton<ICommunicationServicesClient, CommunicationServicesClient>();
         services.AddSingleton<IAuthenticatorClient, AuthenticatorClient>();
         services.AddSingleton<IAuthenticationService, AuthenticationService>();
-        //services.AddSingleton<INotificationRepository, WsNotificationRepository>();
-        services.AddSingleton<IStreamDataServicesClient, StreamDataServicesClient>();
         services.AddSingleton<IAdminPanelClient, AdminPanelClient>();
+        services.AddSingleton<ICommunicationServicesClient, CommunicationServicesClient>();
+        services.AddSingleton<IStreamDataServicesClient, StreamDataServicesClient>();
+        services.AddSingleton<IReportingServicesClient, ReportingServicesClient>();
 
         services.AddTransient<ICommand, ConfigOctoCommand>();
         services.AddTransient<ICommand, SetupCommand>();
@@ -255,6 +262,9 @@ internal static class Program
 
         services.AddTransient<ICommand, EnableStreamDataCommand>();
         services.AddTransient<ICommand, DisableStreamDataCommand>();
+
+        services.AddTransient<ICommand, EnableReportingCommand>();
+        services.AddTransient<ICommand, DisableReportingCommand>();
         
         services.AddTransient<ICommand, GenerateOperatorCertificatesCommand>();
         

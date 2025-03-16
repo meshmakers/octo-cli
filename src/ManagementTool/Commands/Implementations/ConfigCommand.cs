@@ -14,6 +14,7 @@ internal class ConfigOctoCommand : Command<OctoToolOptions>
     private readonly IConfigWriter _configWriter;
     private readonly IArgument _identityServicesUriArg;
     private readonly IArgument _adminPanelUriArg;
+    private readonly IArgument _reportingServicesUriArg;
     private readonly IArgument _tenantIdArg;
 
     public ConfigOctoCommand(ILogger<ConfigOctoCommand> logger, IOptions<OctoToolOptions> options,
@@ -34,6 +35,8 @@ internal class ConfigOctoCommand : Command<OctoToolOptions>
             ["URI of admin panel (e. g. 'https://localhost:5005/')"], 1);
         _tenantIdArg = CommandArgumentValue.AddArgument("tid", "tenantId",
             ["Id of tenant (e. g. 'meshtest')"], 1);
+        _reportingServicesUriArg = CommandArgumentValue.AddArgument("rsu", "reportingServicesUri",
+            ["URI of reporting services (e. g. 'https://localhost:5007/')"], 1);
     }
 
     public override Task Execute()
@@ -51,6 +54,9 @@ internal class ConfigOctoCommand : Command<OctoToolOptions>
         
         Options.Value.CommunicationServiceUrl = CommandArgumentValue.IsArgumentUsed(_communicationServicesUriArg) ? 
             CommandArgumentValue.GetArgumentScalarValue<string>(_communicationServicesUriArg).ToLower() : null;
+
+        Options.Value.ReportingServiceUrl = CommandArgumentValue.IsArgumentUsed(_reportingServicesUriArg) ?
+            CommandArgumentValue.GetArgumentScalarValue<string>(_reportingServicesUriArg).ToLower() : null;
 
         Options.Value.AdminPanelUrl = CommandArgumentValue.IsArgumentUsed(_adminPanelUriArg) ? 
             CommandArgumentValue.GetArgumentScalarValue<string>(_adminPanelUriArg).ToLower() : null;

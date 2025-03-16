@@ -47,6 +47,11 @@ internal class LogInCommand : Command<OctoToolOptions>
             apiScopes |= Meshmakers.Octo.Communication.Contracts.ApiScopes.CommunicationServiceSystemApiFullAccess;
         }
 
+        if (!string.IsNullOrWhiteSpace(Options.Value.ReportingServiceUrl))
+        {
+            apiScopes |= Meshmakers.Octo.Communication.Contracts.ApiScopes.ReportingServiceSystemApiFullAccess;
+        }
+
         var response = await _authenticatorClient.RequestDeviceAuthorizationAsync(apiScopes);
 
         Logger.LogInformation("Device Code: {ResponseDeviceCode}", response.DeviceCode);

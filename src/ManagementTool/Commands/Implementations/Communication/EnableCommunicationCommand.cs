@@ -8,9 +8,9 @@ namespace Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Commu
 internal class EnableCommunicationCommand : ServiceClientOctoCommand<ICommunicationServicesClient>
 {
     public EnableCommunicationCommand(ILogger<EnableCommunicationCommand> logger, IOptions<OctoToolOptions> options,
-        ICommunicationServicesClient identityServicesClient, IAuthenticationService authenticationService)
+        ICommunicationServicesClient communicationServicesClient, IAuthenticationService authenticationService)
         : base(logger, "EnableCommunication", "Enables the communication controller for the current tenant.", options,
-            identityServicesClient, authenticationService)
+            communicationServicesClient, authenticationService)
     {
         
     }
