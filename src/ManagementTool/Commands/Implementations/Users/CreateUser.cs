@@ -23,7 +23,7 @@ internal class CreateUser : ServiceClientOctoCommand<IIdentityServicesClient>
         _nameArg = CommandArgumentValue.AddArgument("un", "userName", ["User name"], true,
             1);
         _passwordArg = CommandArgumentValue.AddArgument("p", "password", ["Password"], false,
-            0);
+            1);
     }
 
 
