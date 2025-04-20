@@ -49,11 +49,11 @@ internal class AddAuthorizationCodeClient : ServiceClientOctoCommand<IIdentitySe
             ClientId = clientId,
             ClientName = clientName,
             ClientUri = clientUri,
-            AllowedCorsOrigins = new[] { clientUri.TrimEnd('/') },
-            AllowedGrantTypes = new[] { OidcConstants.GrantTypes.AuthorizationCode },
-            AllowedScopes = new[] { CommonConstants.SystemApiFullAccess },
-            PostLogoutRedirectUris = new[] { clientUri.EnsureEndsWith("/") },
-            RedirectUris = new[] { clientUri.EnsureEndsWith("/") },
+            AllowedCorsOrigins = [clientUri.TrimEnd('/')],
+            AllowedGrantTypes = [OidcConstants.GrantTypes.AuthorizationCode],
+            AllowedScopes = [CommonConstants.AssetSystemApiFullAccess],
+            PostLogoutRedirectUris = [clientUri.EnsureEndsWith("/")],
+            RedirectUris = [clientUri.EnsureEndsWith("/")],
             IsOfflineAccessEnabled = true
         };
 
@@ -61,7 +61,7 @@ internal class AddAuthorizationCodeClient : ServiceClientOctoCommand<IIdentitySe
         {
             var redirectUri = CommandArgumentValue.GetArgumentScalarValue<string>(_redirectUri);
 
-            clientDto.RedirectUris = new[] { redirectUri };
+            clientDto.RedirectUris = [redirectUri];
         }
 
         await ServiceClient.CreateClient(clientDto);
