@@ -6,6 +6,7 @@ using Meshmakers.Octo.Sdk.ServiceClient.AssetRepositoryServices.System;
 using Meshmakers.Octo.Sdk.ServiceClient.BotServices;
 using Meshmakers.Octo.Sdk.ServiceClient.CommunicationControllerServices;
 using Meshmakers.Octo.Sdk.ServiceClient.IdentityServices;
+using Meshmakers.Octo.Sdk.ServiceClient.ReportingServices;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
@@ -17,6 +18,7 @@ public class ReconfigureLogLevel : ServiceClientOctoCommand<IIdentityServicesCli
     private readonly IBotServicesClient _botServicesClient;
     private readonly ICommunicationServicesClient _communicationServicesClient;
     private readonly IAdminPanelClient _adminPanelClient;
+    private readonly IReportingServicesClient _reportingServicesClient;
     private readonly IArgument _serviceName;
     private readonly IArgument _minLogLevel;
     private readonly IArgument _maxLogLevel;
@@ -25,7 +27,8 @@ public class ReconfigureLogLevel : ServiceClientOctoCommand<IIdentityServicesCli
     public ReconfigureLogLevel(ILogger<ReconfigureLogLevel> logger, IOptions<OctoToolOptions> options,
         IIdentityServicesClient identityServicesClient, IAuthenticationService authenticationService,
         IAssetServicesClient assetServicesClient, IBotServicesClient botServicesClient,
-        ICommunicationServicesClient communicationServicesClient, IAdminPanelClient adminPanelClient)
+        ICommunicationServicesClient communicationServicesClient, IAdminPanelClient adminPanelClient,
+        IReportingServicesClient reportingServicesClient)
         : base(logger, "ReconfigureLogLevel", "Reconfigures the log level for services", options,
             identityServicesClient, authenticationService)
     {
@@ -33,9 +36,10 @@ public class ReconfigureLogLevel : ServiceClientOctoCommand<IIdentityServicesCli
         _botServicesClient = botServicesClient;
         _communicationServicesClient = communicationServicesClient;
         _adminPanelClient = adminPanelClient;
+        _reportingServicesClient = reportingServicesClient;
         _serviceName = CommandArgumentValue.AddArgument("n", "serviceName", [
             "The service name to configure, " +
-            "allowed is 'Identity', 'AssetRepository', 'Bot', 'CommunicationController', 'AdminPanel'"
+            "allowed is 'Identity', 'AssetRepository', 'Bot', 'CommunicationController', 'AdminPanel', 'Reporting'"
         ], true, 1);
         _minLogLevel = CommandArgumentValue.AddArgument("minL", "minLogLevel", [
             "The minimal log level to set for the services, " +
@@ -58,6 +62,7 @@ public class ReconfigureLogLevel : ServiceClientOctoCommand<IIdentityServicesCli
         _botServicesClient.AccessToken.AccessToken = ServiceClient.AccessToken.AccessToken;
         _communicationServicesClient.AccessToken.AccessToken = ServiceClient.AccessToken.AccessToken;
         _adminPanelClient.AccessToken.AccessToken = ServiceClient.AccessToken.AccessToken;
+        _reportingServicesClient.AccessToken.AccessToken = ServiceClient.AccessToken.AccessToken;
     }
 
     public override async Task Execute()
@@ -92,6 +97,10 @@ public class ReconfigureLogLevel : ServiceClientOctoCommand<IIdentityServicesCli
             case "adminpanel":
                 Logger.LogInformation("URI: '{ServiceUri}'", _adminPanelClient.ServiceUri);
                 await _adminPanelClient.ReconfigureLogLevelAsync(loggerName, minLogLevel, maxLogLevel);
+                break;
+            case "reporting":
+                Logger.LogInformation("URI: '{ServiceUri}'", _reportingServicesClient.ServiceUri);
+                await _reportingServicesClient.ReconfigureLogLevelAsync(loggerName, minLogLevel, maxLogLevel);
                 break;
             default:
                 Logger.LogError("Unknown service name '{serviceName}'", serviceName);
