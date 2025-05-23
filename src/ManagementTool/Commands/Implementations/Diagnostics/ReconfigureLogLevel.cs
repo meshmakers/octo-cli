@@ -51,9 +51,18 @@ public class ReconfigureLogLevel : ServiceClientOctoCommand<IIdentityServicesCli
         ], true, 1);
     }
 
+    public override async Task PreValidate()
+    {
+        await base.PreValidate();
+        _assetServicesClient.AccessToken.AccessToken = ServiceClient.AccessToken.AccessToken;
+        _botServicesClient.AccessToken.AccessToken = ServiceClient.AccessToken.AccessToken;
+        _communicationServicesClient.AccessToken.AccessToken = ServiceClient.AccessToken.AccessToken;
+        _adminPanelClient.AccessToken.AccessToken = ServiceClient.AccessToken.AccessToken;
+    }
+
     public override async Task Execute()
     {
-        var serviceName = CommandArgumentValue.GetArgumentScalarValue<string>(_serviceName).ToLower();
+        var serviceName = CommandArgumentValue.GetArgumentScalarValue<string>(_serviceName);
         var minLogLevel = CommandArgumentValue.GetArgumentScalarValue<LogLevelDto>(_minLogLevel);
         var maxLogLevel = CommandArgumentValue.GetArgumentScalarValue<LogLevelDto>(_maxLogLevel);
         var loggerName = CommandArgumentValue.GetArgumentScalarValue<string>(_loggerName);
@@ -62,7 +71,7 @@ public class ReconfigureLogLevel : ServiceClientOctoCommand<IIdentityServicesCli
             "Setting log level for logger '{LoggerName}' to minimum '{MinLogLevel}' and maximum '{MaxLogLevel}' for service \'{ServiceName}\'",
             loggerName, minLogLevel, maxLogLevel, serviceName);
         
-        switch (serviceName)
+        switch (serviceName.ToLower())
         {
             case "identity":
                 Logger.LogInformation("URI: '{ServiceUri}'", ServiceClient.ServiceUri);
@@ -84,6 +93,9 @@ public class ReconfigureLogLevel : ServiceClientOctoCommand<IIdentityServicesCli
                 Logger.LogInformation("URI: '{ServiceUri}'", _adminPanelClient.ServiceUri);
                 await _adminPanelClient.ReconfigureLogLevelAsync(loggerName, minLogLevel, maxLogLevel);
                 break;
+            default:
+                Logger.LogError("Unknown service name '{serviceName}'", serviceName);
+                return;
         }
         
         Logger.LogInformation("Reconfiguration done");
