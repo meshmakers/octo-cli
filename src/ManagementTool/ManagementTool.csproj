@@ -32,6 +32,7 @@
         <PackageReference Include="Meshmakers.Common.CommandLineParser" Version="$(MeshmakerVersion)" />
         <PackageReference Include="Meshmakers.Common.Configuration" Version="$(MeshmakerVersion)" />
         <PackageReference Include="Meshmakers.Octo.Sdk.ServiceClient" Version="$(OctoVersion)" />
+        <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="8.11.0" />
     </ItemGroup>
 
     <ItemGroup>
@@ -50,5 +51,12 @@
             <PackagePath />
             <Link>meshmakers64.png</Link>
         </None>
+    </ItemGroup>
+
+    <ItemGroup>
+      <Folder Include="Commands\Implementations\Asset\" />
+      <Folder Include="Commands\Implementations\Bots\" />
+      <Folder Include="Commands\Implementations\DevOps\" />
+      <Folder Include="Commands\Implementations\General\" />
     </ItemGroup>
 </Project>

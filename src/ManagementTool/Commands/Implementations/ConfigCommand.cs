@@ -8,12 +8,12 @@ namespace Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations;
 
 internal class ConfigOctoCommand : Command<OctoToolOptions>
 {
+    private readonly IArgument _adminPanelUriArg;
     private readonly IArgument _assetServicesUriArg;
     private readonly IArgument _botServicesUriArg;
     private readonly IArgument _communicationServicesUriArg;
     private readonly IConfigWriter _configWriter;
     private readonly IArgument _identityServicesUriArg;
-    private readonly IArgument _adminPanelUriArg;
     private readonly IArgument _reportingServicesUriArg;
     private readonly IArgument _tenantIdArg;
 
@@ -43,29 +43,33 @@ internal class ConfigOctoCommand : Command<OctoToolOptions>
     {
         Logger.LogInformation("Configuring the tool");
 
-        Options.Value.TenantId = CommandArgumentValue.IsArgumentUsed(_tenantIdArg) ?
-            CommandArgumentValue.GetArgumentScalarValue<string>(_tenantIdArg).ToLower() : null;
+        Options.Value.TenantId = CommandArgumentValue.IsArgumentUsed(_tenantIdArg)
+            ? CommandArgumentValue.GetArgumentScalarValue<string>(_tenantIdArg).ToLower()
+            : null;
 
-        Options.Value.AssetServiceUrl = CommandArgumentValue.IsArgumentUsed(_assetServicesUriArg) ?
-            CommandArgumentValue.GetArgumentScalarValue<string>(_assetServicesUriArg).ToLower() : null;
+        Options.Value.AssetServiceUrl = CommandArgumentValue.IsArgumentUsed(_assetServicesUriArg)
+            ? CommandArgumentValue.GetArgumentScalarValue<string>(_assetServicesUriArg).ToLower()
+            : null;
 
-        Options.Value.BotServiceUrl = CommandArgumentValue.IsArgumentUsed(_botServicesUriArg) ?
-            CommandArgumentValue.GetArgumentScalarValue<string>(_botServicesUriArg).ToLower() : null;
-        
-        Options.Value.CommunicationServiceUrl = CommandArgumentValue.IsArgumentUsed(_communicationServicesUriArg) ? 
-            CommandArgumentValue.GetArgumentScalarValue<string>(_communicationServicesUriArg).ToLower() : null;
+        Options.Value.BotServiceUrl = CommandArgumentValue.IsArgumentUsed(_botServicesUriArg)
+            ? CommandArgumentValue.GetArgumentScalarValue<string>(_botServicesUriArg).ToLower()
+            : null;
 
-        Options.Value.ReportingServiceUrl = CommandArgumentValue.IsArgumentUsed(_reportingServicesUriArg) ?
-            CommandArgumentValue.GetArgumentScalarValue<string>(_reportingServicesUriArg).ToLower() : null;
+        Options.Value.CommunicationServiceUrl = CommandArgumentValue.IsArgumentUsed(_communicationServicesUriArg)
+            ? CommandArgumentValue.GetArgumentScalarValue<string>(_communicationServicesUriArg).ToLower()
+            : null;
 
-        Options.Value.AdminPanelUrl = CommandArgumentValue.IsArgumentUsed(_adminPanelUriArg) ? 
-            CommandArgumentValue.GetArgumentScalarValue<string>(_adminPanelUriArg).ToLower() : null;
+        Options.Value.ReportingServiceUrl = CommandArgumentValue.IsArgumentUsed(_reportingServicesUriArg)
+            ? CommandArgumentValue.GetArgumentScalarValue<string>(_reportingServicesUriArg).ToLower()
+            : null;
+
+        Options.Value.AdminPanelUrl = CommandArgumentValue.IsArgumentUsed(_adminPanelUriArg)
+            ? CommandArgumentValue.GetArgumentScalarValue<string>(_adminPanelUriArg).ToLower()
+            : null;
 
         if (CommandArgumentValue.IsArgumentUsed(_identityServicesUriArg))
-        {
             Options.Value.IdentityServiceUrl =
                 CommandArgumentValue.GetArgumentScalarValue<string>(_identityServicesUriArg).ToLower();
-        }
 
         _configWriter.WriteSettings(Constants.OctoToolUserFolderName);
 

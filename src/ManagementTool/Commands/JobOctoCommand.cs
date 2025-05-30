@@ -11,10 +11,10 @@ internal abstract class JobOctoCommand : Command<OctoToolOptions>
 {
     private readonly IAuthenticationService _authenticationService;
 
-    protected JobOctoCommand(ILogger<JobOctoCommand> logger, string commandValue, string commandDescription,
+    protected JobOctoCommand(ILogger<JobOctoCommand> logger, string commandGroup, string commandValue, string commandDescription,
         IOptions<OctoToolOptions> options,
         IBotServicesClient botServiceClient, IAuthenticationService authenticationService)
-        : base(logger, commandValue, commandDescription, options)
+        : base(logger, commandGroup, commandValue, commandDescription, options)
     {
         ServiceClient = botServiceClient;
         _authenticationService = authenticationService;
@@ -24,6 +24,9 @@ internal abstract class JobOctoCommand : Command<OctoToolOptions>
 
     public override async Task PreValidate()
     {
+        Logger.LogInformation("Service URI: {ServiceClientServiceUri}", ServiceClient.ServiceUri);
+        Logger.LogInformation("Default Tenant: {TenantId}", Options.Value.TenantId);
+
         await _authenticationService.EnsureAuthenticated(ServiceClient.AccessToken);
     }
 

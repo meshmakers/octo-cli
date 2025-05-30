@@ -11,10 +11,10 @@ internal abstract class JobWithWaitOctoCommand : JobOctoCommand
 {
     private readonly IArgument _waitForJobArg;
 
-    protected JobWithWaitOctoCommand(ILogger<JobWithWaitOctoCommand> logger, string commandValue,
+    protected JobWithWaitOctoCommand(ILogger<JobWithWaitOctoCommand> logger, string commandGroup, string commandValue,
         string commandDescription, IOptions<OctoToolOptions> options,
         IBotServicesClient botServicesClient, IAuthenticationService authenticationService)
-        : base(logger, commandValue, commandDescription, options, botServicesClient, authenticationService)
+        : base(logger, commandGroup, commandValue, commandDescription, options, botServicesClient, authenticationService)
     {
         _waitForJobArg = CommandArgumentValue.AddArgument("w", "wait",
             ["Wait for a import job to complete"], false, 0);

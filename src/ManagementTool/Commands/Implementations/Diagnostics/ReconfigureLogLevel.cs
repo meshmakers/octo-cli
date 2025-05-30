@@ -14,22 +14,23 @@ namespace Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Diagn
 
 public class ReconfigureLogLevel : ServiceClientOctoCommand<IIdentityServicesClient>
 {
+    private readonly IAdminPanelClient _adminPanelClient;
     private readonly IAssetServicesClient _assetServicesClient;
     private readonly IBotServicesClient _botServicesClient;
     private readonly ICommunicationServicesClient _communicationServicesClient;
-    private readonly IAdminPanelClient _adminPanelClient;
+    private readonly IArgument _loggerName;
+    private readonly IArgument _maxLogLevel;
+    private readonly IArgument _minLogLevel;
     private readonly IReportingServicesClient _reportingServicesClient;
     private readonly IArgument _serviceName;
-    private readonly IArgument _minLogLevel;
-    private readonly IArgument _maxLogLevel;
-    private readonly IArgument _loggerName;
 
     public ReconfigureLogLevel(ILogger<ReconfigureLogLevel> logger, IOptions<OctoToolOptions> options,
         IIdentityServicesClient identityServicesClient, IAuthenticationService authenticationService,
         IAssetServicesClient assetServicesClient, IBotServicesClient botServicesClient,
         ICommunicationServicesClient communicationServicesClient, IAdminPanelClient adminPanelClient,
         IReportingServicesClient reportingServicesClient)
-        : base(logger, "ReconfigureLogLevel", "Reconfigures the log level for services", options,
+        : base(logger, Constants.DiagnosticsGroup, "ReconfigureLogLevel", "Reconfigures the log level for services",
+            options,
             identityServicesClient, authenticationService)
     {
         _assetServicesClient = assetServicesClient;
@@ -75,7 +76,7 @@ public class ReconfigureLogLevel : ServiceClientOctoCommand<IIdentityServicesCli
         Logger.LogInformation(
             "Setting log level for logger '{LoggerName}' to minimum '{MinLogLevel}' and maximum '{MaxLogLevel}' for service \'{ServiceName}\'",
             loggerName, minLogLevel, maxLogLevel, serviceName);
-        
+
         switch (serviceName.ToLower())
         {
             case "identity":
@@ -85,7 +86,7 @@ public class ReconfigureLogLevel : ServiceClientOctoCommand<IIdentityServicesCli
             case "assetrepository":
                 Logger.LogInformation("URI: '{ServiceUri}'", _assetServicesClient.ServiceUri);
                 await _assetServicesClient.ReconfigureLogLevelAsync(loggerName, minLogLevel, maxLogLevel);
-                break;                
+                break;
             case "bot":
                 Logger.LogInformation("URI: '{ServiceUri}'", _botServicesClient.ServiceUri);
                 await _botServicesClient.ReconfigureLogLevelAsync(loggerName, minLogLevel, maxLogLevel);
@@ -106,7 +107,7 @@ public class ReconfigureLogLevel : ServiceClientOctoCommand<IIdentityServicesCli
                 Logger.LogError("Unknown service name '{serviceName}'", serviceName);
                 return;
         }
-        
+
         Logger.LogInformation("Reconfiguration done");
     }
 }
