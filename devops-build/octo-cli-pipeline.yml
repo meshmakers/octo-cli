@@ -11,7 +11,7 @@ trigger:
       - '*'
 
 variables:
-  - group: ApiKeys
+  - group: ApiKeys-mm-cloud
   - group: OctoDefault
   - name: isRelease
     value: ${{ startsWith(variables['Build.SourceBranch'], 'refs/tags/r') }}
@@ -19,7 +19,7 @@ variables:
     value: ${{ eq(variables['Build.SourceBranch'], 'refs/heads/main') }}    
   
 pool:
-  name: Gerald-Local-Linux
+  name: meshmakers-ci-agents
   
 steps:
 - template: update-build-number.yml
