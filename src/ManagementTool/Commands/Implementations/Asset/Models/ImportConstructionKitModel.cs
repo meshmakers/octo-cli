@@ -37,12 +37,21 @@ internal class ImportConstructionKitModel : JobWithWaitOctoCommand
         var ckModelFilePath = CommandArgumentValue.GetArgumentScalarValue<string>(_fileArg).ToLower();
 
         var tenantId = Options.Value.TenantId;
-        if (string.IsNullOrWhiteSpace(tenantId)) throw new ServiceConfigurationMissingException("Tenant is missing.");
+        if (string.IsNullOrWhiteSpace(tenantId))
+        {
+            throw ToolException.NoTenantIdConfigured();
+        }
+
+        if (File.Exists(ckModelFilePath))
+        {
+            Logger.LogError("File \'{CkModelFilePath}\' exists", ckModelFilePath);
+            return;
+        }
 
         Logger.LogInformation("Importing construction kit model \'{CkModelFilePath}\'", ckModelFilePath);
 
         var id = await _assetServicesClient.ImportCkModelAsync(tenantId, ckModelFilePath);
-        Logger.LogInformation("Construction kit model import id \'{Id}\' has been started", id);
+        Logger.LogInformation("Construction kit model import with job id \'{Id}\' has been started", id);
         await WaitForJob(id);
     }
 }

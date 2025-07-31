@@ -68,8 +68,10 @@ internal class ConfigOctoCommand : Command<OctoToolOptions>
             : null;
 
         if (CommandArgumentValue.IsArgumentUsed(_identityServicesUriArg))
+        {
             Options.Value.IdentityServiceUrl =
                 CommandArgumentValue.GetArgumentScalarValue<string>(_identityServicesUriArg).ToLower();
+        }
 
         _configWriter.WriteSettings(Constants.OctoToolUserFolderName);
 

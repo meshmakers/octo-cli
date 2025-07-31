@@ -33,6 +33,7 @@ internal class AddUserToRole : ServiceClientOctoCommand<IIdentityServicesClient>
             ServiceClient.ServiceUri);
 
         if (!string.IsNullOrWhiteSpace(roleName))
+        {
             try
             {
                 await ServiceClient.GetRoleByName(roleName);
@@ -43,6 +44,7 @@ internal class AddUserToRole : ServiceClientOctoCommand<IIdentityServicesClient>
                     ServiceClient.ServiceUri);
                 return;
             }
+        }
 
         await ServiceClient.AddRoleToUser(name, roleName);
 

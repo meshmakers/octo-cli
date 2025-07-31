@@ -71,6 +71,11 @@ internal class Runner
 
             return -4;
         }
+        catch (ToolException ex)
+        {
+            _logger.LogError("{Message}", ex.Message);
+            return -5;
+        }
         catch (Exception ex)
         {
             var tmp = ex;

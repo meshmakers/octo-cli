@@ -1,4 +1,5 @@
 using GraphQL;
+using GraphQlDtos;
 using Meshmakers.Common.CommandLineParser;
 using Meshmakers.Octo.Communication.Contracts.DataTransferObjects;
 using Meshmakers.Octo.Frontend.ManagementTool.Services;
@@ -72,11 +73,15 @@ internal class CreateServiceHook : ServiceClientOctoCommand<ITenantClient>
         {
             var terms = filterArg.Split(" ");
             if (terms.Length != 3)
-                throw new InvalidOperationException($"Filter term '{filterArg}' is invalid. Three terms needed.");
+            {
+                throw ToolException.InvalidFilterTerm(filterArg);
+            }
 
             var attribute = terms[0].Trim('\'');
             if (!Enum.TryParse(terms[1], true, out FieldFilterOperatorDto operatorDto))
-                throw new InvalidOperationException($"Operator '{terms[1]}' of term '{filterArg}' is invalid.");
+            {
+                throw ToolException.InvalidFilterOperator(filterArg, terms[1]);
+            }
 
             var comparisionValue = terms[2].Trim('\'');
 
@@ -97,7 +102,7 @@ internal class CreateServiceHook : ServiceClientOctoCommand<ITenantClient>
 
         var query = new GraphQLRequest
         {
-            Query = GraphQl.CreateServiceHook,
+            Query = GraphQlConstants.CreateServiceHook,
             Variables = new { entities = new[] { createServiceHookDto } }
         };
 

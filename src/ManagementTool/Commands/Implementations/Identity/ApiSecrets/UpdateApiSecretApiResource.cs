@@ -52,10 +52,14 @@ internal class UpdateApiSecretApiResource : ServiceClientOctoCommand<IIdentitySe
         }
 
         if (CommandArgumentValue.IsArgumentUsed(_expirationArg))
+        {
             secretDto.ExpirationDate = CommandArgumentValue.GetArgumentScalarValue<DateTime?>(_expirationArg);
+        }
 
         if (CommandArgumentValue.IsArgumentUsed(_descriptionArg))
+        {
             secretDto.Description = CommandArgumentValue.GetArgumentScalarValue<string>(_descriptionArg);
+        }
 
         await ServiceClient.UpdateApiSecretApiResource(name, secretDto);
 

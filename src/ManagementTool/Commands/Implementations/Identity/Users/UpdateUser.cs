@@ -33,11 +33,15 @@ internal class UpdateUser : ServiceClientOctoCommand<IIdentityServicesClient>
 
         string? newUserName = null;
         if (CommandArgumentValue.IsArgumentUsed(_newNameArg))
+        {
             newUserName = CommandArgumentValue.GetArgumentScalarValue<string>(_newNameArg).ToLower();
+        }
 
         string? eMail = null;
         if (CommandArgumentValue.IsArgumentUsed(_eMailArg))
+        {
             eMail = CommandArgumentValue.GetArgumentScalarValue<string>(_eMailArg).ToLower();
+        }
 
         Logger.LogInformation("Updating user \'{Name}\' at \'{ServiceClientServiceUri}\'", name,
             ServiceClient.ServiceUri);

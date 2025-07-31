@@ -1,4 +1,5 @@
 using GraphQL;
+using GraphQlDtos;
 using Meshmakers.Common.CommandLineParser;
 using Meshmakers.Octo.Communication.Contracts.DataTransferObjects;
 using Meshmakers.Octo.Frontend.ManagementTool.Services;
@@ -72,8 +73,7 @@ internal class UpdateServiceHook : ServiceClientOctoCommand<ITenantClient>
         var serviceHookApiKey = CommandArgumentValue.GetArgumentScalarValueOrDefault<string>(_serviceHookApiKeyArg);
         var ckId = CommandArgumentValue.GetArgumentScalarValueOrDefault<string>(_ckIdArg);
 
-        Logger.LogInformation(
-            $"Update service hook '{serviceHookId}' at '{_tenantClient.ServiceUri}'");
+        Logger.LogInformation("Update service hook \'{ServiceHookId}\' at \'{TenantClientServiceUri}\'", serviceHookId, _tenantClient.ServiceUri);
 
         var fieldFilters = new List<FieldFilterDto>();
         if (CommandArgumentValue.IsArgumentUsed(_filterArg))
@@ -83,12 +83,15 @@ internal class UpdateServiceHook : ServiceClientOctoCommand<ITenantClient>
             {
                 var terms = filterArg.Split(" ");
                 if (terms.Length != 3)
-                    throw new InvalidOperationException(
-                        $"Filter term '{filterArg}' is invalid. Three terms needed.");
+                {
+                    throw ToolException.InvalidFilterTerm(filterArg);
+                }
 
                 var attribute = terms[0].Trim('\'');
                 if (!Enum.TryParse(terms[1], true, out FieldFilterOperatorDto operatorDto))
-                    throw new InvalidOperationException($"Operator '{terms[1]}' of term '{filterArg}' is invalid.");
+                {
+                    throw ToolException.InvalidFilterOperator(filterArg, terms[1]);
+                }
 
                 var comparisionValue = terms[2].Trim('\'');
 
@@ -99,7 +102,7 @@ internal class UpdateServiceHook : ServiceClientOctoCommand<ITenantClient>
 
         var getQuery = new GraphQLRequest
         {
-            Query = GraphQl.GetServiceHookDetails,
+            Query = GraphQlConstants.GetServiceHookDetails,
             Variables = new
             {
                 rtId = serviceHookId
@@ -108,8 +111,9 @@ internal class UpdateServiceHook : ServiceClientOctoCommand<ITenantClient>
 
         var getResult = await _tenantClient.SendQueryAsync<RtServiceHookDto>(getQuery);
         if (getResult?.Items == null || !getResult.Items.Any())
-            throw new InvalidOperationException(
-                $"Service Hook with ID '{serviceHookId}' does not exist.");
+        {
+            throw ToolException.IdNotFound(serviceHookId, "Service Hook");
+        }
 
         var serviceHookDto = getResult.Items.First();
 
@@ -126,7 +130,7 @@ internal class UpdateServiceHook : ServiceClientOctoCommand<ITenantClient>
 
         var updateQuery = new GraphQLRequest
         {
-            Query = GraphQl.UpdateServiceHook,
+            Query = GraphQlConstants.UpdateServiceHook,
             Variables = new
             {
                 entities = new[]
@@ -140,8 +144,8 @@ internal class UpdateServiceHook : ServiceClientOctoCommand<ITenantClient>
             }
         };
 
-        var result = await _tenantClient.SendMutationAsync<IEnumerable<RtServiceHookDto>>(updateQuery);
+        await _tenantClient.SendMutationAsync<IEnumerable<RtServiceHookDto>>(updateQuery);
 
-        Logger.LogInformation($"Service hook '{serviceHookId}' updated (ID '{result.First().RtId}').");
+        Logger.LogInformation("Service hook \'{ServiceHookId}\' updated", serviceHookId);
     }
 }

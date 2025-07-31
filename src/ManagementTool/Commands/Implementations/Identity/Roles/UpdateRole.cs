@@ -30,7 +30,9 @@ internal class UpdateRole : ServiceClientOctoCommand<IIdentityServicesClient>
 
         string? newRoleName = null;
         if (CommandArgumentValue.IsArgumentUsed(_newNameArg))
+        {
             newRoleName = CommandArgumentValue.GetArgumentScalarValue<string>(_newNameArg).ToLower();
+        }
 
         Logger.LogInformation("Updating role \'{Name}\' at \'{ServiceClientServiceUri}\'", name,
             ServiceClient.ServiceUri);

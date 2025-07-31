@@ -4,6 +4,7 @@ using Meshmakers.Common.Configuration;
 using Meshmakers.Common.Shared.Services;
 using Meshmakers.Octo.Communication.Contracts;
 using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations;
+using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Asset.FixupScripts;
 using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Asset.Models;
 using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Asset.Tenants;
 using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Asset.TimeSeries;
@@ -243,6 +244,9 @@ internal static class Program
         services.AddTransient<ICommand, CreateServiceHook>();
         services.AddTransient<ICommand, UpdateServiceHook>();
         services.AddTransient<ICommand, DeleteServiceHook>();
+
+        services.AddTransient<ICommand, CreateFixupScript>();
+        services.AddTransient<ICommand, RunFixupScripts>();
 /*
         services.AddTransient<ICommand, GetNotificationMessages>();
         services.AddTransient<ICommand, CreateNotification>();

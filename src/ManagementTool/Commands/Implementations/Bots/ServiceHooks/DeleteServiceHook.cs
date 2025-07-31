@@ -1,4 +1,5 @@
 using GraphQL;
+using GraphQlDtos;
 using Meshmakers.Common.CommandLineParser;
 using Meshmakers.Octo.Communication.Contracts.DataTransferObjects;
 using Meshmakers.Octo.Frontend.ManagementTool.Services;
@@ -33,7 +34,7 @@ internal class DeleteServiceHook : ServiceClientOctoCommand<ITenantClient>
 
         var getQuery = new GraphQLRequest
         {
-            Query = GraphQl.GetServiceHookDetails,
+            Query = GraphQlConstants.GetServiceHookDetails,
             Variables = new
             {
                 rtId = serviceHookId
@@ -42,14 +43,16 @@ internal class DeleteServiceHook : ServiceClientOctoCommand<ITenantClient>
 
         var getResult = await _tenantClient.SendQueryAsync<RtServiceHookDto>(getQuery);
         if (getResult?.Items == null || !getResult.Items.Any())
+        {
             throw new InvalidOperationException(
                 $"Service Hook with ID '{serviceHookId}' does not exist.");
+        }
 
         var serviceHookDto = getResult.Items.First();
 
         var deleteMutation = new GraphQLRequest
         {
-            Query = GraphQl.DeleteServiceHook,
+            Query = GraphQlConstants.DeleteServiceHook,
             Variables = new
             {
                 entities = new[]
@@ -65,8 +68,12 @@ internal class DeleteServiceHook : ServiceClientOctoCommand<ITenantClient>
         var result = await _tenantClient.SendMutationAsync<bool>(deleteMutation);
 
         if (result)
+        {
             Logger.LogInformation("Service hook \'{ServiceHookId}\' deleted", serviceHookId);
+        }
         else
+        {
             Logger.LogError("Service hook \'{ServiceHookId}\' delete failed", serviceHookId);
+        }
     }
 }

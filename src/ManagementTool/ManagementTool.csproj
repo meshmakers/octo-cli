@@ -54,8 +54,11 @@
 
     <ItemGroup>
       <Folder Include="Commands\Implementations\Asset\" />
-      <Folder Include="Commands\Implementations\Bots\" />
       <Folder Include="Commands\Implementations\DevOps\" />
       <Folder Include="Commands\Implementations\General\" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <ProjectReference Include="..\GraphQlDtos\GraphQlDtos.csproj" />
     </ItemGroup>
 </Project>

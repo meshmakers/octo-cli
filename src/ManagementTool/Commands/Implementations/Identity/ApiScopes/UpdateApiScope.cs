@@ -43,16 +43,24 @@ internal class UpdateApiScope : ServiceClientOctoCommand<IIdentityServicesClient
         var scopeDto = await ServiceClient.GetApiScope(scopeName);
 
         if (CommandArgumentValue.IsArgumentUsed(_newNameArg))
+        {
             scopeDto.Name = CommandArgumentValue.GetArgumentScalarValue<string>(_newNameArg);
+        }
 
         if (CommandArgumentValue.IsArgumentUsed(_displayNameArg))
+        {
             scopeDto.DisplayName = CommandArgumentValue.GetArgumentScalarValue<string>(_displayNameArg);
+        }
 
         if (CommandArgumentValue.IsArgumentUsed(_descriptionArg))
+        {
             scopeDto.Description = CommandArgumentValue.GetArgumentScalarValue<string>(_descriptionArg);
+        }
 
         if (CommandArgumentValue.IsArgumentUsed(_isEnabledArg))
+        {
             scopeDto.IsEnabled = CommandArgumentValue.GetArgumentScalarValue<bool>(_isEnabledArg);
+        }
 
         await ServiceClient.UpdateApiScope(scopeName, scopeDto);
 

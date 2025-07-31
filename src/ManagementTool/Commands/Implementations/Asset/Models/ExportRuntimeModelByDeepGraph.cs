@@ -50,12 +50,21 @@ internal class ExportRuntimeModelByDeepGraph : JobOctoCommand
         var originRtIds = originRtIdsArgumentValue.Values.Select(OctoObjectId.Parse).ToList();
 
         var tenantId = Options.Value.TenantId;
-        if (string.IsNullOrWhiteSpace(tenantId)) throw new ServiceConfigurationMissingException("Tenant is missing.");
+        if (string.IsNullOrWhiteSpace(tenantId))
+        {
+            throw ToolException.NoTenantIdConfigured();
+        }
+
+        if (File.Exists(rtModelFilePath))
+        {
+            Logger.LogError("File \'{RtModelFilePath}\' exists", rtModelFilePath);
+            return;
+        }
 
         Logger.LogInformation("Exporting runtime data as deep graph to \'{RtModelFilePath}\'", rtModelFilePath);
 
         var id = await _assetServicesClient.ExportRtModelByDeepGraphAsync(tenantId, originRtIds, originCkTypeId);
-        Logger.LogInformation("Runtime model export id \'{Id}\' has been started", id);
+        Logger.LogInformation("Runtime model export with job id \'{Id}\' has been started", id);
         await WaitForJob(id);
 
         await DownloadJobResultAsync(tenantId, id, rtModelFilePath);

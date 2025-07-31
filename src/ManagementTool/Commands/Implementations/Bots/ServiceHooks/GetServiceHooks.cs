@@ -1,4 +1,5 @@
 using GraphQL;
+using GraphQlDtos;
 using Meshmakers.Common.Shared.Services;
 using Meshmakers.Octo.Communication.Contracts.DataTransferObjects;
 using Meshmakers.Octo.Frontend.ManagementTool.Services;
@@ -30,7 +31,7 @@ internal class GetServiceHooks : ServiceClientOctoCommand<ITenantClient>
 
         var getQuery = new GraphQLRequest
         {
-            Query = GraphQl.GetServiceHook
+            Query = GraphQlConstants.GetServiceHook
         };
 
         var getResult = await _tenantClient.SendQueryAsync<RtServiceHookDto>(getQuery);

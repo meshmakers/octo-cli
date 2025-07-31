@@ -42,13 +42,18 @@ internal class ImportRuntimeModel : JobWithWaitOctoCommand
         var tenantId = Options.Value.TenantId;
         if (string.IsNullOrWhiteSpace(tenantId))
         {
-            throw new ServiceConfigurationMissingException("Tenant is missing.");
+            throw ToolException.NoTenantIdConfigured();
         }
 
         Logger.LogInformation("Importing runtime model \'{RtModelFilePath}\'", rtModelFilePath);
 
+        if (File.Exists(rtModelFilePath))
+        {
+            Logger.LogError("File \'{RtModelFilePath}\' exists", rtModelFilePath);
+            return;
+        }
         var id = await _assetServicesClient.ImportRtModelAsync(tenantId, rtModelFilePath);
-        Logger.LogInformation("Runtime model import id \'{Id}\' has been started", id);
+        Logger.LogInformation("Runtime model import with job id \'{Id}\' has been started", id);
         await WaitForJob(id);
     }
 }
