@@ -8,6 +8,13 @@ parameters:
 
 steps:
 - task: DotNetCoreCLI@2
+  displayName: 'Restore NuGet packages'
+  inputs:
+    command: 'restore'
+    projects: ${{ parameters.project }}
+    restoreArguments: '--force /p:OctoNugetPrivateServer=$(nugetPrivateServer)'
+    noCache: true
+- task: DotNetCoreCLI@2
   displayName: Building ${{ parameters.exeName }} ${{ parameters.runtime }}
   inputs:
     command: 'publish'
