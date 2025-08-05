@@ -57,7 +57,7 @@ internal class ExportRuntimeModelByDeepGraph : JobOctoCommand
 
         if (File.Exists(rtModelFilePath))
         {
-            Logger.LogError("File \'{RtModelFilePath}\' exists", rtModelFilePath);
+            Logger.LogError("File \'{RtModelFilePath}\' already exists", rtModelFilePath);
             return;
         }
 

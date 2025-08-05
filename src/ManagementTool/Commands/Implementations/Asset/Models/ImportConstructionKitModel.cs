@@ -42,9 +42,9 @@ internal class ImportConstructionKitModel : JobWithWaitOctoCommand
             throw ToolException.NoTenantIdConfigured();
         }
 
-        if (File.Exists(ckModelFilePath))
+        if (!File.Exists(ckModelFilePath))
         {
-            Logger.LogError("File \'{CkModelFilePath}\' exists", ckModelFilePath);
+            Logger.LogError("File \'{CkModelFilePath}\' does not exist", ckModelFilePath);
             return;
         }
 

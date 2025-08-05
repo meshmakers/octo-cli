@@ -47,9 +47,9 @@ internal class ImportRuntimeModel : JobWithWaitOctoCommand
 
         Logger.LogInformation("Importing runtime model \'{RtModelFilePath}\'", rtModelFilePath);
 
-        if (File.Exists(rtModelFilePath))
+        if (!File.Exists(rtModelFilePath))
         {
-            Logger.LogError("File \'{RtModelFilePath}\' exists", rtModelFilePath);
+            Logger.LogError("File \'{CkModelFilePath}\' does not exist", rtModelFilePath);
             return;
         }
         var id = await _assetServicesClient.ImportRtModelAsync(tenantId, rtModelFilePath);
