@@ -29,6 +29,6 @@ internal class RunFixupScripts(
         var response = await ServiceClient.StartRunFixupScriptAsync(Options.Value.TenantId);
         Logger.LogInformation("Run fixup scripts with job id \'{Id}\' has been started", response.JobId);
         await WaitForJob(response.JobId);
-        Logger.LogInformation("Fixup script created");
+        Logger.LogInformation("Fixup scripts have been run successfully");
     }
 }

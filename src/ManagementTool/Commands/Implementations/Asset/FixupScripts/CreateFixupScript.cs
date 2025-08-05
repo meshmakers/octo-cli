@@ -67,8 +67,7 @@ internal class CreateFixupScript : ServiceClientOctoCommand<ITenantClient>
             Variables = new { entity = createFixup }
         };
 
-        await ServiceClient.SendMutationAsync<RtFixupDto>(query);
-
-        Logger.LogInformation("Fixup script created");
+        var dto = await ServiceClient.SendMutationAsync<RtFixupDto>(query);
+        Logger.LogInformation("Fixup script created with id \'{Id}\'", dto.RtId);
     }
 }

@@ -42,4 +42,16 @@ public class ToolException : Exception
         return new ToolException(
             $"The service hook with ID '{serviceHookId}' was not found in the service '{serviceHook}'. Please check the ID and try again.");
     }
+
+    public static Exception JobDeleted(string id, DateTime? toLocalTime)
+    {
+        return new ToolException(
+            $"The job with ID '{id}' has been deleted at '{toLocalTime}'. Please check the job status and server logs and try again.");
+    }
+
+    public static Exception JobFailed(string id, DateTime? toLocalTime)
+    {
+        return new ToolException(
+            $"The job with ID '{id}' has failed at '{toLocalTime}'. Please check the server logs for more details.");
+    }
 }

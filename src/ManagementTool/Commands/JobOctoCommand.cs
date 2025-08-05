@@ -57,16 +57,12 @@ internal abstract class JobOctoCommand : Command<OctoToolOptions>
 
             if (jobDto.Status == "Failed")
             {
-                Logger.LogInformation("Job id \'{Id}\' has failed at \'{LocalTime}\'. See server logs for more details",
-                    id, jobDto.StateChangedAt?.ToLocalTime());
-                break;
+                throw ToolException.JobFailed(id, jobDto.StateChangedAt?.ToLocalTime());
             }
 
             if (jobDto.Status == "Deleted")
             {
-                Logger.LogInformation("Job id \'{Id}\' has failed at \'{LocalTime}\'. See server logs for more details",
-                    id, jobDto.StateChangedAt?.ToLocalTime());
-                break;
+                throw ToolException.JobDeleted(id, jobDto.StateChangedAt?.ToLocalTime());
             }
 
             if (lastJobDto == null || lastJobDto.StateChangedAt != jobDto.StateChangedAt ||
