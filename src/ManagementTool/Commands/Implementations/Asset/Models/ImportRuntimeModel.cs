@@ -1,4 +1,5 @@
 ﻿using Meshmakers.Common.CommandLineParser;
+using Meshmakers.Octo.Communication.Contracts.DataTransferObjects;
 using Meshmakers.Octo.Frontend.ManagementTool.Services;
 using Meshmakers.Octo.Sdk.ServiceClient;
 using Meshmakers.Octo.Sdk.ServiceClient.AssetRepositoryServices.System;
@@ -12,6 +13,7 @@ internal class ImportRuntimeModel : JobWithWaitOctoCommand
 {
     private readonly IAssetServicesClient _assetServicesClient;
     private readonly IArgument _fileArg;
+    private readonly IArgument _replaceArg;
 
     public ImportRuntimeModel(ILogger<ImportRuntimeModel> logger, IOptions<OctoToolOptions> options,
         IAssetServicesClient assetServicesClient, IBotServicesClient botServicesClient,
@@ -23,6 +25,8 @@ internal class ImportRuntimeModel : JobWithWaitOctoCommand
         _assetServicesClient = assetServicesClient;
 
         _fileArg = CommandArgumentValue.AddArgument("f", "file", ["File to import"], true, 1);
+        _replaceArg = CommandArgumentValue.AddArgument("r", "replace",
+            ["When defined, existing entities are replaced."], false, 0);
     }
 
     public override async Task PreValidate()
@@ -39,20 +43,26 @@ internal class ImportRuntimeModel : JobWithWaitOctoCommand
     {
         var rtModelFilePath = CommandArgumentValue.GetArgumentScalarValue<string>(_fileArg).ToLower();
 
+        var importStrategy = CommandArgumentValue.IsArgumentUsed(_replaceArg)
+            ? ImportStrategyDto.Upsert
+            : ImportStrategyDto.InsertOnly;
+
         var tenantId = Options.Value.TenantId;
         if (string.IsNullOrWhiteSpace(tenantId))
         {
             throw ToolException.NoTenantIdConfigured();
         }
 
-        Logger.LogInformation("Importing runtime model \'{RtModelFilePath}\'", rtModelFilePath);
+        Logger.LogInformation("Importing runtime model \'{RtModelFilePath}\' with import mode \'{ImportStrategy}\'",
+            rtModelFilePath, importStrategy);
 
         if (!File.Exists(rtModelFilePath))
         {
             Logger.LogError("File \'{CkModelFilePath}\' does not exist", rtModelFilePath);
             return;
         }
-        var id = await _assetServicesClient.ImportRtModelAsync(tenantId, rtModelFilePath);
+
+        var id = await _assetServicesClient.ImportRtModelAsync(tenantId, importStrategy, rtModelFilePath);
         Logger.LogInformation("Runtime model import with job id \'{Id}\' has been started", id);
         await WaitForJob(id);
     }
