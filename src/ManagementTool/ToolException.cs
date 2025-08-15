@@ -54,4 +54,16 @@ public class ToolException : Exception
         return new ToolException(
             $"The job with ID '{id}' has failed at '{toLocalTime}'. Please check the server logs for more details.");
     }
+
+    public static Exception FixupScriptAlreadyExists(string name)
+    {
+        return new ToolException(
+            $"A fixup script with the name '{name}' already exists. Please choose a different name or use the replace option to update the existing script.");
+    }
+
+    public static Exception FixupScriptAlreadyApplied(string name)
+    {
+        return new ToolException(
+            $"The fixup script with the name '{name}' has already been applied. It cannot be replaced or deleted. Please create a new script with a different name.");
+    }
 }

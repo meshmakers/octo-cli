@@ -160,6 +160,32 @@ public static class GraphQlConstants
         }
       }";
 
+    public const string GetFixupScriptByName = @"
+      query getFixupScriptByName($name: SimpleScalar!) {
+        runtime {
+          systemBotFixup(
+            fieldFilter: [
+              { attributePath: ""name"", operator: EQUALS, comparisonValue: $name }
+            ]
+          ) {
+            totalCount
+            items {
+              rtId
+              ckTypeId
+              rtVersion
+              name
+              enabled
+              script
+              isApplied
+              appliedAt
+              isSuccess
+              error
+              output
+            }
+          }
+        }
+    }";
+
     public const string CreateFixupScript = @"
       mutation createEntity($entity: SystemBotFixupInput!) {
         runtime {

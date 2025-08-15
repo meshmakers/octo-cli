@@ -1,3 +1,4 @@
 ﻿"$schema": "https://schemas.meshmakers.cloud/construction-kit-meta.schema.json"
 imports:
+  - "System"
   - "System.Bot"
