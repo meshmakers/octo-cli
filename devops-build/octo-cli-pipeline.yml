@@ -37,6 +37,11 @@ steps:
 - template: dotnet-publish-to-zip.yml
   parameters:
     exeName: 'octo-cli'
+    runtime: 'linux-arm64'
+    project: 'src/ManagementTool/*.csproj'
+- template: dotnet-publish-to-zip.yml
+  parameters:
+    exeName: 'octo-cli'
     runtime: 'osx-x64'
     project: 'src/ManagementTool/*.csproj'
 - template: dotnet-publish-to-zip.yml
