@@ -41,7 +41,7 @@ internal class ImportRuntimeModel : JobWithWaitOctoCommand
 
     public override async Task Execute()
     {
-        var rtModelFilePath = CommandArgumentValue.GetArgumentScalarValue<string>(_fileArg).ToLower();
+        var rtModelFilePath = CommandArgumentValue.GetArgumentScalarValue<string>(_fileArg);
 
         var importStrategy = CommandArgumentValue.IsArgumentUsed(_replaceArg)
             ? ImportStrategyDto.Upsert

@@ -26,7 +26,7 @@ internal class DumpTenant : JobOctoCommand
     public override async Task Execute()
     {
         var tenantId = CommandArgumentValue.GetArgumentScalarValue<string>(_tenantIdArg).ToLower();
-        var filePath = CommandArgumentValue.GetArgumentScalarValue<string>(_fileArg).ToLower();
+        var filePath = CommandArgumentValue.GetArgumentScalarValue<string>(_fileArg);
 
         Logger.LogInformation(
             "Create dump of tenant \'{TenantId}\' at \'{ServiceClientServiceUri}\'", tenantId, ServiceClient.ServiceUri);

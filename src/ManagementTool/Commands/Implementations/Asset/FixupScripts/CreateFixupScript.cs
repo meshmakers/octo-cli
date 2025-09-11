@@ -40,7 +40,7 @@ internal class CreateFixupScript : ServiceClientOctoCommand<ITenantClient>
 
     public override async Task Execute()
     {
-        var filePath = CommandArgumentValue.GetArgumentScalarValue<string>(_fileArg).ToLower();
+        var filePath = CommandArgumentValue.GetArgumentScalarValue<string>(_fileArg);
 
         Logger.LogInformation(
             "Creating fixup script at \'{ValueAssetServiceUrl}\' for tenant \'{ValueTenantId}\'",

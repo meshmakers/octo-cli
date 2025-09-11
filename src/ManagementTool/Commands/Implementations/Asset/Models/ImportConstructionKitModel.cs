@@ -34,7 +34,7 @@ internal class ImportConstructionKitModel : JobWithWaitOctoCommand
 
     public override async Task Execute()
     {
-        var ckModelFilePath = CommandArgumentValue.GetArgumentScalarValue<string>(_fileArg).ToLower();
+        var ckModelFilePath = CommandArgumentValue.GetArgumentScalarValue<string>(_fileArg);
 
         var tenantId = Options.Value.TenantId;
         if (string.IsNullOrWhiteSpace(tenantId))
