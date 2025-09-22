@@ -7,27 +7,24 @@ using Microsoft.Extensions.Options;
 
 namespace Meshmakers.Octo.Frontend.ManagementTool.Commands;
 
-internal abstract class JobOctoCommand : Command<OctoToolOptions>
+internal abstract class JobOctoCommand(
+    ILogger<JobOctoCommand> logger,
+    string commandGroup,
+    string commandValue,
+    string commandDescription,
+    IOptions<OctoToolOptions> options,
+    IBotServicesClient botServiceClient,
+    IAuthenticationService authenticationService)
+    : Command<OctoToolOptions>(logger, commandGroup, commandValue, commandDescription, options)
 {
-    private readonly IAuthenticationService _authenticationService;
-
-    protected JobOctoCommand(ILogger<JobOctoCommand> logger, string commandGroup, string commandValue, string commandDescription,
-        IOptions<OctoToolOptions> options,
-        IBotServicesClient botServiceClient, IAuthenticationService authenticationService)
-        : base(logger, commandGroup, commandValue, commandDescription, options)
-    {
-        ServiceClient = botServiceClient;
-        _authenticationService = authenticationService;
-    }
-
-    protected IBotServicesClient ServiceClient { get; }
+    protected IBotServicesClient ServiceClient { get; } = botServiceClient;
 
     public override async Task PreValidate()
     {
         Logger.LogInformation("Service URI: {ServiceClientServiceUri}", ServiceClient.ServiceUri);
         Logger.LogInformation("Default Tenant: {TenantId}", Options.Value.TenantId);
 
-        await _authenticationService.EnsureAuthenticated(ServiceClient.AccessToken);
+        await authenticationService.EnsureAuthenticated(ServiceClient.AccessToken);
     }
 
     protected async Task DownloadJobResultAsync(string tenantId, string id, string filePath)
@@ -57,12 +54,12 @@ internal abstract class JobOctoCommand : Command<OctoToolOptions>
 
             if (jobDto.Status == "Failed")
             {
-                throw ToolException.JobFailed(id, jobDto.StateChangedAt?.ToLocalTime());
+                throw ToolException.JobFailed(id, jobDto.StateChangedAt?.ToLocalTime(), jobDto.ErrorMessage);
             }
 
             if (jobDto.Status == "Deleted")
             {
-                throw ToolException.JobDeleted(id, jobDto.StateChangedAt?.ToLocalTime());
+                throw ToolException.JobDeleted(id, jobDto.StateChangedAt?.ToLocalTime(), jobDto.ErrorMessage);
             }
 
             if (lastJobDto == null || lastJobDto.StateChangedAt != jobDto.StateChangedAt ||
