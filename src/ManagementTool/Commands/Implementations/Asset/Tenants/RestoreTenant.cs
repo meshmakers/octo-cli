@@ -33,7 +33,11 @@ internal class RestoreTenant : JobWithWaitOctoCommand
         var tenantId = CommandArgumentValue.GetArgumentScalarValue<string>(_tenantIdArg).ToLower();
         var databaseName = CommandArgumentValue.GetArgumentScalarValue<string>(_databaseArg).ToLower();
         var filePath = CommandArgumentValue.GetArgumentScalarValue<string>(_fileArg);
-        var oldDatabaseName = CommandArgumentValue.GetArgumentScalarValue<string?>(_oldDatabaseNameArg)?.ToLower();
+        string? oldDatabaseName = null;
+        if (CommandArgumentValue.IsArgumentUsed(_oldDatabaseNameArg))
+        {
+            oldDatabaseName = CommandArgumentValue.GetArgumentScalarValue<string>(_oldDatabaseNameArg);
+        }
 
         Logger.LogInformation(
             "Restoring tenant \'{TenantId}\' (database \'{DatabaseName}\') at \'{ServiceClientServiceUri}\'. Old database name: \'{oldDatabaseName}\'", tenantId,
