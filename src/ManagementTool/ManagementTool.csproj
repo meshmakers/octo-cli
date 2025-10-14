@@ -61,4 +61,23 @@
     <ItemGroup>
       <ProjectReference Include="..\GraphQlDtos\GraphQlDtos.csproj" />
     </ItemGroup>
+
+    <ItemGroup>
+      <!-- Embedded resources for tenant comparison viewer -->
+      <EmbeddedResource Include="Commands\Implementations\Bots\TenantComparison\template.html" />
+      <EmbeddedResource Include="Commands\Implementations\Bots\TenantComparison\dist\viewer.bundle.js" />
+    </ItemGroup>
+
+    <!-- Build the tenant comparison viewer bundle before building the project -->
+    <Target Name="BuildComparisonViewer" BeforeTargets="BeforeBuild">
+        <PropertyGroup>
+            <ComparisonViewerPath>$(MSBuildProjectDirectory)\Commands\Implementations\Bots\TenantComparison</ComparisonViewerPath>
+        </PropertyGroup>
+
+        <!-- Check if node_modules exists, if not run npm install -->
+        <Exec Command="npm install" WorkingDirectory="$(ComparisonViewerPath)" Condition="!Exists('$(ComparisonViewerPath)\node_modules')" />
+
+        <!-- Build the viewer bundle -->
+        <Exec Command="npm run build" WorkingDirectory="$(ComparisonViewerPath)" />
+    </Target>
 </Project>

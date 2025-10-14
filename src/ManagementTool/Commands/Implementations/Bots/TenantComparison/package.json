@@ -1,0 +1,18 @@
+{
+  "name": "octo-tenant-comparison-viewer",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Build tooling for OctoMesh tenant comparison viewer",
+  "scripts": {
+    "build": "node build.js"
+  },
+  "dependencies": {
+    "lucide-react": "^0.462.0"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "esbuild": "^0.24.0",
+    "typescript": "^5.7.2"
+  }
+}

@@ -16,6 +16,7 @@ internal class CompareLiveTenantWithBackup : JobWithWaitOctoCommand
     private readonly IArgument _maxEntitiesPerTypeArg;
     private readonly IArgument _includePropertyDifferencesArg;
     private readonly IArgument _includeAssociationDifferencesArg;
+    private readonly IArgument _viewArg;
 
     public CompareLiveTenantWithBackup(ILogger<CompareLiveTenantWithBackup> logger, IOptions<OctoToolOptions> options,
         IBotServicesClient botServicesClient, IAuthenticationService authenticationService)
@@ -37,6 +38,8 @@ internal class CompareLiveTenantWithBackup : JobWithWaitOctoCommand
             ["Include detailed property differences"], false, 0);
         _includeAssociationDifferencesArg = CommandArgumentValue.AddArgument("iad", "includeAssocDiff",
             ["Include association differences"], false, 0);
+        _viewArg = CommandArgumentValue.AddArgument("v", "view",
+            ["Open viewer in browser after completion"], false, 0);
     }
 
     public override async Task Execute()
@@ -94,5 +97,11 @@ internal class CompareLiveTenantWithBackup : JobWithWaitOctoCommand
             "Comparison of tenant '{TenantId}' with backup completed", sourceTenantId);
 
         await DownloadJobResultAsync(tenantId, response.JobId, outputFile);
+
+        // Open viewer if requested
+        if (CommandArgumentValue.IsArgumentUsed(_viewArg))
+        {
+            ComparisonViewerGenerator.GenerateAndOpen(outputFile, Logger);
+        }
     }
 }
