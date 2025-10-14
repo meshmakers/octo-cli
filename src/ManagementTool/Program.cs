@@ -251,6 +251,7 @@ internal static class Program
         services.AddTransient<ICommand, CompareLiveTenants>();
         services.AddTransient<ICommand, CompareLiveTenantWithBackup>();
         services.AddTransient<ICommand, CompareBackups>();
+        services.AddTransient<ICommand, CompareBackupWithLiveTenant>();
 
         services.AddTransient<ICommand, CreateFixupScript>();
         services.AddTransient<ICommand, RunFixupScripts>();
