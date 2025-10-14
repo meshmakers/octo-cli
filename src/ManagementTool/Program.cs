@@ -9,6 +9,7 @@ using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Asset.Mod
 using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Asset.Tenants;
 using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Asset.TimeSeries;
 using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Bots.ServiceHooks;
+using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Bots.TenantComparison;
 using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Communication;
 using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.DevOps.Certificates;
 using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Diagnostics;
@@ -246,6 +247,10 @@ internal static class Program
         services.AddTransient<ICommand, CreateServiceHook>();
         services.AddTransient<ICommand, UpdateServiceHook>();
         services.AddTransient<ICommand, DeleteServiceHook>();
+
+        services.AddTransient<ICommand, CompareLiveTenants>();
+        services.AddTransient<ICommand, CompareLiveTenantWithBackup>();
+        services.AddTransient<ICommand, CompareBackups>();
 
         services.AddTransient<ICommand, CreateFixupScript>();
         services.AddTransient<ICommand, RunFixupScripts>();
