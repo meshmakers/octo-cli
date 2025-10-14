@@ -85,7 +85,7 @@ internal class CompareBackupWithLiveTenant : JobWithWaitOctoCommand
         }
 
         var response =
-            await ServiceClient.CompareBackupWithLiveTenantAsync(tenantId, backupFile, targetTenantId, optionsJson);
+            await ServiceClient.CompareBackupWithLiveTenantAsync(backupFile, targetTenantId, optionsJson);
         Logger.LogInformation("Tenant comparison job with id '{JobId}' has been started", response.JobId);
 
         await WaitForJob(response.JobId);

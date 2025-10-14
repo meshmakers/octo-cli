@@ -87,7 +87,7 @@ internal class CompareBackups : JobWithWaitOctoCommand
             optionsJson = JsonSerializer.Serialize(options);
         }
 
-        var response = await ServiceClient.CompareBackupsAsync(tenantId, sourceBackupFile, targetBackupFile, optionsJson);
+        var response = await ServiceClient.CompareBackupsAsync(sourceBackupFile, targetBackupFile, optionsJson);
         Logger.LogInformation("Backup comparison job with id '{JobId}' has been started", response.JobId);
 
         await WaitForJob(response.JobId);
