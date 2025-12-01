@@ -10,9 +10,9 @@
         <PublishProtocol>FileSystem</PublishProtocol>
         <RootNamespace>Meshmakers.Octo.Frontend.ManagementTool</RootNamespace>
         <RuntimeIdentifier Condition="'$([MSBuild]::IsOsPlatform(Linux))'">linux-x64</RuntimeIdentifier>
-        <RuntimeIdentifier Condition="'$([MSBuild]::IsOsPlatform(OSX))'">osx-x64</RuntimeIdentifier>
+        <RuntimeIdentifier Condition="'$([MSBuild]::IsOsPlatform(OSX))'">osx-arm64</RuntimeIdentifier>
         <RuntimeIdentifier Condition="'$([MSBuild]::IsOsPlatform(Windows))'">win-x64</RuntimeIdentifier>
-        <RuntimeIdentifiers>win-x64;linux-x64;osx-x64</RuntimeIdentifiers>
+        <RuntimeIdentifiers>win-x64;linux-x64;osx-arm64</RuntimeIdentifiers>
         <_IsPortable>false</_IsPortable>
         <Configurations>Debug;Release;DebugL</Configurations>
         <Platforms>AnyCPU</Platforms>

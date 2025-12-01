@@ -42,7 +42,7 @@ steps:
 - template: dotnet-publish-to-zip.yml
   parameters:
     exeName: 'octo-cli'
-    runtime: 'osx-x64'
+    runtime: 'osx-arm64'
     project: 'src/ManagementTool/*.csproj'
 - template: dotnet-publish-to-zip.yml
   parameters:
