@@ -1,6 +1,6 @@
 using GraphQL;
 using GraphQlDtos;
-using GraphQlDtos.DataTransferObjects.System.Bot.v1;
+using GraphQlDtos.DataTransferObjects.System.Bot.v2;
 using Meshmakers.Common.CommandLineParser;
 using Meshmakers.Octo.Communication.Contracts.DataTransferObjects;
 using Meshmakers.Octo.Frontend.ManagementTool.Services;
