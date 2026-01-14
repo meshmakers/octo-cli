@@ -1,1 +1,1 @@
-global using GraphQlDtos.DataTransferObjects.System.v1;
+global using GraphQlDtos.DataTransferObjects.System.v2;
