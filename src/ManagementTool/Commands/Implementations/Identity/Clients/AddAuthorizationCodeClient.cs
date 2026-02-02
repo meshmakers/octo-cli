@@ -16,6 +16,7 @@ internal class AddAuthorizationCodeClient : ServiceClientOctoCommand<IIdentitySe
     private readonly IArgument _clientName;
     private readonly IArgument _clientUri;
     private readonly IArgument _redirectUri;
+    private readonly IArgument _frontChannelLogoutUri;
 
     public AddAuthorizationCodeClient(ILogger<AddAuthorizationCodeClient> logger, IOptions<OctoToolOptions> options,
         IIdentityServicesClient identityServicesClient, IAuthenticationService authenticationService)
@@ -33,6 +34,8 @@ internal class AddAuthorizationCodeClient : ServiceClientOctoCommand<IIdentitySe
         _clientName = CommandArgumentValue.AddArgument("n", "name", ["Display name of client used for grants"],
             true,
             1);
+        _frontChannelLogoutUri = CommandArgumentValue.AddArgument("fclo", "frontChannelLogoutUri",
+            ["Front-channel logout URI for Single Logout (SLO)"], false, 1);
     }
 
     public override async Task Execute()
@@ -63,6 +66,13 @@ internal class AddAuthorizationCodeClient : ServiceClientOctoCommand<IIdentitySe
             var redirectUri = CommandArgumentValue.GetArgumentScalarValue<string>(_redirectUri);
 
             clientDto.RedirectUris = [redirectUri];
+        }
+
+        if (CommandArgumentValue.IsArgumentUsed(_frontChannelLogoutUri))
+        {
+            var frontChannelLogoutUri = CommandArgumentValue.GetArgumentScalarValue<string>(_frontChannelLogoutUri);
+            clientDto.FrontChannelLogoutUri = frontChannelLogoutUri;
+            clientDto.FrontChannelLogoutSessionRequired = true;
         }
 
         await ServiceClient.CreateClient(clientDto);

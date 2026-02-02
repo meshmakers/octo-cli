@@ -13,19 +13,22 @@ internal class UpdateClient : ServiceClientOctoCommand<IIdentityServicesClient>
     private readonly IArgument _clientName;
     private readonly IArgument _clientUri;
     private readonly IArgument _redirectUri;
+    private readonly IArgument _frontChannelLogoutUri;
 
     public UpdateClient(ILogger<UpdateClient> logger, IOptions<OctoToolOptions> options,
         IIdentityServicesClient identityServicesClient, IAuthenticationService authenticationService)
-        : base(logger, Constants.IdentityServicesGroup, "UpdateClient", "Updates a new client.", options,
+        : base(logger, Constants.IdentityServicesGroup, "UpdateClient", "Updates an existing client.", options,
             identityServicesClient, authenticationService)
     {
         _clientUri = CommandArgumentValue.AddArgument("u", "clientUri", ["URI of client"], false, 1);
         _redirectUri = CommandArgumentValue.AddArgument("ru", "redirectUri",
             ["Redirect URI for login procedure"], false, 1);
         _clientId = CommandArgumentValue.AddArgument("id", "clientId", ["ServiceClient ID, must be unique"],
-            false, 1);
+            true, 1);
         _clientName =
             CommandArgumentValue.AddArgument("n", "name", ["Display name of client used for grants"], false, 1);
+        _frontChannelLogoutUri = CommandArgumentValue.AddArgument("fclo", "frontChannelLogoutUri",
+            ["Front-channel logout URI for Single Logout (SLO)"], false, 1);
     }
 
     public override async Task Execute()
@@ -59,6 +62,13 @@ internal class UpdateClient : ServiceClientOctoCommand<IIdentityServicesClient>
             var clientName = CommandArgumentValue.GetArgumentScalarValue<string>(_clientName);
 
             clientDto.ClientName = clientName;
+        }
+
+        if (CommandArgumentValue.IsArgumentUsed(_frontChannelLogoutUri))
+        {
+            var frontChannelLogoutUri = CommandArgumentValue.GetArgumentScalarValue<string>(_frontChannelLogoutUri);
+            clientDto.FrontChannelLogoutUri = frontChannelLogoutUri;
+            clientDto.FrontChannelLogoutSessionRequired = true;
         }
 
         await ServiceClient.UpdateClient(clientId, clientDto);

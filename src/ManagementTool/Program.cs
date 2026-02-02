@@ -191,6 +191,7 @@ internal static class Program
         services.AddTransient<ICommand, ExportRuntimeModelByDeepGraph>();
 
         services.AddTransient<ICommand, GetClients>();
+        services.AddTransient<ICommand, GetClient>();
         services.AddTransient<ICommand, AddAuthorizationCodeClient>();
         services.AddTransient<ICommand, AddClientCredentialsClient>();
         services.AddTransient<ICommand, AddDeviceCodeClient>();

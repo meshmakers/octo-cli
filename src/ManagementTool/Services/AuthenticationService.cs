@@ -25,27 +25,30 @@ public class AuthenticationService : IAuthenticationService
 
     public async Task EnsureAuthenticated(IServiceClientAccessToken serviceClientAccessToken)
     {
-        if (string.IsNullOrEmpty(_authenticationOptions.Value.RefreshToken) ||
-            string.IsNullOrEmpty(_authenticationOptions.Value.AccessToken))
+        if (string.IsNullOrEmpty(_authenticationOptions.Value.AccessToken))
         {
             Logger.Info("No credential data available.");
             return;
         }
 
-        var ensureAuthenticationData = await
-            _authenticatorClient.EnsureAuthenticatedAsync(_authenticationOptions.Value.RefreshToken,
-                _authenticationOptions.Value.AccessToken);
+        // If we have a refresh token, try to refresh the access token if needed
+        if (!string.IsNullOrEmpty(_authenticationOptions.Value.RefreshToken))
+        {
+            var ensureAuthenticationData = await
+                _authenticatorClient.EnsureAuthenticatedAsync(_authenticationOptions.Value.RefreshToken,
+                    _authenticationOptions.Value.AccessToken);
 
-        if (ensureAuthenticationData.IsRefreshDone)
-        {
-            SaveAuthenticationData(ensureAuthenticationData.RefreshedAuthenticationData);
-            serviceClientAccessToken.AccessToken = ensureAuthenticationData.RefreshedAuthenticationData.AccessToken;
-            Logger.Info("Credential data has been refreshed.");
+            if (ensureAuthenticationData.IsRefreshDone)
+            {
+                SaveAuthenticationData(ensureAuthenticationData.RefreshedAuthenticationData);
+                serviceClientAccessToken.AccessToken = ensureAuthenticationData.RefreshedAuthenticationData.AccessToken;
+                Logger.Info("Credential data has been refreshed.");
+                return;
+            }
         }
-        else
-        {
-            serviceClientAccessToken.AccessToken = _authenticationOptions.Value.AccessToken;
-        }
+
+        // Use the existing access token (even without refresh token)
+        serviceClientAccessToken.AccessToken = _authenticationOptions.Value.AccessToken;
     }
 
     public void SaveAuthenticationData(AuthenticationData authenticationData)
