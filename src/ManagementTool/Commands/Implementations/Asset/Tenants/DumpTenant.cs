@@ -41,7 +41,12 @@ internal class DumpTenant : JobOctoCommand
         await WaitForJob(response.JobId);
 
         Logger.LogInformation(
-            "Dump of tenant \'{TenantId}\' at \'{ServiceClientServiceUri}\' created", tenantId, ServiceClient.ServiceUri);
-        await DownloadJobResultAsync(tenantId, response.JobId, filePath);
+            "Dump of tenant \'{TenantId}\' at \'{ServiceClientServiceUri}\' created. Downloading...", tenantId, ServiceClient.ServiceUri);
+        await ServiceClient.DownloadDumpToFileAsync(tenantId, response.JobId, filePath,
+            bytesDownloaded =>
+            {
+                Logger.LogInformation("Downloaded {Bytes:N0} bytes", bytesDownloaded);
+            });
+        Logger.LogInformation("Dump downloaded to \'{FilePath}\'", filePath);
     }
 }

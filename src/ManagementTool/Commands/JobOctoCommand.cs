@@ -31,9 +31,12 @@ internal abstract class JobOctoCommand(
     {
         Logger.LogInformation("[{TenantId}] Downloading file of job \'{Id}\'", tenantId, id);
 
-        var responseContent = await ServiceClient.DownloadExportRtResultAsync(tenantId, id);
+        await ServiceClient.DownloadDumpToFileAsync(tenantId, id, filePath,
+            totalBytes =>
+            {
+                Logger.LogInformation("[{TenantId}] Downloaded {TotalBytes} bytes...", tenantId, totalBytes);
+            });
 
-        await File.WriteAllBytesAsync(filePath, responseContent);
         Logger.LogInformation("[{TenantId}] File downloaded at \'{FilePath}\'", tenantId, filePath);
     }
 

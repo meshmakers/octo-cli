@@ -53,8 +53,12 @@ internal class RestoreTenant : JobWithWaitOctoCommand
             throw ToolException.FilePathDoesNotExist(filePath);
         }
         
-        var response = await ServiceClient.RestoreRepositoryAsync(tenantId, databaseName, filePath, oldDatabaseName);
-        Logger.LogInformation("Run restore with job id \'{Id}\' has been started", response.JobId);
+        var response = await ServiceClient.RestoreRepositoryWithTusAsync(tenantId, databaseName, filePath, oldDatabaseName,
+            progress =>
+            {
+                Logger.LogInformation("Upload progress: {Progress:P0}", progress);
+            });
+        Logger.LogInformation("Upload complete. Restore job with id \'{Id}\' has been started", response.JobId);
         await WaitForJob(response.JobId);
         Logger.LogInformation(
             "Tenant \'{TenantId}\' (database \'{DatabaseName}\') at \'{ServiceClientServiceUri}\' restored", tenantId,
