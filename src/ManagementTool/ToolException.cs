@@ -37,12 +37,6 @@ public class ToolException : Exception
             $"The filter operator '{filterArg}' is invalid for the term '{term}'. Please provide a valid filter operator.");
     }
 
-    public static Exception IdNotFound(string serviceHookId, string serviceHook)
-    {
-        return new ToolException(
-            $"The service hook with ID '{serviceHookId}' was not found in the service '{serviceHook}'. Please check the ID and try again.");
-    }
-
     public static Exception JobDeleted(string id, DateTime? dateTime, string? message)
     {
         return new ToolException(
@@ -65,5 +59,10 @@ public class ToolException : Exception
     {
         return new ToolException(
             $"The fixup script with the name '{name}' has already been applied. It cannot be replaced or deleted. Please create a new script with a different name.");
+    }
+
+    public static Exception OperationCancelledByUser()
+    {
+        return new ToolException("Operation cancelled by user.");
     }
 }

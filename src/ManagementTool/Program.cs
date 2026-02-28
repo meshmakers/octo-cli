@@ -8,7 +8,6 @@ using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Asset.Fix
 using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Asset.Models;
 using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Asset.Tenants;
 using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Asset.TimeSeries;
-using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Bots.ServiceHooks;
 using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Communication;
 using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.DevOps.Certificates;
 using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Diagnostics;
@@ -98,6 +97,7 @@ internal static class Program
             loggingBuilder.AddNLog(config);
         });
 
+        services.AddSingleton<IConfirmationService, ConfirmationService>();
         services.AddSingleton<IConsoleService, ConsoleService>();
         services.AddSingleton<IEnvironmentService, EnvironmentService>();
         services.AddSingleton<IParserService, ParserService>();
@@ -243,10 +243,6 @@ internal static class Program
         services.AddTransient<ICommand, DeleteApiSecretClient>();
         services.AddTransient<ICommand, AddScopeToClient>();
 
-        services.AddTransient<ICommand, GetServiceHooks>();
-        services.AddTransient<ICommand, CreateServiceHook>();
-        services.AddTransient<ICommand, UpdateServiceHook>();
-        services.AddTransient<ICommand, DeleteServiceHook>();
 
         services.AddTransient<ICommand, CreateFixupScript>();
         services.AddTransient<ICommand, RunFixupScripts>();

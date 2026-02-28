@@ -104,7 +104,7 @@ Environment variables are prefixed with `OCTO_`.
 |----------|----------|---------|
 | Identity | users, roles, clients, identityProviders, apiResources, apiScopes | Identity Services |
 | Asset | tenants, models, timeSeries | Asset Repository |
-| Bots | notifications, serviceHooks | Bot Services |
+| Bots | notifications | Bot Services |
 | Communication | enable/disable | Communication Controller |
 | Reporting | enable/disable | Report Services |
 | DevOps | certificates | Local operations |
@@ -130,6 +130,46 @@ octo-cli users get
 
 # Create tenant
 octo-cli tenants create -n "MyTenant"
+```
+
+## Confirmation Dialogs for Destructive Commands
+
+All destructive commands (Delete, Clean, Reset, Remove) require interactive user confirmation before executing. This prevents accidental data loss from typos or wrong IDs.
+
+### How It Works
+
+- **`IConfirmationService`** (`Services/IConfirmationService.cs`): Interface injected into destructive commands.
+- **`ConfirmationService`** (`Services/ConfirmationService.cs`): Prompts the user with `"<message> (y/N): "`. Returns `true` only on "y" or "yes" (case-insensitive). If input is redirected (piped/non-interactive), writes an error to stderr and returns `false`.
+- **`--yes` / `-y` flag**: All destructive commands accept this flag to skip the confirmation prompt, enabling CI/automation use.
+- **`ToolException.OperationCancelledByUser()`**: Thrown when the user declines confirmation.
+
+### Commands with Confirmation
+
+| Command | Confirmation Message |
+|---------|---------------------|
+| `DeleteTenant` | `delete tenant '{tenantId}'` |
+| `CleanTenant` | `clean tenant '{tenantId}'? This will reset it to factory defaults` |
+| `ClearTenantCache` | `clear the cache for tenant '{tenantId}'` |
+| `DeleteUser` | `delete user '{name}'` |
+| `ResetPassword` | `reset the password for user '{name}'` |
+| `RemoveUserFromRole` | `remove user '{name}' from role '{roleName}'` |
+| `DeleteRole` | `delete role '{name}'` |
+| `DeleteClient` | `delete client '{clientId}'` |
+| `DeleteIdentityProvider` | `delete identity provider '{rtId}'` |
+| `DeleteApiResource` | `delete API resource '{name}'` |
+| `DeleteApiScope` | `delete API scope '{name}'` |
+| `DeleteApiSecretApiResource` | `delete API secret for resource '{name}'` |
+| `DeleteApiSecretClient` | `delete API secret for client '{clientId}'` |
+
+### Usage Examples
+
+```bash
+# Interactive: prompts for confirmation
+octo-cli tenants Delete -tid my-tenant
+
+# Skip confirmation (for scripts/CI)
+octo-cli tenants Delete -tid my-tenant --yes
+octo-cli tenants Delete -tid my-tenant -y
 ```
 
 ## Documentation Guidelines
