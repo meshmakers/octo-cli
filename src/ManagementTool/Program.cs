@@ -143,7 +143,11 @@ internal static class Program
 
         services.AddOptions<IdentityServiceClientOptions>()
             .Configure<IOptions<OctoToolOptions>>(
-                (options, toolOptions) => { options.EndpointUri = toolOptions.Value.IdentityServiceUrl; });
+                (options, toolOptions) =>
+                {
+                    options.TenantId = toolOptions.Value.TenantId;
+                    options.EndpointUri = toolOptions.Value.IdentityServiceUrl;
+                });
 
         services.AddOptions<StreamDataServiceClientOptions>()
             .Configure<IOptions<OctoToolOptions>>(
