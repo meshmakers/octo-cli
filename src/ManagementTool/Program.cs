@@ -1,6 +1,5 @@
 ﻿using Meshmakers.Common.CommandLineParser;
 using Meshmakers.Common.CommandLineParser.Commands;
-using Meshmakers.Common.Configuration;
 using Meshmakers.Common.Shared.Services;
 using Meshmakers.Octo.Communication.Contracts;
 using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations;
@@ -13,6 +12,7 @@ using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Communica
 using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.DevOps.Certificates;
 using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Diagnostics;
 using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.General.Authentication;
+using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.General.Context;
 using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Identity;
 using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Identity.ApiResources;
 using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Identity.ApiScopes;
@@ -75,20 +75,47 @@ internal static class Program
         // Runner is the custom class
         services.AddTransient<Runner>();
 
+        // Load context-based configuration
+        var contextManager = new ContextManager();
+        contextManager.MigrateIfNeeded();
+        contextManager.Load();
+
+        var activeContext = contextManager.GetActiveContext();
+
         var config = new ConfigurationBuilder()
             .SetBasePath(Directory.GetCurrentDirectory())
             .AddJsonFile("appsettings.json", true, true)
-            .AddJsonFile(
-                Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
-                    $".{Constants.OctoToolUserFolderName}{Path.DirectorySeparatorChar}settings.json"),
-                true, true)
             .Build();
 
+        services.AddSingleton<IContextManager>(contextManager);
+
         services.Configure<OctoToolOptions>(options =>
-            config.GetSection(Constants.OctoToolOptionsRootNode).Bind(options));
+        {
+            if (activeContext == null)
+            {
+                return;
+            }
+
+            options.IdentityServiceUrl = activeContext.OctoToolOptions.IdentityServiceUrl;
+            options.AssetServiceUrl = activeContext.OctoToolOptions.AssetServiceUrl;
+            options.BotServiceUrl = activeContext.OctoToolOptions.BotServiceUrl;
+            options.CommunicationServiceUrl = activeContext.OctoToolOptions.CommunicationServiceUrl;
+            options.ReportingServiceUrl = activeContext.OctoToolOptions.ReportingServiceUrl;
+            options.AdminPanelUrl = activeContext.OctoToolOptions.AdminPanelUrl;
+            options.TenantId = activeContext.OctoToolOptions.TenantId;
+        });
 
         services.Configure<OctoToolAuthenticationOptions>(options =>
-            config.GetSection(Constants.AuthenticationRootNode).Bind(options));
+        {
+            if (activeContext == null)
+            {
+                return;
+            }
+
+            options.AccessToken = activeContext.Authentication.AccessToken;
+            options.RefreshToken = activeContext.Authentication.RefreshToken;
+            options.AccessTokenExpiresAt = activeContext.Authentication.AccessTokenExpiresAt;
+        });
 
         // configure Logging with NLog
         services.AddLogging(loggingBuilder =>
@@ -102,15 +129,6 @@ internal static class Program
         services.AddSingleton<IEnvironmentService, EnvironmentService>();
         services.AddSingleton<IParserService, ParserService>();
         services.AddSingleton<ICommandParser, CommandParser>();
-        services.AddSingleton<IConfigWriter, ConfigWriter>(provider =>
-        {
-            var configWriter = new ConfigWriter();
-            configWriter.AddOptions(Constants.OctoToolOptionsRootNode,
-                provider.GetRequiredService<IOptions<OctoToolOptions>>());
-            configWriter.AddOptions(Constants.AuthenticationRootNode,
-                provider.GetRequiredService<IOptions<OctoToolAuthenticationOptions>>());
-            return configWriter;
-        });
 
         services.AddOptions<AuthenticatorOptions>()
             .Configure<IOptions<OctoToolOptions>>(
@@ -188,6 +206,10 @@ internal static class Program
 
         services.AddTransient<ICommand, LogInCommand>();
         services.AddTransient<ICommand, AuthStatusCommand>();
+
+        services.AddTransient<ICommand, AddContextCommand>();
+        services.AddTransient<ICommand, RemoveContextCommand>();
+        services.AddTransient<ICommand, UseContextCommand>();
 
         services.AddTransient<ICommand, ImportConstructionKitModel>();
         services.AddTransient<ICommand, ImportRuntimeModel>();

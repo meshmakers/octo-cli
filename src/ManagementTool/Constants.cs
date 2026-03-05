@@ -14,4 +14,5 @@ internal static class Constants
     public const string ReportingServicesGroup = "Reporting Services";
     public const string DiagnosticsGroup = "Diagnostics";
     public const string DevOpsGroup = "DevOps";
+    public const string ContextGroup = "Context Management";
 }

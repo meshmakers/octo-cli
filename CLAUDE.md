@@ -43,10 +43,12 @@ src/
 │   │       ├── Communication/# Communication controller commands
 │   │       ├── Diagnostics/  # Log level commands
 │   │       ├── DevOps/       # Certificate generation commands
-│   │       ├── General/      # Authentication commands
+│   │       ├── General/      # Authentication and context commands
+│   │       │   ├── Authentication/  # LogIn, AuthStatus
+│   │       │   └── Context/         # AddContext, RemoveContext, UseContext
 │   │       ├── Identity/     # User, role, client, provider commands
 │   │       └── Reporting/    # Report service commands
-│   ├── Services/             # Service layer (AuthenticationService, etc.)
+│   ├── Services/             # Service layer (AuthenticationService, ContextManager, etc.)
 │   ├── Program.cs            # Entry point
 │   └── Runner.cs             # Command execution orchestrator
 └── GraphQlDtos/              # GraphQL DTOs for service communication
@@ -54,7 +56,9 @@ src/
 
 ### Key Components
 
-- **AuthenticationService** (`Services/AuthenticationService.cs`): Handles OAuth token management. Supports both access tokens and refresh tokens. Works with device flow (no refresh token) and standard flows (with refresh token).
+- **ContextManager** (`Services/ContextManager.cs`): Manages named contexts stored in `~/.octo-cli/contexts.json`. Each context holds its own `OctoToolOptions` (service URIs, tenant) and `OctoToolAuthenticationOptions` (tokens). Supports migration from legacy `settings.json`.
+
+- **AuthenticationService** (`Services/AuthenticationService.cs`): Handles OAuth token management. Saves tokens to the active context via `IContextManager`. Supports both access tokens and refresh tokens.
 
 - **ServiceClientOctoCommand**: Base class for commands that call Octo services. Automatically handles authentication via `IAuthenticationService`.
 
@@ -75,26 +79,42 @@ The CLI supports multiple authentication methods:
    - For automated/service scenarios
    - Uses client ID and secret
 
-### Token Storage
+### Token Storage & Context Management
 
-Credentials are stored in `~/.octo-cli/settings.json`:
+The CLI uses named contexts (similar to `kubectl config use-context`) stored in `~/.octo-cli/contexts.json`. Each context holds service URIs, tenant ID, and authentication tokens independently:
 
 ```json
 {
-  "AccessToken": "eyJ...",
-  "RefreshToken": "optional...",
-  "AccessTokenExpiresAt": "2024-01-01T00:00:00Z"
+  "ActiveContext": "dev",
+  "Contexts": {
+    "dev": {
+      "OctoToolOptions": {
+        "IdentityServiceUrl": "https://localhost:5003/",
+        "AssetServiceUrl": "https://localhost:5001/",
+        "TenantId": "octosystem"
+      },
+      "Authentication": {
+        "AccessToken": "eyJ...",
+        "RefreshToken": "...",
+        "AccessTokenExpiresAt": "2024-01-01T00:00:00Z"
+      }
+    },
+    "prod": { "..." : "..." }
+  }
 }
 ```
 
-**Note**: Device flow does not provide a refresh token (no `offline_access` scope). The `AuthenticationService` handles this gracefully by using the access token directly without attempting refresh.
+**Migration**: On first run, if `contexts.json` does not exist but `settings.json` does, the CLI automatically imports the legacy settings as a `"default"` context. The original `settings.json` is kept intact.
+
+**Note**: The device code flow already requests `offline_access` scope, so refresh tokens are returned and persisted per context.
 
 ## Configuration
 
 The CLI uses:
 - **User folder**: `~/.octo-cli/` (defined in `Constants.OctoToolUserFolderName`)
-- **Settings file**: `settings.json` for authentication data
-- **Config writer**: `IConfigWriter` for persisting settings
+- **Context file**: `contexts.json` for multi-context configuration and authentication data
+- **Legacy file**: `settings.json` (auto-migrated to `contexts.json` on first run)
+- **Context manager**: `IContextManager` for loading/saving context configuration
 
 Environment variables are prefixed with `OCTO_`.
 
@@ -109,15 +129,26 @@ Environment variables are prefixed with `OCTO_`.
 | Reporting | enable/disable | Report Services |
 | DevOps | certificates | Local operations |
 | General | login, authStatus, config | Local operations |
+| Context | addContext, removeContext, useContext | Local operations |
 
 ## Common Operations
 
 ```bash
-# Login via device code flow
-octo-cli login
+# Context management
+octo-cli -c AddContext -n dev -isu https://localhost:5003/ -tid octosystem
+octo-cli -c AddContext -n prod -isu https://id.example.com/ -tid customer1
+octo-cli -c UseContext -n dev       # Switch to dev context
+octo-cli -c UseContext              # List all contexts (no -n arg)
+octo-cli -c RemoveContext -n prod   # Remove a context
+
+# Login via device code flow (tokens saved to active context)
+octo-cli -c LogIn
 
 # Check authentication status
-octo-cli authStatus
+octo-cli -c AuthStatus
+
+# Configure the active context
+octo-cli -c Config -isu https://localhost:5003/ -asu https://localhost:5001/ -tid meshtest
 
 # List identity providers
 octo-cli identityProviders get
