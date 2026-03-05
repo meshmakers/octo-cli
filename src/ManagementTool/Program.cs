@@ -18,6 +18,10 @@ using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Identity.
 using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Identity.ApiScopes;
 using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Identity.ApiSecrets;
 using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Identity.Clients;
+using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Identity.AdminProvisioning;
+using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Identity.EmailDomainGroupRules;
+using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Identity.ExternalTenantUserMappings;
+using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Identity.Groups;
 using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Identity.IdentityProviders;
 using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Identity.Roles;
 using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Identity.Users;
@@ -229,8 +233,37 @@ internal static class Program
         services.AddTransient<ICommand, AddOpenLdapIdentityProvider>();
         services.AddTransient<ICommand, AddActiveDirectoryIdentityProvider>();
         services.AddTransient<ICommand, AddAzureEntryIdIdentityProvider>();
+        services.AddTransient<ICommand, AddOctoTenantIdentityProvider>();
         services.AddTransient<ICommand, UpdateIdentityProvider>();
         services.AddTransient<ICommand, DeleteIdentityProvider>();
+
+        services.AddTransient<ICommand, GetEmailDomainGroupRules>();
+        services.AddTransient<ICommand, GetEmailDomainGroupRule>();
+        services.AddTransient<ICommand, CreateEmailDomainGroupRule>();
+        services.AddTransient<ICommand, UpdateEmailDomainGroupRule>();
+        services.AddTransient<ICommand, DeleteEmailDomainGroupRule>();
+
+        services.AddTransient<ICommand, GetGroups>();
+        services.AddTransient<ICommand, GetGroup>();
+        services.AddTransient<ICommand, CreateGroup>();
+        services.AddTransient<ICommand, UpdateGroup>();
+        services.AddTransient<ICommand, DeleteGroup>();
+        services.AddTransient<ICommand, UpdateGroupRoles>();
+        services.AddTransient<ICommand, AddUserToGroup>();
+        services.AddTransient<ICommand, RemoveUserFromGroup>();
+        services.AddTransient<ICommand, AddGroupToGroup>();
+        services.AddTransient<ICommand, RemoveGroupFromGroup>();
+
+        services.AddTransient<ICommand, GetExternalTenantUserMappings>();
+        services.AddTransient<ICommand, GetExternalTenantUserMapping>();
+        services.AddTransient<ICommand, CreateExternalTenantUserMapping>();
+        services.AddTransient<ICommand, UpdateExternalTenantUserMapping>();
+        services.AddTransient<ICommand, DeleteExternalTenantUserMapping>();
+
+        services.AddTransient<ICommand, GetAdminProvisioningMappings>();
+        services.AddTransient<ICommand, CreateAdminProvisioningMapping>();
+        services.AddTransient<ICommand, ProvisionCurrentUser>();
+        services.AddTransient<ICommand, DeleteAdminProvisioningMapping>();
 
         services.AddTransient<ICommand, CreateTenant>();
         services.AddTransient<ICommand, CleanTenant>();

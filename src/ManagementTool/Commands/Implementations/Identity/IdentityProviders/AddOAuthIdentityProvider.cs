@@ -9,8 +9,10 @@ namespace Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Ident
 
 internal class AddOAuthIdentityProvider : ServiceClientOctoCommand<IIdentityServicesClient>
 {
+    private readonly IArgument _allowSelfRegistration;
     private readonly IArgument _clientId;
     private readonly IArgument _clientSecret;
+    private readonly IArgument _defaultGroupRtId;
     private readonly IArgument _enabled;
     private readonly IArgument _name;
     private readonly IArgument _type;
@@ -33,6 +35,10 @@ internal class AddOAuthIdentityProvider : ServiceClientOctoCommand<IIdentityServ
             ["ServiceClient secret, provided by provider"], true, 1);
         _type = CommandArgumentValue.AddArgument("t", "type",
             ["Type of provider, available are 'google', 'microsoft', 'facebook'"], true, 1);
+        _allowSelfRegistration = CommandArgumentValue.AddArgument("asr", "allowSelfRegistration",
+            ["Allow self registration (default: true)"], false, 1);
+        _defaultGroupRtId = CommandArgumentValue.AddArgument("dgid", "defaultGroupRtId",
+            ["Default group RtId for new users"], false, 1);
     }
 
     public override async Task Execute()
@@ -43,42 +49,64 @@ internal class AddOAuthIdentityProvider : ServiceClientOctoCommand<IIdentityServ
         var clientId = CommandArgumentValue.GetArgumentScalarValue<string>(_clientId);
         var clientSecret = CommandArgumentValue.GetArgumentScalarValueOrDefault<string>(_clientSecret);
 
+        bool? allowSelfRegistration = CommandArgumentValue.IsArgumentUsed(_allowSelfRegistration)
+            ? CommandArgumentValue.GetArgumentScalarValue<bool>(_allowSelfRegistration)
+            : null;
+        string? defaultGroupRtId = CommandArgumentValue.IsArgumentUsed(_defaultGroupRtId)
+            ? CommandArgumentValue.GetArgumentScalarValue<string>(_defaultGroupRtId)
+            : null;
+
         Logger.LogInformation("Creating OAuth identity provider \'{Name}\' at \'{ServiceClientServiceUri}\'", name,
             ServiceClient.ServiceUri);
 
+        IdentityProviderDto identityProviderDto;
         if (type == IdentityProviderTypesDto.Google)
         {
-            var identityProviderDto = new GoogleIdentityProviderDto
+            identityProviderDto = new GoogleIdentityProviderDto
             {
                 IsEnabled = isEnabled,
                 ClientId = clientId,
                 ClientSecret = clientSecret,
                 Name = name
             };
-            await ServiceClient.CreateIdentityProvider(identityProviderDto);
         }
         else if (type == IdentityProviderTypesDto.Microsoft)
         {
-            var identityProviderDto = new MicrosoftIdentityProviderDto
+            identityProviderDto = new MicrosoftIdentityProviderDto
             {
                 IsEnabled = isEnabled,
                 ClientId = clientId,
                 ClientSecret = clientSecret,
                 Name = name
             };
-            await ServiceClient.CreateIdentityProvider(identityProviderDto);
         }
         else if (type == IdentityProviderTypesDto.Facebook)
         {
-            var identityProviderDto = new FacebookIdentityProviderDto
+            identityProviderDto = new FacebookIdentityProviderDto
             {
                 IsEnabled = isEnabled,
                 ClientId = clientId,
                 ClientSecret = clientSecret,
                 Name = name
             };
-            await ServiceClient.CreateIdentityProvider(identityProviderDto);
         }
+        else
+        {
+            Logger.LogError("Unsupported OAuth provider type '{Type}'", type);
+            return;
+        }
+
+        if (allowSelfRegistration.HasValue)
+        {
+            identityProviderDto.AllowSelfRegistration = allowSelfRegistration.Value;
+        }
+
+        if (defaultGroupRtId != null)
+        {
+            identityProviderDto.DefaultGroupRtId = defaultGroupRtId;
+        }
+
+        await ServiceClient.CreateIdentityProvider(identityProviderDto);
 
         Logger.LogInformation("Identity provider \'{Name}\' at \'{ServiceClientServiceUri}\' created", name,
             ServiceClient.ServiceUri);

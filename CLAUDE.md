@@ -46,7 +46,7 @@ src/
 │   │       ├── General/      # Authentication and context commands
 │   │       │   ├── Authentication/  # LogIn, AuthStatus
 │   │       │   └── Context/         # AddContext, RemoveContext, UseContext
-│   │       ├── Identity/     # User, role, client, provider commands
+│   │       ├── Identity/     # User, role, client, provider, group, email domain rules, external mapping, admin provisioning commands
 │   │       └── Reporting/    # Report service commands
 │   ├── Services/             # Service layer (AuthenticationService, ContextManager, etc.)
 │   ├── Program.cs            # Entry point
@@ -122,7 +122,7 @@ Environment variables are prefixed with `OCTO_`.
 
 | Category | Commands | Service |
 |----------|----------|---------|
-| Identity | users, roles, clients, identityProviders, apiResources, apiScopes | Identity Services |
+| Identity | users, roles, clients, identityProviders, groups, emailDomainGroupRules, externalTenantUserMappings, adminProvisioning, apiResources, apiScopes | Identity Services |
 | Asset | tenants, models, timeSeries | Asset Repository |
 | Bots | notifications, serviceHooks | Bot Services |
 | Communication | enable/disable | Communication Controller |
@@ -161,6 +161,41 @@ octo-cli users get
 
 # Create tenant
 octo-cli tenants create -n "MyTenant"
+
+# Groups management
+octo-cli -c GetGroups
+octo-cli -c CreateGroup -n "MyGroup" -d "Description" -rids "role1,role2"
+octo-cli -c UpdateGroup -id <groupId> -n "NewName"
+octo-cli -c DeleteGroup -id <groupId>
+octo-cli -c UpdateGroupRoles -id <groupId> -rids "role1,role2"
+octo-cli -c AddUserToGroup -id <groupId> -uid <userId>
+octo-cli -c RemoveUserFromGroup -id <groupId> -uid <userId>
+octo-cli -c AddGroupToGroup -id <parentGroupId> -cgid <childGroupId>
+octo-cli -c RemoveGroupFromGroup -id <parentGroupId> -cgid <childGroupId>
+
+# Email domain group rules
+octo-cli -c GetEmailDomainGroupRules
+octo-cli -c CreateEmailDomainGroupRule -edp "meshmakers.com" -tgid <groupRtId>
+octo-cli -c UpdateEmailDomainGroupRule -id <ruleId> -edp "meshmakers.com" -tgid <groupRtId>
+octo-cli -c DeleteEmailDomainGroupRule -id <ruleId>
+
+# External tenant user mappings
+octo-cli -c GetExternalTenantUserMappings -stid <sourceTenantId>
+octo-cli -c CreateExternalTenantUserMapping -stid <sourceTenantId> -suid <sourceUserId> -sun <sourceUserName>
+octo-cli -c UpdateExternalTenantUserMapping -id <mappingId> -rids "role1,role2"
+octo-cli -c DeleteExternalTenantUserMapping -id <mappingId>
+
+# Admin provisioning (run from system tenant context)
+octo-cli -c GetAdminProvisioningMappings -ttid <targetTenantId>
+octo-cli -c CreateAdminProvisioningMapping -ttid <targetTenantId> -stid <sourceTenantId> -suid <sourceUserId> -sun <sourceUserName>
+octo-cli -c ProvisionCurrentUser -ttid <targetTenantId>
+octo-cli -c DeleteAdminProvisioningMapping -ttid <targetTenantId> -mid <mappingId>
+
+# OctoTenant identity provider (cross-tenant auth)
+octo-cli -c AddOctoTenantIdentityProvider -n "ParentTenant" -e true -ptid <parentTenantId>
+
+# Identity providers with self-registration and default group
+octo-cli -c AddAzureEntryIdIdentityProvider -n "Azure" -e true -t <tenantId> -cid <clientId> -cs <secret> -asr false -dgid <groupRtId>
 ```
 
 ## Documentation Guidelines

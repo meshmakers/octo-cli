@@ -9,6 +9,8 @@ namespace Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Ident
 
 internal class AddActiveDirectoryIdentityProvider : ServiceClientOctoCommand<IIdentityServicesClient>
 {
+    private readonly IArgument _allowSelfRegistration;
+    private readonly IArgument _defaultGroupRtId;
     private readonly IArgument _enabled;
     private readonly IArgument _host;
     private readonly IArgument _name;
@@ -31,6 +33,10 @@ internal class AddActiveDirectoryIdentityProvider : ServiceClientOctoCommand<IId
             ["Host"], true, 1);
         _port = CommandArgumentValue.AddArgument("p", "port",
             ["Host"], true, 1);
+        _allowSelfRegistration = CommandArgumentValue.AddArgument("asr", "allowSelfRegistration",
+            ["Allow self registration (default: true)"], false, 1);
+        _defaultGroupRtId = CommandArgumentValue.AddArgument("dgid", "defaultGroupRtId",
+            ["Default group RtId for new users"], false, 1);
     }
 
     public override async Task Execute()
@@ -48,6 +54,19 @@ internal class AddActiveDirectoryIdentityProvider : ServiceClientOctoCommand<IId
             Port = CommandArgumentValue.GetArgumentScalarValue<ushort>(_port),
             Name = name
         };
+
+        if (CommandArgumentValue.IsArgumentUsed(_allowSelfRegistration))
+        {
+            identityProviderDto.AllowSelfRegistration =
+                CommandArgumentValue.GetArgumentScalarValue<bool>(_allowSelfRegistration);
+        }
+
+        if (CommandArgumentValue.IsArgumentUsed(_defaultGroupRtId))
+        {
+            identityProviderDto.DefaultGroupRtId =
+                CommandArgumentValue.GetArgumentScalarValue<string>(_defaultGroupRtId);
+        }
+
         await ServiceClient.CreateIdentityProvider(identityProviderDto);
 
         Logger.LogInformation("Identity provider \'{Name}\' at \'{ServiceClientServiceUri}\' created", name,
