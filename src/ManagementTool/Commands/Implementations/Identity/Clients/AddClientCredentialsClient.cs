@@ -48,7 +48,7 @@ internal class AddClientCredentialsClient : ServiceClientOctoCommand<IIdentitySe
             ClientName = clientName,
             ClientSecret = clientSecret,
             AllowedGrantTypes = [OidcConstants.GrantTypes.ClientCredentials],
-            AllowedScopes = [CommonConstants.AssetSystemApiFullAccess],
+            AllowedScopes = [CommonConstants.OctoApiFullAccess],
             IsOfflineAccessEnabled = true
         };
 

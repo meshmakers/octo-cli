@@ -34,26 +34,7 @@ internal class LogInCommand : Command<OctoToolOptions>
         Logger.LogInformation("Device log-in at \'{ValueIdentityServiceUrl}\' in progress...",
             Options.Value.IdentityServiceUrl);
 
-        var apiScopes = ApiScopes.IdentityApiFullAccess;
-        if (!string.IsNullOrWhiteSpace(Options.Value.BotServiceUrl))
-        {
-            apiScopes |= ApiScopes.BotApiFullAccess;
-        }
-
-        if (!string.IsNullOrWhiteSpace(Options.Value.AssetServiceUrl))
-        {
-            apiScopes |= ApiScopes.AssetSystemApiFullAccess;
-        }
-
-        if (!string.IsNullOrWhiteSpace(Options.Value.CommunicationServiceUrl))
-        {
-            apiScopes |= ApiScopes.CommunicationServiceSystemApiFullAccess;
-        }
-
-        if (!string.IsNullOrWhiteSpace(Options.Value.ReportingServiceUrl))
-        {
-            apiScopes |= ApiScopes.ReportingServiceSystemApiFullAccess;
-        }
+        var apiScopes = ApiScopes.OctoApiFullAccess;
 
         var response = await _authenticatorClient.RequestDeviceAuthorizationAsync(apiScopes);
 
