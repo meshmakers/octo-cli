@@ -87,7 +87,7 @@ Credentials are stored in `~/.octo-cli/settings.json`:
 }
 ```
 
-**Note**: Device flow does not provide a refresh token (no `offline_access` scope). The `AuthenticationService` handles this gracefully by using the access token directly without attempting refresh.
+**Note**: Device flow requests `offline_access` scope and receives a refresh token. The `AuthenticationService` handles both cases: if a refresh token is present, it refreshes expired access tokens automatically; if not, it uses the existing access token directly.
 
 ## Configuration
 
