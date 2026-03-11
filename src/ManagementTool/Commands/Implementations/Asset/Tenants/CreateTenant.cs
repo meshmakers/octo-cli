@@ -49,13 +49,21 @@ internal class CreateTenant : ServiceClientOctoCommand<IAssetServicesClient>
 
         if (!skipProvisioning)
         {
+            // Copy the access token from the asset services client to the identity services client
+            _identityServicesClient.AccessToken.AccessToken = ServiceClient.AccessToken.AccessToken;
+
             Logger.LogInformation(
-                "Provisioning current user as admin in tenant '{TenantId}'", tenantId);
+                "Provisioning current user as admin in tenant '{TenantId}' via identity service at '{IdentityServiceUri}'",
+                tenantId, _identityServicesClient.ServiceUri);
 
             await _identityServicesClient.ProvisionCurrentUser(tenantId);
 
             Logger.LogInformation(
                 "Current user provisioned as admin in tenant '{TenantId}'", tenantId);
+        }
+        else
+        {
+            Logger.LogInformation("Admin provisioning skipped (--no-provision)");
         }
     }
 }
