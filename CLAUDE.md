@@ -159,8 +159,11 @@ octo-cli identityProviders addAzureEntraId -n "Azure AD" -c <clientId> -s <secre
 # List users
 octo-cli users get
 
-# Create tenant
-octo-cli tenants create -n "MyTenant"
+# Create tenant (automatically provisions current user as admin)
+octo-cli tenants create -tid mytenant -db mytenant
+
+# Create tenant without admin provisioning
+octo-cli tenants create -tid mytenant -db mytenant --no-provision
 
 # Groups management
 octo-cli -c GetGroups
