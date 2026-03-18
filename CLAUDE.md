@@ -106,7 +106,7 @@ The CLI uses named contexts (similar to `kubectl config use-context`) stored in 
 
 **Migration**: On first run, if `contexts.json` does not exist but `settings.json` does, the CLI automatically imports the legacy settings as a `"default"` context. The original `settings.json` is kept intact.
 
-**Note**: The device code flow already requests `offline_access` scope, so refresh tokens are returned and persisted per context.
+**Note**: Device flow requests `offline_access` scope and receives a refresh token. The `AuthenticationService` handles both cases: if a refresh token is present, it refreshes expired access tokens automatically; if not, it uses the existing access token directly.
 
 ## Configuration
 
