@@ -153,7 +153,11 @@ internal static class Program
 
         services.AddOptions<AssetServiceClientOptions>()
             .Configure<IOptions<OctoToolOptions>>(
-                (options, toolOptions) => { options.EndpointUri = toolOptions.Value.AssetServiceUrl; });
+                (options, toolOptions) =>
+                {
+                    options.EndpointUri = toolOptions.Value.AssetServiceUrl;
+                    options.TenantId = toolOptions.Value.TenantId;
+                });
 
         services.AddOptions<BotServiceClientOptions>()
             .Configure<IOptions<OctoToolOptions>>(
@@ -161,7 +165,11 @@ internal static class Program
 
         services.AddOptions<CommunicationServiceClientOptions>()
             .Configure<IOptions<OctoToolOptions>>(
-                (options, toolOptions) => { options.EndpointUri = toolOptions.Value.CommunicationServiceUrl; });
+                (options, toolOptions) =>
+                {
+                    options.EndpointUri = toolOptions.Value.CommunicationServiceUrl;
+                    options.TenantId = toolOptions.Value.TenantId;
+                });
 
         services.AddOptions<IdentityServiceClientOptions>()
             .Configure<IOptions<OctoToolOptions>>(
@@ -182,7 +190,11 @@ internal static class Program
 
         services.AddOptions<ReportingServicesClientOptions>()
             .Configure<IOptions<OctoToolOptions>>(
-                (options, toolOptions) => { options.EndpointUri = toolOptions.Value.ReportingServiceUrl; });
+                (options, toolOptions) =>
+                {
+                    options.EndpointUri = toolOptions.Value.ReportingServiceUrl;
+                    options.TenantId = toolOptions.Value.TenantId;
+                });
 
         services.AddSingleton<ITenantClientAccessToken, ServiceClientAccessToken>();
         services.AddSingleton<IBotServiceClientAccessToken, ServiceClientAccessToken>();
