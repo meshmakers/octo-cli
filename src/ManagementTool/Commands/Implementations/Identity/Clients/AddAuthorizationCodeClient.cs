@@ -55,7 +55,7 @@ internal class AddAuthorizationCodeClient : ServiceClientOctoCommand<IIdentitySe
             ClientUri = clientUri,
             AllowedCorsOrigins = [clientUri.TrimEnd('/')],
             AllowedGrantTypes = [OidcConstants.GrantTypes.AuthorizationCode],
-            AllowedScopes = [CommonConstants.AssetSystemApiFullAccess],
+            AllowedScopes = [CommonConstants.OctoApiFullAccess],
             PostLogoutRedirectUris = [clientUri.EnsureEndsWith("/")],
             RedirectUris = [clientUri.EnsureEndsWith("/")],
             IsOfflineAccessEnabled = true

@@ -1,6 +1,5 @@
 ﻿using Meshmakers.Common.CommandLineParser;
 using Meshmakers.Common.CommandLineParser.Commands;
-using Meshmakers.Common.Configuration;
 using Meshmakers.Common.Shared.Services;
 using Meshmakers.Octo.Communication.Contracts;
 using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations;
@@ -12,11 +11,16 @@ using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Communica
 using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.DevOps.Certificates;
 using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Diagnostics;
 using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.General.Authentication;
+using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.General.Context;
 using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Identity;
 using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Identity.ApiResources;
 using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Identity.ApiScopes;
 using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Identity.ApiSecrets;
 using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Identity.Clients;
+using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Identity.AdminProvisioning;
+using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Identity.EmailDomainGroupRules;
+using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Identity.ExternalTenantUserMappings;
+using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Identity.Groups;
 using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Identity.IdentityProviders;
 using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Identity.Roles;
 using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Identity.Users;
@@ -74,20 +78,47 @@ internal static class Program
         // Runner is the custom class
         services.AddTransient<Runner>();
 
+        // Load context-based configuration
+        var contextManager = new ContextManager();
+        contextManager.MigrateIfNeeded();
+        contextManager.Load();
+
+        var activeContext = contextManager.GetActiveContext();
+
         var config = new ConfigurationBuilder()
             .SetBasePath(Directory.GetCurrentDirectory())
             .AddJsonFile("appsettings.json", true, true)
-            .AddJsonFile(
-                Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
-                    $".{Constants.OctoToolUserFolderName}{Path.DirectorySeparatorChar}settings.json"),
-                true, true)
             .Build();
 
+        services.AddSingleton<IContextManager>(contextManager);
+
         services.Configure<OctoToolOptions>(options =>
-            config.GetSection(Constants.OctoToolOptionsRootNode).Bind(options));
+        {
+            if (activeContext == null)
+            {
+                return;
+            }
+
+            options.IdentityServiceUrl = activeContext.OctoToolOptions.IdentityServiceUrl;
+            options.AssetServiceUrl = activeContext.OctoToolOptions.AssetServiceUrl;
+            options.BotServiceUrl = activeContext.OctoToolOptions.BotServiceUrl;
+            options.CommunicationServiceUrl = activeContext.OctoToolOptions.CommunicationServiceUrl;
+            options.ReportingServiceUrl = activeContext.OctoToolOptions.ReportingServiceUrl;
+            options.AdminPanelUrl = activeContext.OctoToolOptions.AdminPanelUrl;
+            options.TenantId = activeContext.OctoToolOptions.TenantId;
+        });
 
         services.Configure<OctoToolAuthenticationOptions>(options =>
-            config.GetSection(Constants.AuthenticationRootNode).Bind(options));
+        {
+            if (activeContext == null)
+            {
+                return;
+            }
+
+            options.AccessToken = activeContext.Authentication.AccessToken;
+            options.RefreshToken = activeContext.Authentication.RefreshToken;
+            options.AccessTokenExpiresAt = activeContext.Authentication.AccessTokenExpiresAt;
+        });
 
         // configure Logging with NLog
         services.AddLogging(loggingBuilder =>
@@ -102,15 +133,6 @@ internal static class Program
         services.AddSingleton<IEnvironmentService, EnvironmentService>();
         services.AddSingleton<IParserService, ParserService>();
         services.AddSingleton<ICommandParser, CommandParser>();
-        services.AddSingleton<IConfigWriter, ConfigWriter>(provider =>
-        {
-            var configWriter = new ConfigWriter();
-            configWriter.AddOptions(Constants.OctoToolOptionsRootNode,
-                provider.GetRequiredService<IOptions<OctoToolOptions>>());
-            configWriter.AddOptions(Constants.AuthenticationRootNode,
-                provider.GetRequiredService<IOptions<OctoToolAuthenticationOptions>>());
-            return configWriter;
-        });
 
         services.AddOptions<AuthenticatorOptions>()
             .Configure<IOptions<OctoToolOptions>>(
@@ -131,7 +153,11 @@ internal static class Program
 
         services.AddOptions<AssetServiceClientOptions>()
             .Configure<IOptions<OctoToolOptions>>(
-                (options, toolOptions) => { options.EndpointUri = toolOptions.Value.AssetServiceUrl; });
+                (options, toolOptions) =>
+                {
+                    options.EndpointUri = toolOptions.Value.AssetServiceUrl;
+                    options.TenantId = toolOptions.Value.TenantId;
+                });
 
         services.AddOptions<BotServiceClientOptions>()
             .Configure<IOptions<OctoToolOptions>>(
@@ -139,11 +165,19 @@ internal static class Program
 
         services.AddOptions<CommunicationServiceClientOptions>()
             .Configure<IOptions<OctoToolOptions>>(
-                (options, toolOptions) => { options.EndpointUri = toolOptions.Value.CommunicationServiceUrl; });
+                (options, toolOptions) =>
+                {
+                    options.EndpointUri = toolOptions.Value.CommunicationServiceUrl;
+                    options.TenantId = toolOptions.Value.TenantId;
+                });
 
         services.AddOptions<IdentityServiceClientOptions>()
             .Configure<IOptions<OctoToolOptions>>(
-                (options, toolOptions) => { options.EndpointUri = toolOptions.Value.IdentityServiceUrl; });
+                (options, toolOptions) =>
+                {
+                    options.TenantId = toolOptions.Value.TenantId;
+                    options.EndpointUri = toolOptions.Value.IdentityServiceUrl;
+                });
 
         services.AddOptions<StreamDataServiceClientOptions>()
             .Configure<IOptions<OctoToolOptions>>(
@@ -156,7 +190,11 @@ internal static class Program
 
         services.AddOptions<ReportingServicesClientOptions>()
             .Configure<IOptions<OctoToolOptions>>(
-                (options, toolOptions) => { options.EndpointUri = toolOptions.Value.ReportingServiceUrl; });
+                (options, toolOptions) =>
+                {
+                    options.EndpointUri = toolOptions.Value.ReportingServiceUrl;
+                    options.TenantId = toolOptions.Value.TenantId;
+                });
 
         services.AddSingleton<ITenantClientAccessToken, ServiceClientAccessToken>();
         services.AddSingleton<IBotServiceClientAccessToken, ServiceClientAccessToken>();
@@ -185,6 +223,10 @@ internal static class Program
         services.AddTransient<ICommand, LogInCommand>();
         services.AddTransient<ICommand, AuthStatusCommand>();
 
+        services.AddTransient<ICommand, AddContextCommand>();
+        services.AddTransient<ICommand, RemoveContextCommand>();
+        services.AddTransient<ICommand, UseContextCommand>();
+
         services.AddTransient<ICommand, ImportConstructionKitModel>();
         services.AddTransient<ICommand, ImportRuntimeModel>();
         services.AddTransient<ICommand, ExportRuntimeModelByQuery>();
@@ -203,8 +245,37 @@ internal static class Program
         services.AddTransient<ICommand, AddOpenLdapIdentityProvider>();
         services.AddTransient<ICommand, AddActiveDirectoryIdentityProvider>();
         services.AddTransient<ICommand, AddAzureEntryIdIdentityProvider>();
+        services.AddTransient<ICommand, AddOctoTenantIdentityProvider>();
         services.AddTransient<ICommand, UpdateIdentityProvider>();
         services.AddTransient<ICommand, DeleteIdentityProvider>();
+
+        services.AddTransient<ICommand, GetEmailDomainGroupRules>();
+        services.AddTransient<ICommand, GetEmailDomainGroupRule>();
+        services.AddTransient<ICommand, CreateEmailDomainGroupRule>();
+        services.AddTransient<ICommand, UpdateEmailDomainGroupRule>();
+        services.AddTransient<ICommand, DeleteEmailDomainGroupRule>();
+
+        services.AddTransient<ICommand, GetGroups>();
+        services.AddTransient<ICommand, GetGroup>();
+        services.AddTransient<ICommand, CreateGroup>();
+        services.AddTransient<ICommand, UpdateGroup>();
+        services.AddTransient<ICommand, DeleteGroup>();
+        services.AddTransient<ICommand, UpdateGroupRoles>();
+        services.AddTransient<ICommand, AddUserToGroup>();
+        services.AddTransient<ICommand, RemoveUserFromGroup>();
+        services.AddTransient<ICommand, AddGroupToGroup>();
+        services.AddTransient<ICommand, RemoveGroupFromGroup>();
+
+        services.AddTransient<ICommand, GetExternalTenantUserMappings>();
+        services.AddTransient<ICommand, GetExternalTenantUserMapping>();
+        services.AddTransient<ICommand, CreateExternalTenantUserMapping>();
+        services.AddTransient<ICommand, UpdateExternalTenantUserMapping>();
+        services.AddTransient<ICommand, DeleteExternalTenantUserMapping>();
+
+        services.AddTransient<ICommand, GetAdminProvisioningMappings>();
+        services.AddTransient<ICommand, CreateAdminProvisioningMapping>();
+        services.AddTransient<ICommand, ProvisionCurrentUser>();
+        services.AddTransient<ICommand, DeleteAdminProvisioningMapping>();
 
         services.AddTransient<ICommand, CreateTenant>();
         services.AddTransient<ICommand, CleanTenant>();

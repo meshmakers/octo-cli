@@ -9,8 +9,10 @@ namespace Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Ident
 
 internal class AddAzureEntryIdIdentityProvider : ServiceClientOctoCommand<IIdentityServicesClient>
 {
+    private readonly IArgument _allowSelfRegistration;
     private readonly IArgument _clientId;
     private readonly IArgument _clientSecret;
+    private readonly IArgument _defaultGroupRtId;
     private readonly IArgument _enabled;
     private readonly IArgument _name;
     private readonly IArgument _tenantId;
@@ -35,6 +37,10 @@ internal class AddAzureEntryIdIdentityProvider : ServiceClientOctoCommand<IIdent
             ["ServiceClient ID, provided by provider"], true, 1);
         _clientSecret = CommandArgumentValue.AddArgument("cs", "clientSecret",
             ["ServiceClient secret, provided by provider"], true, 1);
+        _allowSelfRegistration = CommandArgumentValue.AddArgument("asr", "allowSelfRegistration",
+            ["Allow self registration (default: true)"], false, 1);
+        _defaultGroupRtId = CommandArgumentValue.AddArgument("dgid", "defaultGroupRtId",
+            ["Default group RtId for new users"], false, 1);
     }
 
     public override async Task Execute()
@@ -53,6 +59,19 @@ internal class AddAzureEntryIdIdentityProvider : ServiceClientOctoCommand<IIdent
             ClientId = CommandArgumentValue.GetArgumentScalarValue<string>(_clientId),
             ClientSecret = CommandArgumentValue.GetArgumentScalarValue<string>(_clientSecret)
         };
+
+        if (CommandArgumentValue.IsArgumentUsed(_allowSelfRegistration))
+        {
+            identityProviderDto.AllowSelfRegistration =
+                CommandArgumentValue.GetArgumentScalarValue<bool>(_allowSelfRegistration);
+        }
+
+        if (CommandArgumentValue.IsArgumentUsed(_defaultGroupRtId))
+        {
+            identityProviderDto.DefaultGroupRtId =
+                CommandArgumentValue.GetArgumentScalarValue<string>(_defaultGroupRtId);
+        }
+
         await ServiceClient.CreateIdentityProvider(identityProviderDto);
 
         Logger.LogInformation("Identity provider \'{Name}\' at \'{ServiceClientServiceUri}\' created", name,

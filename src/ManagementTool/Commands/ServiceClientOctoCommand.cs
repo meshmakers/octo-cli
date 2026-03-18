@@ -22,7 +22,7 @@ public abstract class ServiceClientOctoCommand<TServiceClientType>(
     public override async Task PreValidate()
     {
         logger.LogInformation("Service URI: {ServiceClientServiceUri}", ServiceClient.ServiceUri);
-        logger.LogInformation("Default Tenant: {TenantId}", Options.Value.TenantId);
+        logger.LogInformation("Using tenant: {TenantId}", Options.Value.TenantId);
 
         await authenticationService.EnsureAuthenticated(ServiceClient.AccessToken);
     }

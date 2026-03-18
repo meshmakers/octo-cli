@@ -1,6 +1,6 @@
 ﻿using Meshmakers.Common.CommandLineParser;
 using Meshmakers.Common.CommandLineParser.Commands;
-using Meshmakers.Common.Configuration;
+using Meshmakers.Octo.Frontend.ManagementTool.Services;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
@@ -12,16 +12,16 @@ internal class ConfigOctoCommand : Command<OctoToolOptions>
     private readonly IArgument _assetServicesUriArg;
     private readonly IArgument _botServicesUriArg;
     private readonly IArgument _communicationServicesUriArg;
-    private readonly IConfigWriter _configWriter;
+    private readonly IContextManager _contextManager;
     private readonly IArgument _identityServicesUriArg;
     private readonly IArgument _reportingServicesUriArg;
     private readonly IArgument _tenantIdArg;
 
     public ConfigOctoCommand(ILogger<ConfigOctoCommand> logger, IOptions<OctoToolOptions> options,
-        IConfigWriter configWriter)
-        : base(logger, "Config", "Configures the tool.", options)
+        IContextManager contextManager)
+        : base(logger, "Config", "Configures the active context.", options)
     {
-        _configWriter = configWriter;
+        _contextManager = contextManager;
 
         _assetServicesUriArg = CommandArgumentValue.AddArgument("asu", "assetServicesUri",
             ["URI of asset repository services (e. g. 'https://localhost:5001/')"], 1);
@@ -73,7 +73,21 @@ internal class ConfigOctoCommand : Command<OctoToolOptions>
                 CommandArgumentValue.GetArgumentScalarValue<string>(_identityServicesUriArg).ToLower();
         }
 
-        _configWriter.WriteSettings(Constants.OctoToolUserFolderName);
+        // Save to active context, creating a default if none exists
+        var activeContext = _contextManager.GetActiveContext();
+        if (activeContext != null)
+        {
+            activeContext.OctoToolOptions = Options.Value;
+            _contextManager.SaveActiveContext();
+        }
+        else
+        {
+            var entry = new ContextEntry
+            {
+                OctoToolOptions = Options.Value
+            };
+            _contextManager.AddOrUpdateContext("default", entry);
+        }
 
         return Task.CompletedTask;
     }

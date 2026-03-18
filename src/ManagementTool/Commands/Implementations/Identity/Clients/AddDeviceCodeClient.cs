@@ -48,7 +48,7 @@ internal class AddDeviceCodeClient : ServiceClientOctoCommand<IIdentityServicesC
             ClientName = clientName,
             ClientSecret = clientSecret,
             AllowedGrantTypes = [OidcConstants.GrantTypes.DeviceCode],
-            AllowedScopes = [CommonConstants.AssetSystemApiFullAccess],
+            AllowedScopes = [CommonConstants.OctoApiFullAccess],
             IsOfflineAccessEnabled = true
         };
 

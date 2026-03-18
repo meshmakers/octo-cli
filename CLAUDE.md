@@ -43,10 +43,12 @@ src/
 │   │       ├── Communication/# Communication controller commands
 │   │       ├── Diagnostics/  # Log level commands
 │   │       ├── DevOps/       # Certificate generation commands
-│   │       ├── General/      # Authentication commands
-│   │       ├── Identity/     # User, role, client, provider commands
+│   │       ├── General/      # Authentication and context commands
+│   │       │   ├── Authentication/  # LogIn, AuthStatus
+│   │       │   └── Context/         # AddContext, RemoveContext, UseContext
+│   │       ├── Identity/     # User, role, client, provider, group, email domain rules, external mapping, admin provisioning commands
 │   │       └── Reporting/    # Report service commands
-│   ├── Services/             # Service layer (AuthenticationService, etc.)
+│   ├── Services/             # Service layer (AuthenticationService, ContextManager, etc.)
 │   ├── Program.cs            # Entry point
 │   └── Runner.cs             # Command execution orchestrator
 └── GraphQlDtos/              # GraphQL DTOs for service communication
@@ -54,7 +56,9 @@ src/
 
 ### Key Components
 
-- **AuthenticationService** (`Services/AuthenticationService.cs`): Handles OAuth token management. Supports both access tokens and refresh tokens. Works with device flow (no refresh token) and standard flows (with refresh token).
+- **ContextManager** (`Services/ContextManager.cs`): Manages named contexts stored in `~/.octo-cli/contexts.json`. Each context holds its own `OctoToolOptions` (service URIs, tenant) and `OctoToolAuthenticationOptions` (tokens). Supports migration from legacy `settings.json`.
+
+- **AuthenticationService** (`Services/AuthenticationService.cs`): Handles OAuth token management. Saves tokens to the active context via `IContextManager`. Supports both access tokens and refresh tokens.
 
 - **ServiceClientOctoCommand**: Base class for commands that call Octo services. Automatically handles authentication via `IAuthenticationService`.
 
@@ -75,17 +79,32 @@ The CLI supports multiple authentication methods:
    - For automated/service scenarios
    - Uses client ID and secret
 
-### Token Storage
+### Token Storage & Context Management
 
-Credentials are stored in `~/.octo-cli/settings.json`:
+The CLI uses named contexts (similar to `kubectl config use-context`) stored in `~/.octo-cli/contexts.json`. Each context holds service URIs, tenant ID, and authentication tokens independently:
 
 ```json
 {
-  "AccessToken": "eyJ...",
-  "RefreshToken": "optional...",
-  "AccessTokenExpiresAt": "2024-01-01T00:00:00Z"
+  "ActiveContext": "dev",
+  "Contexts": {
+    "dev": {
+      "OctoToolOptions": {
+        "IdentityServiceUrl": "https://localhost:5003/",
+        "AssetServiceUrl": "https://localhost:5001/",
+        "TenantId": "octosystem"
+      },
+      "Authentication": {
+        "AccessToken": "eyJ...",
+        "RefreshToken": "...",
+        "AccessTokenExpiresAt": "2024-01-01T00:00:00Z"
+      }
+    },
+    "prod": { "..." : "..." }
+  }
 }
 ```
+
+**Migration**: On first run, if `contexts.json` does not exist but `settings.json` does, the CLI automatically imports the legacy settings as a `"default"` context. The original `settings.json` is kept intact.
 
 **Note**: Device flow requests `offline_access` scope and receives a refresh token. The `AuthenticationService` handles both cases: if a refresh token is present, it refreshes expired access tokens automatically; if not, it uses the existing access token directly.
 
@@ -93,8 +112,9 @@ Credentials are stored in `~/.octo-cli/settings.json`:
 
 The CLI uses:
 - **User folder**: `~/.octo-cli/` (defined in `Constants.OctoToolUserFolderName`)
-- **Settings file**: `settings.json` for authentication data
-- **Config writer**: `IConfigWriter` for persisting settings
+- **Context file**: `contexts.json` for multi-context configuration and authentication data
+- **Legacy file**: `settings.json` (auto-migrated to `contexts.json` on first run)
+- **Context manager**: `IContextManager` for loading/saving context configuration
 
 Environment variables are prefixed with `OCTO_`.
 
@@ -102,22 +122,33 @@ Environment variables are prefixed with `OCTO_`.
 
 | Category | Commands | Service |
 |----------|----------|---------|
-| Identity | users, roles, clients, identityProviders, apiResources, apiScopes | Identity Services |
+| Identity | users, roles, clients, identityProviders, groups, emailDomainGroupRules, externalTenantUserMappings, adminProvisioning, apiResources, apiScopes | Identity Services |
 | Asset | tenants, models, timeSeries | Asset Repository |
 | Bots | notifications | Bot Services |
 | Communication | enable/disable | Communication Controller |
 | Reporting | enable/disable | Report Services |
 | DevOps | certificates | Local operations |
 | General | login, authStatus, config | Local operations |
+| Context | addContext, removeContext, useContext | Local operations |
 
 ## Common Operations
 
 ```bash
-# Login via device code flow
-octo-cli login
+# Context management
+octo-cli -c AddContext -n dev -isu https://localhost:5003/ -tid octosystem
+octo-cli -c AddContext -n prod -isu https://id.example.com/ -tid customer1
+octo-cli -c UseContext -n dev       # Switch to dev context
+octo-cli -c UseContext              # List all contexts (no -n arg)
+octo-cli -c RemoveContext -n prod   # Remove a context
+
+# Login via device code flow (tokens saved to active context)
+octo-cli -c LogIn
 
 # Check authentication status
-octo-cli authStatus
+octo-cli -c AuthStatus
+
+# Configure the active context
+octo-cli -c Config -isu https://localhost:5003/ -asu https://localhost:5001/ -tid meshtest
 
 # List identity providers
 octo-cli identityProviders get
@@ -128,8 +159,46 @@ octo-cli identityProviders addAzureEntraId -n "Azure AD" -c <clientId> -s <secre
 # List users
 octo-cli users get
 
-# Create tenant
-octo-cli tenants create -n "MyTenant"
+# Create tenant (automatically provisions current user as admin)
+octo-cli tenants create -tid mytenant -db mytenant
+
+# Create tenant without admin provisioning
+octo-cli tenants create -tid mytenant -db mytenant --no-provision
+
+# Groups management
+octo-cli -c GetGroups
+octo-cli -c CreateGroup -n "MyGroup" -d "Description" -rids "role1,role2"
+octo-cli -c UpdateGroup -id <groupId> -n "NewName"
+octo-cli -c DeleteGroup -id <groupId>
+octo-cli -c UpdateGroupRoles -id <groupId> -rids "role1,role2"
+octo-cli -c AddUserToGroup -id <groupId> -uid <userId>
+octo-cli -c RemoveUserFromGroup -id <groupId> -uid <userId>
+octo-cli -c AddGroupToGroup -id <parentGroupId> -cgid <childGroupId>
+octo-cli -c RemoveGroupFromGroup -id <parentGroupId> -cgid <childGroupId>
+
+# Email domain group rules
+octo-cli -c GetEmailDomainGroupRules
+octo-cli -c CreateEmailDomainGroupRule -edp "meshmakers.com" -tgid <groupRtId>
+octo-cli -c UpdateEmailDomainGroupRule -id <ruleId> -edp "meshmakers.com" -tgid <groupRtId>
+octo-cli -c DeleteEmailDomainGroupRule -id <ruleId>
+
+# External tenant user mappings
+octo-cli -c GetExternalTenantUserMappings -stid <sourceTenantId>
+octo-cli -c CreateExternalTenantUserMapping -stid <sourceTenantId> -suid <sourceUserId> -sun <sourceUserName>
+octo-cli -c UpdateExternalTenantUserMapping -id <mappingId> -rids "role1,role2"
+octo-cli -c DeleteExternalTenantUserMapping -id <mappingId>
+
+# Admin provisioning (run from system tenant context)
+octo-cli -c GetAdminProvisioningMappings -ttid <targetTenantId>
+octo-cli -c CreateAdminProvisioningMapping -ttid <targetTenantId> -stid <sourceTenantId> -suid <sourceUserId> -sun <sourceUserName>
+octo-cli -c ProvisionCurrentUser -ttid <targetTenantId>
+octo-cli -c DeleteAdminProvisioningMapping -ttid <targetTenantId> -mid <mappingId>
+
+# OctoTenant identity provider (cross-tenant auth)
+octo-cli -c AddOctoTenantIdentityProvider -n "ParentTenant" -e true -ptid <parentTenantId>
+
+# Identity providers with self-registration and default group
+octo-cli -c AddAzureEntryIdIdentityProvider -n "Azure" -e true -t <tenantId> -cid <clientId> -cs <secret> -asr false -dgid <groupRtId>
 ```
 
 ## Confirmation Dialogs for Destructive Commands
