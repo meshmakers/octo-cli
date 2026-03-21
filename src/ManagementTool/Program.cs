@@ -277,6 +277,7 @@ internal static class Program
         services.AddTransient<ICommand, ProvisionCurrentUser>();
         services.AddTransient<ICommand, DeleteAdminProvisioningMapping>();
 
+        services.AddTransient<ICommand, GetTenants>();
         services.AddTransient<ICommand, CreateTenant>();
         services.AddTransient<ICommand, CleanTenant>();
         services.AddTransient<ICommand, AttachTenant>();
