@@ -194,7 +194,6 @@ internal static class Program
                 (options, toolOptions) =>
                 {
                     options.EndpointUri = toolOptions.Value.ReportingServiceUrl;
-                    options.TenantId = toolOptions.Value.TenantId;
                 });
 
         services.AddSingleton<ITenantClientAccessToken, ServiceClientAccessToken>();
