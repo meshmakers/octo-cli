@@ -3,6 +3,7 @@ using Meshmakers.Common.CommandLineParser.Commands;
 using Meshmakers.Common.Shared.Services;
 using Meshmakers.Octo.Communication.Contracts;
 using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations;
+using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Asset.CkModelLibraries;
 using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Asset.FixupScripts;
 using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Asset.Models;
 using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Asset.Tenants;
@@ -231,6 +232,16 @@ internal static class Program
         services.AddTransient<ICommand, ImportRuntimeModel>();
         services.AddTransient<ICommand, ExportRuntimeModelByQuery>();
         services.AddTransient<ICommand, ExportRuntimeModelByDeepGraph>();
+
+        // CK Model Library Management
+        services.AddTransient<ICommand, ListCatalogs>();
+        services.AddTransient<ICommand, ListCatalogModels>();
+        services.AddTransient<ICommand, LibraryStatusCommand>();
+        services.AddTransient<ICommand, CheckDependenciesCommand>();
+        services.AddTransient<ICommand, CheckUpgradeCommand>();
+        services.AddTransient<ICommand, ImportFromCatalogCommand>();
+        services.AddTransient<ICommand, FixAllCommand>();
+        services.AddTransient<ICommand, RefreshCatalogsCommand>();
 
         services.AddTransient<ICommand, GetClients>();
         services.AddTransient<ICommand, GetClient>();
