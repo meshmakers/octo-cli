@@ -125,7 +125,7 @@ Environment variables are prefixed with `OCTO_`.
 | Identity | users, roles, clients, identityProviders, groups, emailDomainGroupRules, externalTenantUserMappings, adminProvisioning, apiResources, apiScopes | Identity Services |
 | Asset | tenants, models, timeSeries | Asset Repository |
 | Bots | notifications | Bot Services |
-| Communication | enable/disable | Communication Controller |
+| Communication | enable/disable, adapters, pipelines, triggers, pools, dataFlows | Communication Controller |
 | Reporting | enable/disable | Report Services |
 | DevOps | certificates | Local operations |
 | General | login, authStatus, config | Local operations |
@@ -199,6 +199,74 @@ octo-cli -c AddOctoTenantIdentityProvider -n "ParentTenant" -e true -ptid <paren
 
 # Identity providers with self-registration and default group
 octo-cli -c AddAzureEntryIdIdentityProvider -n "Azure" -e true -t <tenantId> -cid <clientId> -cs <secret> -asr false -dgid <groupRtId>
+```
+
+## Communication Services Commands
+
+All communication commands accept plain runtime object IDs (e.g. `69cfa838092b710403248acd`). The SDK client internally constructs composite RtEntityId strings where the server requires them.
+
+### Adapters
+
+| Command | Parameters | Description |
+|---------|-----------|-------------|
+| `GetAdapters` | `--json` (optional) | List all adapters for the tenant |
+| `GetAdapter` | `--identifier <rtId>`, `--json` (optional) | Get adapter configuration |
+| `GetAdapterNodes` | | List available pipeline nodes from connected adapters |
+| `GetPipelineSchema` | `--adapterId <rtId>`, `--outputFile` (optional) | Get pipeline JSON schema for an adapter |
+| `DeployAdapter` | `--identifier <rtId>` | Deploy adapter configuration update |
+
+### Pipelines
+
+| Command | Parameters | Description |
+|---------|-----------|-------------|
+| `GetPipelineStatus` | `--identifier <rtId>`, `--json` (optional) | Get deployment state of a pipeline |
+| `DeployPipeline` | `--adapterId <rtId>`, `--pipelineId <rtId>`, `--file <path>` | Deploy pipeline definition (YAML/JSON file) |
+| `ExecutePipeline` | `--identifier <rtId>`, `--inputFile <path>` (optional) | Execute a pipeline, returns execution ID |
+| `GetPipelineExecutions` | `--identifier <rtId>`, `--json` (optional) | List pipeline execution history |
+| `GetLatestPipelineExecution` | `--identifier <rtId>`, `--json` (optional) | Get the most recent pipeline execution |
+| `GetPipelineDebugPoints` | `--identifier <rtId>`, `--executionId <guid>`, `--json` (optional) | Get debug points for a specific execution |
+
+### Triggers
+
+| Command | Parameters | Description |
+|---------|-----------|-------------|
+| `DeployTriggers` | | Deploy all pipeline triggers for the tenant |
+| `UndeployTriggers` | | Undeploy all pipeline triggers for the tenant |
+
+### Pools
+
+| Command | Parameters | Description |
+|---------|-----------|-------------|
+| `GetPools` | `--json` (optional) | List all pools for the tenant |
+| `GetPool` | `--identifier <rtId>`, `--json` (optional) | Get pool configuration |
+| `DeployPoolAdapters` | `--poolId <rtId>`, `--adapterId <rtId>` (optional) | Deploy all or a specific adapter in a pool |
+| `UndeployPoolAdapters` | `--poolId <rtId>`, `--adapterId <rtId>` (optional) | Undeploy all or a specific adapter from a pool |
+
+### Data Flows
+
+| Command | Parameters | Description |
+|---------|-----------|-------------|
+| `DeployDataFlow` | `--identifier <rtId>` | Deploy a data flow |
+| `UndeployDataFlow` | `--identifier <rtId>` | Undeploy a data flow |
+| `GetDataFlowStatus` | `--identifier <rtId>`, `--json` (optional) | Get aggregated execution status of a data flow |
+
+### Examples
+
+```bash
+# List all adapters
+octo-cli -c GetAdapters
+
+# Get adapter config as compact JSON
+octo-cli -c GetAdapter --identifier 69cfa838092b710403248acd --json
+
+# Deploy a pipeline from YAML file
+octo-cli -c DeployPipeline --adapterId 69cfa838092b710403248acd --pipelineId cc0000000000000000000003 --file pipeline.yaml
+
+# Execute a pipeline and capture the execution ID
+octo-cli -c ExecutePipeline --identifier cc0000000000000000000003
+
+# Check data flow status
+octo-cli -c GetDataFlowStatus --identifier cc0000000000000000000002
 ```
 
 ## Confirmation Dialogs for Destructive Commands

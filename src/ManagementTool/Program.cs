@@ -344,6 +344,38 @@ internal static class Program
         services.AddTransient<ICommand, EnableCommunicationCommand>();
         services.AddTransient<ICommand, DisableCommunicationCommand>();
 
+        // Communication - Adapters
+        services.AddTransient<ICommand, GetAdaptersCommand>();
+        services.AddTransient<ICommand, GetAdapterCommand>();
+        services.AddTransient<ICommand, GetAdapterNodesCommand>();
+        services.AddTransient<ICommand, GetPipelineSchemaCommand>();
+        services.AddTransient<ICommand, DeployAdapterCommand>();
+
+        // Communication - Pipelines
+        services.AddTransient<ICommand, GetPipelineStatusCommand>();
+        services.AddTransient<ICommand, DeployPipelineCommand>();
+        services.AddTransient<ICommand, ExecutePipelineCommand>();
+
+        // Communication - Pipeline Debug
+        services.AddTransient<ICommand, GetPipelineExecutionsCommand>();
+        services.AddTransient<ICommand, GetLatestPipelineExecutionCommand>();
+        services.AddTransient<ICommand, GetPipelineDebugPointsCommand>();
+
+        // Communication - Triggers
+        services.AddTransient<ICommand, DeployTriggersCommand>();
+        services.AddTransient<ICommand, UndeployTriggersCommand>();
+
+        // Communication - Pools
+        services.AddTransient<ICommand, GetPoolsCommand>();
+        services.AddTransient<ICommand, GetPoolCommand>();
+        services.AddTransient<ICommand, DeployPoolAdaptersCommand>();
+        services.AddTransient<ICommand, UndeployPoolAdaptersCommand>();
+
+        // Communication - Data Flows
+        services.AddTransient<ICommand, DeployDataFlowCommand>();
+        services.AddTransient<ICommand, UndeployDataFlowCommand>();
+        services.AddTransient<ICommand, GetDataFlowStatusCommand>();
+
         services.AddTransient<ICommand, EnableStreamDataCommand>();
         services.AddTransient<ICommand, DisableStreamDataCommand>();
 
