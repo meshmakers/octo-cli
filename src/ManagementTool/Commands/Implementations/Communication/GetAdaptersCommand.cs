@@ -5,11 +5,17 @@ using Meshmakers.Octo.Sdk.ServiceClient.CommunicationControllerServices;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Newtonsoft.Json;
+using Newtonsoft.Json.Converters;
 
 namespace Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Communication;
 
 internal class GetAdaptersCommand : ServiceClientOctoCommand<ICommunicationServicesClient>
 {
+    private static readonly JsonSerializerSettings JsonSettings = new()
+    {
+        Converters = { new StringEnumConverter() }
+    };
+
     private readonly IConsoleService _consoleService;
     private readonly IArgument _jsonArg;
 
@@ -36,17 +42,15 @@ internal class GetAdaptersCommand : ServiceClientOctoCommand<ICommunicationServi
             return;
         }
 
-        var rawJson = await ServiceClient.GetAdaptersAsync();
+        var result = await ServiceClient.GetAdaptersAsync();
 
         if (CommandArgumentValue.IsArgumentUsed(_jsonArg))
         {
-            _consoleService.WriteLine(rawJson);
+            _consoleService.WriteLine(JsonConvert.SerializeObject(result, JsonSettings));
         }
         else
         {
-            var parsed = JsonConvert.DeserializeObject(rawJson);
-            var formatted = JsonConvert.SerializeObject(parsed, Formatting.Indented);
-            _consoleService.WriteLine(formatted);
+            _consoleService.WriteLine(JsonConvert.SerializeObject(result, Formatting.Indented, JsonSettings));
         }
     }
 }
