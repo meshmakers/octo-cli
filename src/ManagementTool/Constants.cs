@@ -7,6 +7,9 @@ internal static class Constants
     public const string OctoToolOptionsRootNode = "OctoToolOptions";
     public const string AuthenticationRootNode = "Authentication";
 
+    public const string EnvVarClientId = "OCTO_CLI_CLIENT_ID";
+    public const string EnvVarClientSecret = "OCTO_CLI_CLIENT_SECRET";
+
     public const string IdentityServicesGroup = "Identity Services";
     public const string BotServicesGroup = "Bot Services";
     public const string CommunicationServicesGroup = "Communication Services";

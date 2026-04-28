@@ -222,6 +222,7 @@ internal static class Program
         services.AddTransient<ICommand, SetupCommand>();
 
         services.AddTransient<ICommand, LogInCommand>();
+        services.AddTransient<ICommand, LogInClientCredentialsCommand>();
         services.AddTransient<ICommand, AuthStatusCommand>();
 
         services.AddTransient<ICommand, AddContextCommand>();

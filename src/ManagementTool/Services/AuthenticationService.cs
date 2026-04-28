@@ -1,3 +1,4 @@
+using Meshmakers.Octo.Communication.Contracts;
 using Meshmakers.Octo.Sdk.ServiceClient;
 using Meshmakers.Octo.Sdk.ServiceClient.Authentication;
 using Microsoft.Extensions.Options;
@@ -44,9 +45,50 @@ public class AuthenticationService : IAuthenticationService
                 return;
             }
         }
+        // No refresh token, but client_credentials env vars are set →
+        // silently re-acquire token if expired/near-expiry. Device flow always
+        // provides a refresh token (offline_access), so this branch only fires
+        // for client_credentials sessions.
+        // Note: when a device-code session's refresh token IS present (the `if` branch above),
+        // we never fall back into this client_credentials branch, even if env vars are set —
+        // device-code and client_credentials sessions are kept separate by design.
+        else if (IsTokenExpiringSoon() &&
+                 TryReadClientCredentialsEnv(out var clientId, out var clientSecret))
+        {
+            var newAuthData = await _authenticatorClient.RequestClientCredentialsTokenAsync(
+                ApiScopes.OctoApiFullAccess,
+                DefaultScopes.None,
+                customScopes: null,
+                clientId: clientId,
+                clientSecret: clientSecret);
+            SaveAuthenticationData(newAuthData);
+            serviceClientAccessToken.AccessToken = newAuthData.AccessToken;
+            Logger.Info("Access token re-acquired via client_credentials env vars.");
+            return;
+        }
 
         // Use the existing access token (even without refresh token)
         serviceClientAccessToken.AccessToken = _authenticationOptions.Value.AccessToken;
+    }
+
+    private bool IsTokenExpiringSoon()
+    {
+        var expiresAt = _authenticationOptions.Value.AccessTokenExpiresAt;
+        if (expiresAt == null)
+        {
+            // Unknown expiry → treat as expired so we re-acquire defensively.
+            return true;
+        }
+
+        // Compared in local time because the SDK's AuthenticationData.ExpiresAt is set with DateTime.Now (see Sdk.ServiceClient.Authentication.AuthenticatorClient).
+        return expiresAt.Value < DateTime.Now.AddSeconds(30);
+    }
+
+    private static bool TryReadClientCredentialsEnv(out string clientId, out string clientSecret)
+    {
+        clientId = Environment.GetEnvironmentVariable(Constants.EnvVarClientId) ?? string.Empty;
+        clientSecret = Environment.GetEnvironmentVariable(Constants.EnvVarClientSecret) ?? string.Empty;
+        return !string.IsNullOrEmpty(clientId) && !string.IsNullOrEmpty(clientSecret);
     }
 
     public void SaveAuthenticationData(AuthenticationData authenticationData)

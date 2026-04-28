@@ -68,16 +68,19 @@ src/
 
 The CLI supports multiple authentication methods:
 
-1. **Device Code Flow** (recommended for CLI):
-   - User runs `octo-cli login`
+1. **Device Code Flow** (recommended for interactive CLI use):
+   - User runs `octo-cli -c LogIn -i`
    - CLI displays device code and verification URL
    - User authenticates in browser
-   - CLI receives access token (no refresh token with device flow)
-   - Token stored in `~/.octo-cli/settings.json`
+   - CLI receives access token plus a refresh token (device flow requests `offline_access`)
+   - Token stored in the active context's `Authentication` block in `~/.octo-cli/contexts.json`
 
-2. **Client Credentials Flow**:
-   - For automated/service scenarios
-   - Uses client ID and secret
+2. **Client Credentials Flow** (non-interactive — pipelines, cron jobs, headless servers, container entrypoints, batch scripts, bots, etc.):
+   - Operator creates a per-tenant client once: `octo-cli -c AddClientCredentialsClient -id <id> -n "<name>" -s <secret>`
+   - Caller exports `OCTO_CLI_CLIENT_ID` and `OCTO_CLI_CLIENT_SECRET` (or passes `-id`/`-s`), then runs `octo-cli -c LogInClientCredentials`
+   - Tenant comes from the active context (no `-tid` arg on the login command). Switch contexts with `UseContext` to target a different tenant.
+   - No refresh token is issued. While the env vars remain set, `EnsureAuthenticated` automatically re-acquires the token when it expires; otherwise re-run `LogInClientCredentials`.
+   - Token stored in the active context's `Authentication` block, same path as device flow.
 
 ### Token Storage & Context Management
 
@@ -128,7 +131,7 @@ Environment variables are prefixed with `OCTO_`.
 | Communication | enable/disable, adapters, pipelines, triggers, pools, dataFlows | Communication Controller |
 | Reporting | enable/disable | Report Services |
 | DevOps | certificates | Local operations |
-| General | login, authStatus, config | Local operations |
+| General | login, loginClientCredentials, authStatus, config | Local operations |
 | Context | addContext, removeContext, useContext | Local operations |
 
 ## Common Operations
@@ -143,6 +146,13 @@ octo-cli -c RemoveContext -n prod   # Remove a context
 
 # Login via device code flow (tokens saved to active context)
 octo-cli -c LogIn
+
+# Non-interactive login (pipelines, cron jobs, headless scripts, etc.)
+# Tenant comes from the active context.
+export OCTO_CLI_CLIENT_ID=my-client-id
+export OCTO_CLI_CLIENT_SECRET=***
+octo-cli -c LogInClientCredentials
+# Subsequent commands auto-renew the token while the env vars remain exported.
 
 # Check authentication status
 octo-cli -c AuthStatus
