@@ -379,6 +379,11 @@ internal static class Program
 
         services.AddTransient<ICommand, EnableStreamDataCommand>();
         services.AddTransient<ICommand, DisableStreamDataCommand>();
+        services.AddTransient<ICommand, ActivateArchiveCommand>();
+        services.AddTransient<ICommand, DisableArchiveCommand>();
+        services.AddTransient<ICommand, EnableArchiveCommand>();
+        services.AddTransient<ICommand, RetryArchiveActivationCommand>();
+        services.AddTransient<ICommand, DeleteArchiveCommand>();
 
         services.AddTransient<ICommand, EnableReportingCommand>();
         services.AddTransient<ICommand, DisableReportingCommand>();

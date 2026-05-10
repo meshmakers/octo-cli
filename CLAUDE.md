@@ -126,7 +126,7 @@ Environment variables are prefixed with `OCTO_`.
 | Category | Commands | Service |
 |----------|----------|---------|
 | Identity | users, roles, clients, identityProviders, groups, emailDomainGroupRules, externalTenantUserMappings, adminProvisioning, apiResources, apiScopes | Identity Services |
-| Asset | tenants, models, timeSeries | Asset Repository |
+| Asset | tenants, models, timeSeries (EnableStreamData, DisableStreamData, ActivateArchive, DisableArchive, EnableArchive, RetryArchiveActivation, DeleteArchive) | Asset Repository |
 | Bots | notifications | Bot Services |
 | Communication | enable/disable, adapters, pipelines, triggers, pools, dataFlows | Communication Controller |
 | Reporting | enable/disable | Report Services |
@@ -174,6 +174,16 @@ octo-cli tenants create -tid mytenant -db mytenant
 
 # Create tenant without admin provisioning
 octo-cli tenants create -tid mytenant -db mytenant --no-provision
+
+# Stream data lifecycle (asset repository)
+octo-cli -c EnableStreamData
+octo-cli -c ActivateArchive -id 69fda707d47638c68edc7fea       # provisions per-archive CrateDB table
+octo-cli -c DisableArchive -id 69fda707d47638c68edc7fea        # status-only; data preserved
+octo-cli -c EnableArchive -id 69fda707d47638c68edc7fea         # back from Disabled to Activated
+octo-cli -c RetryArchiveActivation -id 69fda707d47638c68edc7fea # only from Failed
+octo-cli -c DeleteArchive -id 69fda707d47638c68edc7fea          # destructive — drops table, lose data
+octo-cli -c DeleteArchive -id 69fda707d47638c68edc7fea -y       # skip confirmation
+octo-cli -c DisableStreamData
 
 # Groups management
 octo-cli -c GetGroups
@@ -307,6 +317,7 @@ All destructive commands (Delete, Clean, Reset, Remove) require interactive user
 | `DeleteApiScope` | `delete API scope '{name}'` |
 | `DeleteApiSecretApiResource` | `delete API secret for resource '{name}'` |
 | `DeleteApiSecretClient` | `delete API secret for client '{clientId}'` |
+| `DeleteArchive` | `delete archive '{archiveRtId}'? The CrateDB table will be dropped and historical data lost` |
 
 ### Usage Examples
 
