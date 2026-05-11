@@ -384,6 +384,10 @@ internal static class Program
         services.AddTransient<ICommand, EnableArchiveCommand>();
         services.AddTransient<ICommand, RetryArchiveActivationCommand>();
         services.AddTransient<ICommand, DeleteArchiveCommand>();
+        services.AddTransient<ICommand, FreezeRollupArchiveCommand>();
+        services.AddTransient<ICommand, UnfreezeRollupArchiveCommand>();
+        services.AddTransient<ICommand, RewindRollupWatermarkCommand>();
+        services.AddTransient<ICommand, ListRollupsForArchiveCommand>();
 
         services.AddTransient<ICommand, EnableReportingCommand>();
         services.AddTransient<ICommand, DisableReportingCommand>();

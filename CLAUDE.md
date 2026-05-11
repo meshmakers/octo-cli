@@ -126,7 +126,7 @@ Environment variables are prefixed with `OCTO_`.
 | Category | Commands | Service |
 |----------|----------|---------|
 | Identity | users, roles, clients, identityProviders, groups, emailDomainGroupRules, externalTenantUserMappings, adminProvisioning, apiResources, apiScopes | Identity Services |
-| Asset | tenants, models, timeSeries (EnableStreamData, DisableStreamData, ActivateArchive, DisableArchive, EnableArchive, RetryArchiveActivation, DeleteArchive) | Asset Repository |
+| Asset | tenants, models, timeSeries (EnableStreamData, DisableStreamData, ActivateArchive, DisableArchive, EnableArchive, RetryArchiveActivation, DeleteArchive, FreezeRollupArchive, UnfreezeRollupArchive, RewindRollupWatermark, ListRollupsForArchive) | Asset Repository |
 | Bots | notifications | Bot Services |
 | Communication | enable/disable, adapters, pipelines, triggers, pools, dataFlows | Communication Controller |
 | Reporting | enable/disable | Report Services |
@@ -184,6 +184,13 @@ octo-cli -c RetryArchiveActivation -id 69fda707d47638c68edc7fea # only from Fail
 octo-cli -c DeleteArchive -id 69fda707d47638c68edc7fea          # destructive — drops table, lose data
 octo-cli -c DeleteArchive -id 69fda707d47638c68edc7fea -y       # skip confirmation
 octo-cli -c DisableStreamData
+
+# Rollup archive operations (rollup-archives concept §9)
+octo-cli -c ListRollupsForArchive -id <sourceArchiveRtId>       # list rollups attached to a source archive
+octo-cli -c FreezeRollupArchive -id <rollupRtId> -u 2026-05-11T14:00:00Z   # set FrozenUntil (monotonic)
+octo-cli -c UnfreezeRollupArchive -id <rollupRtId>              # clear FrozenUntil (idempotent)
+octo-cli -c UnfreezeRollupArchive -id <rollupRtId> -ag          # accept resulting gaps
+octo-cli -c RewindRollupWatermark -id <rollupRtId> -t 2026-05-11T10:00:00Z # re-aggregate from boundary
 
 # Groups management
 octo-cli -c GetGroups
