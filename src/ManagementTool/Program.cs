@@ -350,7 +350,6 @@ internal static class Program
         services.AddTransient<ICommand, GetAdapterCommand>();
         services.AddTransient<ICommand, GetAdapterNodesCommand>();
         services.AddTransient<ICommand, GetPipelineSchemaCommand>();
-        services.AddTransient<ICommand, DeployAdapterCommand>();
 
         // Communication - Pipelines
         services.AddTransient<ICommand, GetPipelineStatusCommand>();
@@ -368,9 +367,6 @@ internal static class Program
 
         // Communication - Pools
         services.AddTransient<ICommand, GetPoolsCommand>();
-        services.AddTransient<ICommand, GetPoolCommand>();
-        services.AddTransient<ICommand, DeployPoolAdaptersCommand>();
-        services.AddTransient<ICommand, UndeployPoolAdaptersCommand>();
 
         // Communication - Data Flows
         services.AddTransient<ICommand, DeployDataFlowCommand>();
