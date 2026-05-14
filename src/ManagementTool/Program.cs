@@ -252,6 +252,8 @@ internal static class Program
         services.AddTransient<ICommand, UpdateBlueprint>();
         services.AddTransient<ICommand, ListBlueprintBackups>();
         services.AddTransient<ICommand, RollbackBlueprint>();
+        services.AddTransient<ICommand, ListBlueprintInstallations>();
+        services.AddTransient<ICommand, UninstallBlueprint>();
 
         services.AddTransient<ICommand, GetClients>();
         services.AddTransient<ICommand, GetClient>();
