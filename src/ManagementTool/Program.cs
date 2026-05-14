@@ -3,6 +3,7 @@ using Meshmakers.Common.CommandLineParser.Commands;
 using Meshmakers.Common.Shared.Services;
 using Meshmakers.Octo.Communication.Contracts;
 using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations;
+using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Asset.Blueprints;
 using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Asset.CkModelLibraries;
 using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Asset.FixupScripts;
 using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Asset.Models;
@@ -243,6 +244,10 @@ internal static class Program
         services.AddTransient<ICommand, ImportFromCatalogCommand>();
         services.AddTransient<ICommand, FixAllCommand>();
         services.AddTransient<ICommand, RefreshCatalogsCommand>();
+
+        services.AddTransient<ICommand, ListBlueprints>();
+        services.AddTransient<ICommand, InstallBlueprint>();
+        services.AddTransient<ICommand, GetBlueprintHistory>();
 
         services.AddTransient<ICommand, GetClients>();
         services.AddTransient<ICommand, GetClient>();
