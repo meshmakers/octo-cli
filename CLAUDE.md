@@ -126,7 +126,7 @@ Environment variables are prefixed with `OCTO_`.
 | Category | Commands | Service |
 |----------|----------|---------|
 | Identity | users, roles, clients, identityProviders, groups, emailDomainGroupRules, externalTenantUserMappings, adminProvisioning, apiResources, apiScopes | Identity Services |
-| Asset | tenants, models, blueprints (ListBlueprints, InstallBlueprint, GetBlueprintHistory), timeSeries (EnableStreamData, DisableStreamData, ActivateArchive, DisableArchive, EnableArchive, RetryArchiveActivation, DeleteArchive, FreezeRollupArchive, UnfreezeRollupArchive, RewindRollupWatermark, ListRollupsForArchive) | Asset Repository |
+| Asset | tenants, models, blueprints (ListBlueprints, InstallBlueprint, GetBlueprintHistory, PreviewBlueprintUpdate, UpdateBlueprint, ListBlueprintBackups, RollbackBlueprint), timeSeries (EnableStreamData, DisableStreamData, ActivateArchive, DisableArchive, EnableArchive, RetryArchiveActivation, DeleteArchive, FreezeRollupArchive, UnfreezeRollupArchive, RewindRollupWatermark, ListRollupsForArchive) | Asset Repository |
 | Bots | notifications | Bot Services |
 | Communication | enable/disable, adapters, pipelines, triggers, pools, dataFlows | Communication Controller |
 | Reporting | enable/disable | Report Services |
@@ -180,6 +180,16 @@ octo-cli -c ListBlueprints                                          # list catal
 octo-cli -c InstallBlueprint -b MyBlueprint-1.0.0                   # apply blueprint to the active tenant
 octo-cli -c InstallBlueprint -b MyBlueprint-1.0.0 -f                # re-apply seed data via upsert (recovery)
 octo-cli -c GetBlueprintHistory                                     # show application history for the active tenant
+
+# Blueprints — update + rollback (Phase 2a: operations layer; richer diff/merge in Phase 2b)
+octo-cli -c PreviewBlueprintUpdate -tv MyBlueprint-2.0.0            # preview changes a target version would apply (Merge mode)
+octo-cli -c PreviewBlueprintUpdate -tv MyBlueprint-2.0.0 -m Safe    # preview in Safe mode
+octo-cli -c UpdateBlueprint -tv MyBlueprint-2.0.0                   # apply update with Merge mode + auto-backup
+octo-cli -c UpdateBlueprint -tv MyBlueprint-2.0.0 -m Full -nb       # apply Full mode without pre-update backup
+octo-cli -c UpdateBlueprint -tv MyBlueprint-2.0.0 -dr               # dry-run (no persistent changes)
+octo-cli -c ListBlueprintBackups                                    # list backups created before updates
+octo-cli -c RollbackBlueprint -bid <backupId>                       # roll the tenant back to a backup
+octo-cli -c RollbackBlueprint -bid <backupId> -y                    # skip the interactive confirmation
 
 # Stream data lifecycle (asset repository)
 octo-cli -c EnableStreamData
@@ -331,6 +341,7 @@ All destructive commands (Delete, Clean, Reset, Remove) require interactive user
 | `DeleteApiSecretApiResource` | `delete API secret for resource '{name}'` |
 | `DeleteApiSecretClient` | `delete API secret for client '{clientId}'` |
 | `DeleteArchive` | `delete archive '{archiveRtId}'? The CrateDB table will be dropped and historical data lost` |
+| `RollbackBlueprint` | `rollback tenant '{tenantId}' to backup '{backupId}'? Current tenant data will be replaced` |
 
 ### Usage Examples
 
