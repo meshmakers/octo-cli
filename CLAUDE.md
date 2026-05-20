@@ -128,7 +128,7 @@ Environment variables are prefixed with `OCTO_`.
 | Identity | users, roles, clients (+ mirror commands: GetClientMirrors, ProvisionClientInExistingTenants, ProvisionClientInTenant, UnprovisionClientFromTenant, SetClientAutoProvision), identityProviders, groups, emailDomainGroupRules, externalTenantUserMappings, adminProvisioning, apiResources, apiScopes | Identity Services |
 | Asset | tenants, models, blueprints (ListBlueprints, InstallBlueprint, GetBlueprintHistory, PreviewBlueprintUpdate, UpdateBlueprint, ListBlueprintBackups, RollbackBlueprint, ListBlueprintInstallations, UninstallBlueprint), timeSeries (EnableStreamData, DisableStreamData, ActivateArchive, DisableArchive, EnableArchive, RetryArchiveActivation, DeleteArchive, FreezeRollupArchive, UnfreezeRollupArchive, RewindRollupWatermark, ListRollupsForArchive) | Asset Repository |
 | Bots | notifications | Bot Services |
-| Communication | enable/disable, adapters, pipelines, triggers, pools, dataFlows | Communication Controller |
+| Communication | enable/disable, adapters, pipelines, triggers, pools, dataFlows, workloads (GetWorkloadsByChart, UpdateWorkloadChartVersion, DeployWorkload, UndeployWorkload) | Communication Controller |
 | Reporting | enable/disable | Report Services |
 | DevOps | certificates | Local operations |
 | General | login, loginClientCredentials, authStatus, config | Local operations |
@@ -242,6 +242,16 @@ octo-cli -c GetAdminProvisioningMappings -ttid <targetTenantId>
 octo-cli -c CreateAdminProvisioningMapping -ttid <targetTenantId> -stid <sourceTenantId> -suid <sourceUserId> -sun <sourceUserName>
 octo-cli -c ProvisionCurrentUser -ttid <targetTenantId>
 octo-cli -c DeleteAdminProvisioningMapping -ttid <targetTenantId> -mid <mappingId>
+
+# CI/CD workload rollout (Epic 3054, #4053) — chart-version staging + deploy.
+# List every workload in the active tenant that uses the chart.
+octo-cli -c GetWorkloadsByChart -cn octo-mesh-adapter
+# Set ChartVersion on a workload. Does NOT trigger a deploy.
+octo-cli -c UpdateWorkloadChartVersion -id <workloadRtId> -cv 1.2.3
+# Trigger deploy of the workload through its parent pool.
+octo-cli -c DeployWorkload -id <workloadRtId>
+# Undeploy (destructive — confirmation prompt; -y to skip).
+octo-cli -c UndeployWorkload -id <workloadRtId>
 
 # Multi-tenant ClientCredentials mirroring (Epic 3054, #4047)
 # Create a flagged client in octosystem — gets auto-provisioned into every new sub-tenant.

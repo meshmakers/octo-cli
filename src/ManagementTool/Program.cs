@@ -391,6 +391,12 @@ internal static class Program
         services.AddTransient<ICommand, UndeployDataFlowCommand>();
         services.AddTransient<ICommand, GetDataFlowStatusCommand>();
 
+        // Communication - Workloads (Epic 3054 #4053): CI/CD chart rollout commands
+        services.AddTransient<ICommand, GetWorkloadsByChartCommand>();
+        services.AddTransient<ICommand, UpdateWorkloadChartVersionCommand>();
+        services.AddTransient<ICommand, DeployWorkloadCommand>();
+        services.AddTransient<ICommand, UndeployWorkloadCommand>();
+
         services.AddTransient<ICommand, EnableStreamDataCommand>();
         services.AddTransient<ICommand, DisableStreamDataCommand>();
         services.AddTransient<ICommand, ActivateArchiveCommand>();
