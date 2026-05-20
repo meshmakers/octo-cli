@@ -125,7 +125,7 @@ Environment variables are prefixed with `OCTO_`.
 
 | Category | Commands | Service |
 |----------|----------|---------|
-| Identity | users, roles, clients, identityProviders, groups, emailDomainGroupRules, externalTenantUserMappings, adminProvisioning, apiResources, apiScopes | Identity Services |
+| Identity | users, roles, clients (+ mirror commands: GetClientMirrors, ProvisionClientInExistingTenants, ProvisionClientInTenant, UnprovisionClientFromTenant, SetClientAutoProvision), identityProviders, groups, emailDomainGroupRules, externalTenantUserMappings, adminProvisioning, apiResources, apiScopes | Identity Services |
 | Asset | tenants, models, blueprints (ListBlueprints, InstallBlueprint, GetBlueprintHistory, PreviewBlueprintUpdate, UpdateBlueprint, ListBlueprintBackups, RollbackBlueprint, ListBlueprintInstallations, UninstallBlueprint), timeSeries (EnableStreamData, DisableStreamData, ActivateArchive, DisableArchive, EnableArchive, RetryArchiveActivation, DeleteArchive, FreezeRollupArchive, UnfreezeRollupArchive, RewindRollupWatermark, ListRollupsForArchive) | Asset Repository |
 | Bots | notifications | Bot Services |
 | Communication | enable/disable, adapters, pipelines, triggers, pools, dataFlows | Communication Controller |
@@ -242,6 +242,21 @@ octo-cli -c GetAdminProvisioningMappings -ttid <targetTenantId>
 octo-cli -c CreateAdminProvisioningMapping -ttid <targetTenantId> -stid <sourceTenantId> -suid <sourceUserId> -sun <sourceUserName>
 octo-cli -c ProvisionCurrentUser -ttid <targetTenantId>
 octo-cli -c DeleteAdminProvisioningMapping -ttid <targetTenantId> -mid <mappingId>
+
+# Multi-tenant ClientCredentials mirroring (Epic 3054, #4047)
+# Create a flagged client in octosystem — gets auto-provisioned into every new sub-tenant.
+octo-cli -c AddClientCredentialsClient -id ci-deploy -n "CI Deploy" -s <secret> -apic
+# List the sub-tenants a client has been mirrored into.
+octo-cli -c GetClientMirrors -id ci-deploy
+# Backfill: provision the flagged client into every existing sub-tenant (idempotent).
+octo-cli -c ProvisionClientInExistingTenants -id ci-deploy
+# Manually provision into a single named sub-tenant.
+octo-cli -c ProvisionClientInTenant -id ci-deploy -ctid acme
+# Manually remove a mirror (destructive — confirmation prompt, -y to skip).
+octo-cli -c UnprovisionClientFromTenant -id ci-deploy -ctid acme
+# Flip the AutoProvisionInChildTenants flag on an existing client.
+# Note: flipping true does NOT auto-backfill — use ProvisionClientInExistingTenants for that.
+octo-cli -c SetClientAutoProvision -id ci-deploy -e true
 
 # OctoTenant identity provider (cross-tenant auth)
 octo-cli -c AddOctoTenantIdentityProvider -n "ParentTenant" -e true -ptid <parentTenantId>

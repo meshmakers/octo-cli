@@ -263,6 +263,13 @@ internal static class Program
         services.AddTransient<ICommand, UpdateClient>();
         services.AddTransient<ICommand, DeleteClient>();
 
+        // Multi-tenant ClientCredentials mirroring (Epic 3054 #4047)
+        services.AddTransient<ICommand, GetClientMirrors>();
+        services.AddTransient<ICommand, ProvisionClientInExistingTenants>();
+        services.AddTransient<ICommand, ProvisionClientInTenant>();
+        services.AddTransient<ICommand, UnprovisionClientFromTenant>();
+        services.AddTransient<ICommand, SetClientAutoProvision>();
+
         services.AddTransient<ICommand, GetIdentityProviders>();
         services.AddTransient<ICommand, AddOAuthIdentityProvider>();
         services.AddTransient<ICommand, AddOpenLdapIdentityProvider>();
