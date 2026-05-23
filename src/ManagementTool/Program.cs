@@ -396,6 +396,7 @@ internal static class Program
         services.AddTransient<ICommand, UpdateWorkloadChartVersionCommand>();
         services.AddTransient<ICommand, DeployWorkloadCommand>();
         services.AddTransient<ICommand, UndeployWorkloadCommand>();
+        services.AddTransient<ICommand, MovePipelinesToAdapterCommand>();
 
         services.AddTransient<ICommand, EnableStreamDataCommand>();
         services.AddTransient<ICommand, DisableStreamDataCommand>();

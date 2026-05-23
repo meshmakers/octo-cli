@@ -128,7 +128,7 @@ Environment variables are prefixed with `OCTO_`.
 | Identity | users, roles, clients (+ mirror commands: GetClientMirrors, ProvisionClientInExistingTenants, ProvisionClientInTenant, UnprovisionClientFromTenant, SetClientAutoProvision), identityProviders, groups, emailDomainGroupRules, externalTenantUserMappings, adminProvisioning, apiResources, apiScopes | Identity Services |
 | Asset | tenants, models, blueprints (ListBlueprints, InstallBlueprint, GetBlueprintHistory, PreviewBlueprintUpdate, UpdateBlueprint, ListBlueprintBackups, RollbackBlueprint, ListBlueprintInstallations, UninstallBlueprint), timeSeries (EnableStreamData, DisableStreamData, ActivateArchive, DisableArchive, EnableArchive, RetryArchiveActivation, DeleteArchive, FreezeRollupArchive, UnfreezeRollupArchive, RewindRollupWatermark, ListRollupsForArchive) | Asset Repository |
 | Bots | notifications | Bot Services |
-| Communication | enable/disable, adapters, pipelines, triggers, pools, dataFlows, workloads (GetWorkloadsByChart, UpdateWorkloadChartVersion, DeployWorkload, UndeployWorkload) | Communication Controller |
+| Communication | enable/disable, adapters, pipelines (incl. MovePipelines for bulk reassignment to a different adapter), triggers, pools, dataFlows, workloads (GetWorkloadsByChart, UpdateWorkloadChartVersion, DeployWorkload, UndeployWorkload) | Communication Controller |
 | Reporting | enable/disable | Report Services |
 | DevOps | certificates | Local operations |
 | General | login, loginClientCredentials, authStatus, config | Local operations |
@@ -252,6 +252,19 @@ octo-cli -c UpdateWorkloadChartVersion -id <workloadRtId> -cv 1.2.3
 octo-cli -c DeployWorkload -id <workloadRtId>
 # Undeploy (destructive — confirmation prompt; -y to skip).
 octo-cli -c UndeployWorkload -id <workloadRtId>
+
+# Pipeline reassignment — move pipelines onto a different adapter when a
+# fresh Blueprint provisioned a replacement adapter. Source + target adapter
+# must share the same CkTypeId. Each pipeline is moved atomically;
+# per-pipeline failures are listed in the output but don't abort the batch.
+octo-cli -c MovePipelines -ids p1,p2,p3 -aid <newAdapterRtId>
+# Add -rd to also redeploy each moved pipeline onto the new adapter.
+# A redeploy failure does not roll the move back — the pipeline already
+# points at the new adapter, just hit DeployPipeline manually once the
+# adapter is back online.
+octo-cli -c MovePipelines -ids p1,p2 -aid <newAdapterRtId> -rd
+# -y skips the interactive confirmation prompt.
+octo-cli -c MovePipelines -ids p1 -aid <newAdapterRtId> -y
 
 # Multi-tenant ClientCredentials mirroring (Epic 3054, #4047)
 # Create a flagged client in octosystem — gets auto-provisioned into every new sub-tenant.
