@@ -15,7 +15,7 @@ internal class UpdateApiSecretApiResource : ServiceClientOctoCommand<IIdentitySe
 
     public UpdateApiSecretApiResource(ILogger<UpdateApiSecretApiResource> logger, IOptions<OctoToolOptions> options,
         IIdentityServicesClient identityServicesClient, IAuthenticationService authenticationService)
-        : base(logger, "User Management", "UpdateApiSecretApiResource", "Updates an API secret for an API resource.",
+        : base(logger, Constants.IdentityServicesGroup, "UpdateApiSecretApiResource", "Updates an API secret for an API resource.",
             options, identityServicesClient,
             authenticationService)
     {
