@@ -15,7 +15,7 @@ internal class DeleteApiScope : ServiceClientOctoCommand<IIdentityServicesClient
     public DeleteApiScope(ILogger<DeleteApiScope> logger, IOptions<OctoToolOptions> options,
         IIdentityServicesClient identityServicesClient, IAuthenticationService authenticationService,
         IConfirmationService confirmationService)
-        : base(logger, Constants.IdentityServicesGroup, "DeleteApiScope", "Deletes a client.", options,
+        : base(logger, Constants.IdentityServicesGroup, "DeleteApiScope", "Deletes an API scope.", options,
             identityServicesClient,
             authenticationService)
     {

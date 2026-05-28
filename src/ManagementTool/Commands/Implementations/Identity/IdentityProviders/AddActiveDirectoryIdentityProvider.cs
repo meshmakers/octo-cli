@@ -32,7 +32,7 @@ internal class AddActiveDirectoryIdentityProvider : ServiceClientOctoCommand<IId
         _host = CommandArgumentValue.AddArgument("h", "host",
             ["Host"], true, 1);
         _port = CommandArgumentValue.AddArgument("p", "port",
-            ["Host"], true, 1);
+            ["Port of host"], true, 1);
         _allowSelfRegistration = CommandArgumentValue.AddArgument("asr", "allowSelfRegistration",
             ["Allow self registration (default: true)"], false, 1);
         _defaultGroupRtId = CommandArgumentValue.AddArgument("dgid", "defaultGroupRtId",

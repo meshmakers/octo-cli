@@ -25,7 +25,7 @@ internal class CreateApiResource : ServiceClientOctoCommand<IIdentityServicesCli
         _displayNameArg =
             CommandArgumentValue.AddArgument("dn", "displayName", ["Display name of resource"], false, 1);
         _descriptionArg =
-            CommandArgumentValue.AddArgument("d", "description", ["Description of scope resource"], false, 1);
+            CommandArgumentValue.AddArgument("d", "description", ["Description of API resource"], false, 1);
 
         _scopesArg =
             CommandArgumentValue.AddArgument("s", "scopes", ["Scopes to add to resource. Split them with ,"], false, 1);

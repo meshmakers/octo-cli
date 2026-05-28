@@ -31,7 +31,7 @@ internal class CreateApiSecretClient : ServiceClientOctoCommand<IIdentityService
         _expirationArg =
             CommandArgumentValue.AddArgument("e", "expirationDate", ["Expiration date of secret"], false, 1);
         _descriptionArg =
-            CommandArgumentValue.AddArgument("d", "description", ["Description of scope scope"], false, 1);
+            CommandArgumentValue.AddArgument("d", "description", ["Description of API secret"], false, 1);
     }
 
     public override async Task Execute()

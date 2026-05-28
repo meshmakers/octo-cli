@@ -30,7 +30,7 @@ internal class UpdateApiScope : ServiceClientOctoCommand<IIdentityServicesClient
         _displayNameArg =
             CommandArgumentValue.AddArgument("dn", "displayName", ["Display name of scope"], false, 1);
         _descriptionArg =
-            CommandArgumentValue.AddArgument("d", "description", ["Description of scope scope"], false, 1);
+            CommandArgumentValue.AddArgument("d", "description", ["Description of API scope"], false, 1);
     }
 
     public override async Task Execute()
