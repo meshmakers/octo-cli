@@ -100,10 +100,15 @@ foreach (var (path, src) in sourcesByPath)
             {
                 var fallbackName = FilenameResolver.ResolveDisambiguated(cmd);
                 var fallbackPath = Path.Combine(groupDir, $"{fallbackName}.md");
+                if (!writtenPaths.Add(fallbackPath))
+                {
+                    throw new InvalidOperationException(
+                        $"Filename collision: '{primaryName}.md' and disambiguated '{fallbackName}.md' both " +
+                        $"already exist in group '{label}'. Two commands have indistinguishable verb AND class name.");
+                }
                 Console.Error.WriteLine($"[WARN] Filename collision on '{primaryName}.md' in group '{label}'. " +
                                         $"Using disambiguated '{fallbackName}.md' instead.");
                 outPath = fallbackPath;
-                writtenPaths.Add(outPath);
             }
             File.WriteAllText(outPath, md);
             written++;

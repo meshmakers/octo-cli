@@ -2,13 +2,13 @@
 
 Full status:
 
-```bash
+```powershell
 octo-cli -c LibraryStatus
 ```
 
 Only models needing attention:
 
-```bash
+```powershell
 octo-cli -c LibraryStatus -na
 ```
 

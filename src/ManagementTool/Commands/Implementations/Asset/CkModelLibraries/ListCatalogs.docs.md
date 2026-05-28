@@ -1,6 +1,6 @@
 ## Examples
 
-```bash
+```powershell
 octo-cli -c ListCatalogs
 ```
 

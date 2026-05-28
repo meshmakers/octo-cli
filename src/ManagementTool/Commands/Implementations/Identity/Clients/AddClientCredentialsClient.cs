@@ -14,6 +14,7 @@ internal class AddClientCredentialsClient : ServiceClientOctoCommand<IIdentitySe
     private readonly IArgument _clientId;
     private readonly IArgument _clientName;
     private readonly IArgument _clientSecret;
+    private readonly IArgument _autoProvision;
 
     public AddClientCredentialsClient(ILogger<AddClientCredentialsClient> logger, IOptions<OctoToolOptions> options,
         IIdentityServicesClient identityServicesClient, IAuthenticationService authenticationService)
@@ -30,6 +31,11 @@ internal class AddClientCredentialsClient : ServiceClientOctoCommand<IIdentitySe
         _clientSecret = CommandArgumentValue.AddArgument("s", "secret",
             ["ApiSecret that is used for client credential authentication"], true,
             1);
+        _autoProvision = CommandArgumentValue.AddArgument("apic", "autoProvision",
+            [
+                "If set, this client is auto-provisioned (mirrored) into every new sub-tenant of the calling tenant.",
+                "Use for service-to-service / CI-CD identities that must reach many tenants with a single ClientId/secret pair."
+            ], false, 0);
     }
 
     public override async Task Execute()
@@ -37,6 +43,7 @@ internal class AddClientCredentialsClient : ServiceClientOctoCommand<IIdentitySe
         var clientSecret = CommandArgumentValue.GetArgumentScalarValue<string>(_clientSecret);
         var clientId = CommandArgumentValue.GetArgumentScalarValue<string>(_clientId);
         var clientName = CommandArgumentValue.GetArgumentScalarValue<string>(_clientName);
+        var autoProvision = CommandArgumentValue.IsArgumentUsed(_autoProvision);
 
         Logger.LogInformation("Creating client \'{ClientId}\' at \'{ServiceClientServiceUri}\'", clientId,
             ServiceClient.ServiceUri);
@@ -50,12 +57,14 @@ internal class AddClientCredentialsClient : ServiceClientOctoCommand<IIdentitySe
             RequireClientSecret = true,
             AllowedGrantTypes = [OidcConstants.GrantTypes.ClientCredentials],
             AllowedScopes = [CommonConstants.OctoApiFullAccess],
-            IsOfflineAccessEnabled = true
+            IsOfflineAccessEnabled = true,
+            AutoProvisionInChildTenants = autoProvision ? true : null
         };
 
         await ServiceClient.CreateClient(clientDto);
 
-        Logger.LogInformation("ServiceClient \'{ClientId}\' at \'{ServiceClientServiceUri}\' created", clientId,
-            ServiceClient.ServiceUri);
+        Logger.LogInformation("ServiceClient \'{ClientId}\' at \'{ServiceClientServiceUri}\' created{AutoNote}",
+            clientId, ServiceClient.ServiceUri,
+            autoProvision ? " (AutoProvisionInChildTenants enabled)" : string.Empty);
     }
 }

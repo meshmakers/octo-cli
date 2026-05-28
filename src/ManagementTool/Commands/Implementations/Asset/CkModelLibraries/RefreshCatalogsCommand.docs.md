@@ -2,12 +2,12 @@
 
 Refresh all catalogs:
 
-```bash
+```powershell
 octo-cli -c RefreshCatalogs
 ```
 
 Refresh specific catalog:
 
-```bash
+```powershell
 octo-cli -c RefreshCatalogs -cn PublicGitHubCatalog
 ```

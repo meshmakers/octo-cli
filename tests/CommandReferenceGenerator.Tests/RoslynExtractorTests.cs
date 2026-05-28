@@ -165,6 +165,30 @@ public class RoslynExtractorTests
     }
 
     [Fact]
+    public void InheritedArgsByBaseClass_does_not_drift_from_JobWithWaitOctoCommand_source()
+    {
+        // Drift guard: RoslynExtractor.InheritedArgsByBaseClass hardcodes the wait-arg signature
+        // mirroring JobWithWaitOctoCommand.cs. If the base class adds, removes, or changes args,
+        // this test fails and reminds you to update the hardcoded mirror.
+        var root = AppContext.BaseDirectory;
+        while (root != null && !File.Exists(Path.Combine(root, "Octo.Cli.sln")))
+            root = Directory.GetParent(root)?.FullName;
+        Assert.NotNull(root);
+        var sourcePath = Path.Combine(root!, "src", "ManagementTool", "Commands", "JobWithWaitOctoCommand.cs");
+        Assert.True(File.Exists(sourcePath), $"Expected JobWithWaitOctoCommand.cs at {sourcePath}");
+
+        var src = File.ReadAllText(sourcePath);
+
+        // Hardcoded mirror expects exactly one AddArgument with these literals.
+        // If you change either side, change both.
+        Assert.Contains("AddArgument(\"w\", \"wait\"", src);
+        Assert.Contains("\"Wait for a import job to complete\"", src);
+        // No other AddArgument calls in this base class — keep it that way or update mirror.
+        var addArgumentCount = System.Text.RegularExpressions.Regex.Matches(src, @"\.AddArgument\(").Count;
+        Assert.Equal(1, addArgumentCount);
+    }
+
+    [Fact]
     public void Appends_inherited_args_from_known_base_class()
     {
         var source = """

@@ -3,12 +3,7 @@
 Delegates authentication to a parent tenant for cross-tenant access.
 
 ```powershell
-octo-cli -c AddOctoTenantIdentityProvider \
-  -n "Parent Tenant Auth" \
-  -ptid "octosystem" \
-  -e true \
-  -asr true \
-  -dgid "<default-group-rtid>"
+octo-cli -c AddOctoTenantIdentityProvider -n "Parent Tenant Auth" -ptid "octosystem" -e true -asr true -dgid "<default-group-rtid>"
 ```
 
 ## See Also

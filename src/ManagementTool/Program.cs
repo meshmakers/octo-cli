@@ -263,6 +263,13 @@ internal static class Program
         services.AddTransient<ICommand, UpdateClient>();
         services.AddTransient<ICommand, DeleteClient>();
 
+        // Multi-tenant ClientCredentials mirroring (Epic 3054 #4047)
+        services.AddTransient<ICommand, GetClientMirrors>();
+        services.AddTransient<ICommand, ProvisionClientInExistingTenants>();
+        services.AddTransient<ICommand, ProvisionClientInTenant>();
+        services.AddTransient<ICommand, UnprovisionClientFromTenant>();
+        services.AddTransient<ICommand, SetClientAutoProvision>();
+
         services.AddTransient<ICommand, GetIdentityProviders>();
         services.AddTransient<ICommand, AddOAuthIdentityProvider>();
         services.AddTransient<ICommand, AddOpenLdapIdentityProvider>();
@@ -383,6 +390,13 @@ internal static class Program
         services.AddTransient<ICommand, DeployDataFlowCommand>();
         services.AddTransient<ICommand, UndeployDataFlowCommand>();
         services.AddTransient<ICommand, GetDataFlowStatusCommand>();
+
+        // Communication - Workloads (Epic 3054 #4053): CI/CD chart rollout commands
+        services.AddTransient<ICommand, GetWorkloadsByChartCommand>();
+        services.AddTransient<ICommand, UpdateWorkloadChartVersionCommand>();
+        services.AddTransient<ICommand, DeployWorkloadCommand>();
+        services.AddTransient<ICommand, UndeployWorkloadCommand>();
+        services.AddTransient<ICommand, MovePipelinesToAdapterCommand>();
 
         services.AddTransient<ICommand, EnableStreamDataCommand>();
         services.AddTransient<ICommand, DisableStreamDataCommand>();

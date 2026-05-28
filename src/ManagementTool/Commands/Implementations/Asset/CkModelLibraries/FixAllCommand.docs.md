@@ -2,12 +2,12 @@
 
 Interactive with wait:
 
-```bash
+```powershell
 octo-cli -c FixAll -w
 ```
 
 Non-interactive (for CI/CD):
 
-```bash
+```powershell
 octo-cli -c FixAll -w -y
 ```

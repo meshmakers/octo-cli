@@ -29,7 +29,7 @@ public static class MarkdownRenderer
         }
         else
         {
-            sb.Append("```bash\n");
+            sb.Append("```powershell\n");
             sb.Append(BuildCanonicalExample(cmd));
             sb.Append('\n');
             sb.Append("```\n");
@@ -49,7 +49,7 @@ public static class MarkdownRenderer
             foreach (var arg in cmd.Args)
             {
                 var required = arg.IsRequired ? "yes" : "no";
-                var helpForCell = arg.Help.Replace("\n", "<br>");
+                var helpForCell = arg.Help.Replace("\n", "<br/>");
                 sb.Append("| `-").Append(arg.Short).Append("` | `--").Append(arg.Long)
                   .Append("` | ").Append(required).Append(" | ").Append(helpForCell).Append(" |\n");
             }

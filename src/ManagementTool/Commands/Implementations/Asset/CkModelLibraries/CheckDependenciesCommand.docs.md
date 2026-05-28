@@ -1,6 +1,6 @@
 ## Examples
 
-```bash
+```powershell
 octo-cli -c CheckDependencies -cn PublicGitHubCatalog -m "Industry.Energy-2.0.0"
 ```
 

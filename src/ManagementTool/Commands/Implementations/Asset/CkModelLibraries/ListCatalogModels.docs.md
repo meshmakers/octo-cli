@@ -2,18 +2,18 @@
 
 List all models:
 
-```bash
+```powershell
 octo-cli -c ListCatalogModels
 ```
 
 Search for energy models:
 
-```bash
+```powershell
 octo-cli -c ListCatalogModels -q "Energy"
 ```
 
 List from specific catalog:
 
-```bash
+```powershell
 octo-cli -c ListCatalogModels -cn PublicGitHubCatalog
 ```

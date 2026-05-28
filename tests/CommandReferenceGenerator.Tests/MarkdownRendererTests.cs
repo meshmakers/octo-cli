@@ -33,7 +33,7 @@ public class MarkdownRendererTests
             "\n" +
             "## Examples\n" +
             "\n" +
-            "```bash\n" +
+            "```powershell\n" +
             "octo-cli -c LaunchAttack -t <target>\n" +
             "```\n" +
             "\n" +
@@ -90,7 +90,7 @@ public class MarkdownRendererTests
             "\n" +
             "## Examples\n" +
             "\n" +
-            "```bash\n" +
+            "```powershell\n" +
             "octo-cli -c DeployToBattlefield -s <sector>\n" +
             "```\n" +
             "\n" +
@@ -130,7 +130,7 @@ public class MarkdownRendererTests
             "\n" +
             "## Examples\n" +
             "\n" +
-            "```bash\n" +
+            "```powershell\n" +
             "octo-cli -c Status\n" +
             "```\n" +
             "\n" +
@@ -155,7 +155,7 @@ public class MarkdownRendererTests
 
         var md = MarkdownRenderer.Render(cmd);
 
-        Assert.Contains("| `-e` | `--emergency` | no | First line<br>Second line |\n", md);
+        Assert.Contains("| `-e` | `--emergency` | no | First line<br/>Second line |\n", md);
     }
 
     [Fact]

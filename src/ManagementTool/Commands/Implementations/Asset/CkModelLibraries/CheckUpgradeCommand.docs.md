@@ -1,6 +1,6 @@
 ## Examples
 
-```bash
+```powershell
 octo-cli -c CheckUpgrade -cn PublicGitHubCatalog -m "Basic-2.0.2"
 ```
 
