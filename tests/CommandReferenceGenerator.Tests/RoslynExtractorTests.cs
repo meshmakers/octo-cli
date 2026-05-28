@@ -33,17 +33,17 @@ public class RoslynExtractorTests
     [Fact]
     public void Extracts_shape_b_command_with_literal_group()
     {
-        // Real-world case: UpdateApiSecretClient.cs uses a string literal "User Management"
-        // as the group instead of a constant. The extractor must NOT mistake this for Shape A
-        // (where arg1 would be the verb).
+        // Shape B with literal group: some authors pass the group as a string literal
+        // instead of a Constants.X reference. The extractor must NOT mistake this for
+        // Shape A (where arg1 would be the verb).
         var source = """
             namespace Test;
-            internal class UpdateApiSecretClient : ServiceClientCommand<X>
+            internal class FooCommand : ServiceClientCommand<X>
             {
-                public UpdateApiSecretClient(ILogger<UpdateApiSecretClient> logger, IOptions<X> options, X x)
-                    : base(logger, "User Management", "UpdateApiSecretClient", "Updates an API secret for a client.", options, x)
+                public FooCommand(ILogger<FooCommand> logger, IOptions<X> options, X x)
+                    : base(logger, "Some Literal Group", "Foo", "Does foo.", options, x)
                 {
-                    CommandArgumentValue.AddArgument("cid", "clientId", ["ID of client"], true, 1);
+                    CommandArgumentValue.AddArgument("f", "foo", ["foo help"], true, 1);
                 }
             }
             """;
@@ -52,9 +52,9 @@ public class RoslynExtractorTests
 
         Assert.Single(commands);
         var cmd = commands[0];
-        Assert.Equal("User Management", cmd.Group);
-        Assert.Equal("UpdateApiSecretClient", cmd.Verb);
-        Assert.Equal("Updates an API secret for a client.", cmd.Description);
+        Assert.Equal("Some Literal Group", cmd.Group);
+        Assert.Equal("Foo", cmd.Verb);
+        Assert.Equal("Does foo.", cmd.Description);
     }
 
     [Fact]
