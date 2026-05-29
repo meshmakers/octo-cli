@@ -497,3 +497,35 @@ internal class FooCommand : ServiceClientOctoCommand<IFooClient>
 ### Where output goes
 
 The generator emits to `bin/Release/documentation/technologyGuide/tools/octo-cli/command-reference/` during CI builds. `octo-cli-pipeline.yml` invokes `createCommandReference.ps1`, and the resulting tree is published as the `_octo-cli` artifact via `handle-artifacts.yml`.
+
+### End-to-end flow
+
+```
+   dev edits command class (.cs)              ← only step a developer ever does
+            │
+            ▼
+   octo-cli-CI builds the branch
+            │
+            ▼
+   _octo-cli artifact (contains the regenerated command-reference tree)
+            │
+            ▼
+   Azure DevOps release: documentation-main-collect
+   • Task Group UpdateDocumentationRepo:
+       Delete files in octo-documentation's command-reference/
+         (Contents `**`, excludes `_category_.json` and `**/_category_.json`)
+       Copy Files from _octo-cli artifact into the same path
+       Commit + push to octo-documentation main
+            │
+            ▼
+   octo-documentation-CI rebuilds Docusaurus
+            │
+            ▼
+   docs.meshmakers.cloud (auto-published)
+```
+
+Net effect: editing a `GetDocumentation()` override, an `AddArgument(...)`
+help string, or a base() description in any command class is the **single**
+step needed to update the public docs site. No manual edits in
+`octo-documentation` — handwritten pages there are limited to `intro.md`
+and `common-workflows.md`.
