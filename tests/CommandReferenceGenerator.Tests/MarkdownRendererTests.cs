@@ -159,7 +159,7 @@ public class MarkdownRendererTests
     }
 
     [Fact]
-    public void Renders_notes_section_when_sidecar_has_notes()
+    public void Renders_notes_section_when_command_has_notes()
     {
         var cmd = new CommandDescriptor(
             Group: null,
@@ -167,7 +167,7 @@ public class MarkdownRendererTests
             Description: "Does foo.",
             Args: Array.Empty<ArgumentDescriptor>())
         {
-            NotesMarkdown = "Requires authentication. Run `octo-cli LogIn` first."
+            Notes = new[] { "Requires authentication. Run `octo-cli LogIn` first." }
         };
 
         var md = MarkdownRenderer.Render(cmd);
@@ -176,7 +176,7 @@ public class MarkdownRendererTests
     }
 
     [Fact]
-    public void Omits_notes_section_when_sidecar_has_no_notes()
+    public void Omits_notes_section_when_command_has_no_notes()
     {
         var cmd = new CommandDescriptor(
             Group: null,
@@ -190,7 +190,7 @@ public class MarkdownRendererTests
     }
 
     [Fact]
-    public void Renders_see_also_section_when_sidecar_has_see_also()
+    public void Renders_see_also_section_when_command_has_see_also()
     {
         var cmd = new CommandDescriptor(
             Group: null,
@@ -198,7 +198,11 @@ public class MarkdownRendererTests
             Description: "Does foo.",
             Args: Array.Empty<ArgumentDescriptor>())
         {
-            SeeAlsoMarkdown = "- [LogIn](../general/LogIn.md)\n- [Bar](./Bar.md)"
+            SeeAlso = new[]
+            {
+                new SeeAlsoDescriptor("LogIn", "../general/LogIn.md"),
+                new SeeAlsoDescriptor("Bar", "./Bar.md"),
+            }
         };
 
         var md = MarkdownRenderer.Render(cmd);
@@ -207,7 +211,7 @@ public class MarkdownRendererTests
     }
 
     [Fact]
-    public void Omits_see_also_section_when_sidecar_has_no_see_also()
+    public void Omits_see_also_section_when_command_has_no_see_also()
     {
         var cmd = new CommandDescriptor(
             Group: null,
@@ -221,24 +225,129 @@ public class MarkdownRendererTests
     }
 
     [Fact]
-    public void Renders_sidecar_examples_when_set_skipping_auto_canonical()
+    public void Composes_invocation_from_argument_bindings()
     {
+        var fooArg = new ArgumentDescriptor("f", "foo", "foo help", IsRequired: true, ValueCount: 1);
         var cmd = new CommandDescriptor(
             Group: null,
-            Verb: "Foo",
-            Description: "Does foo.",
-            Args: new[]
-            {
-                new ArgumentDescriptor("f", "foo", "foo help", IsRequired: true, ValueCount: 1)
-            })
+            Verb: "Bar",
+            Description: "Bars.",
+            Args: new[] { fooArg })
         {
-            ExamplesMarkdown = "Custom example block:\n\n```bash\noctocli foo --special\n```"
+            Samples = new[]
+            {
+                new SampleDescriptor(
+                    new[] { new SampleArgumentBinding(fooArg, "value-1") },
+                    "Basic usage"),
+            }
         };
 
         var md = MarkdownRenderer.Render(cmd);
 
-        Assert.Contains("Custom example block:", md);
-        Assert.Contains("octocli foo --special", md);
-        Assert.DoesNotContain("octo-cli -c Foo -f <foo>", md); // auto-canonical NOT present
+        Assert.Contains("Basic usage:", md);
+        Assert.Contains("octo-cli -c Bar -f \"value-1\"", md);
+    }
+
+    [Fact]
+    public void Composes_invocation_multiline_when_three_or_more_bindings()
+    {
+        var aArg = new ArgumentDescriptor("a", "alpha", "a help", IsRequired: true, ValueCount: 1);
+        var bArg = new ArgumentDescriptor("b", "beta", "b help", IsRequired: true, ValueCount: 1);
+        var cArg = new ArgumentDescriptor("c", "gamma", "c help", IsRequired: true, ValueCount: 1);
+        var cmd = new CommandDescriptor(
+            Group: null,
+            Verb: "Multi",
+            Description: "Multi.",
+            Args: new[] { aArg, bArg, cArg })
+        {
+            Samples = new[]
+            {
+                new SampleDescriptor(
+                    new[]
+                    {
+                        new SampleArgumentBinding(aArg, "v1"),
+                        new SampleArgumentBinding(bArg, "v2"),
+                        new SampleArgumentBinding(cArg, "v3"),
+                    },
+                    "Three bindings"),
+            }
+        };
+
+        var md = MarkdownRenderer.Render(cmd);
+
+        // Multi-line uses PowerShell-7 backtick line-continuation with 4-space indent.
+        Assert.Contains("octo-cli -c Multi `\n    -a \"v1\" `\n    -b \"v2\" `\n    -c \"v3\"", md);
+    }
+
+    [Fact]
+    public void Description_with_trailing_punctuation_does_not_get_extra_colon()
+    {
+        var arg = new ArgumentDescriptor("f", "foo", "foo", IsRequired: true, ValueCount: 1);
+        var cmd = new CommandDescriptor(
+            Group: null,
+            Verb: "Foo",
+            Description: "Does foo.",
+            Args: new[] { arg })
+        {
+            Samples = new[]
+            {
+                new SampleDescriptor(
+                    new[] { new SampleArgumentBinding(arg, "x") },
+                    "Ends with a period."),
+            }
+        };
+
+        var md = MarkdownRenderer.Render(cmd);
+
+        Assert.Contains("Ends with a period.\n", md);
+        Assert.DoesNotContain("Ends with a period.:", md);
+    }
+
+    [Fact]
+    public void Composes_flag_without_value()
+    {
+        var waitArg = new ArgumentDescriptor("w", "wait", "Wait for completion", IsRequired: false, ValueCount: 0);
+        var cmd = new CommandDescriptor(
+            Group: null,
+            Verb: "Run",
+            Description: "Runs.",
+            Args: new[] { waitArg })
+        {
+            Samples = new[]
+            {
+                new SampleDescriptor(
+                    new[] { new SampleArgumentBinding(waitArg, null) },
+                    "Wait inline"),
+            }
+        };
+
+        var md = MarkdownRenderer.Render(cmd);
+
+        Assert.Contains("octo-cli -c Run -w", md);
+        // Flag must not be followed by a quoted value
+        Assert.DoesNotContain("-w \"", md);
+    }
+
+    [Fact]
+    public void Renders_expected_output_block()
+    {
+        var cmd = new CommandDescriptor(
+            Group: null,
+            Verb: "Status",
+            Description: "Shows status.",
+            Args: Array.Empty<ArgumentDescriptor>())
+        {
+            Samples = new[]
+            {
+                new SampleDescriptor(
+                    Array.Empty<SampleArgumentBinding>(),
+                    "Show current status",
+                    "NAME   STATE\nfoo    OK"),
+            }
+        };
+
+        var md = MarkdownRenderer.Render(cmd);
+
+        Assert.Contains("**Output:**\n\n```\nNAME   STATE\nfoo    OK\n```", md);
     }
 }

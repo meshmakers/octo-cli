@@ -25,6 +25,22 @@ internal class DeleteAdminProvisioningMapping : ServiceClientOctoCommand<IIdenti
             ["ID of the mapping to delete"], true, 1);
     }
 
+    public override CommandDocumentation? GetDocumentation() =>
+        new(
+            Samples:
+            [
+                new CodeSample(arguments: [
+                    new CodeSampleArgument(_targetTenantId, "customer-project"),
+                    new CodeSampleArgument(_mappingId, "<mapping-rtid>"),
+                ],
+                    description: "Basic usage"),
+            ],
+            Notes:
+            [
+                "All admin provisioning commands must be run from the **system tenant context**.",
+            ]
+        );
+
     public override async Task Execute()
     {
         var targetTenantId = CommandArgumentValue.GetArgumentScalarValue<string>(_targetTenantId);

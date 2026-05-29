@@ -34,6 +34,25 @@ internal class CreateAdminProvisioningMapping : ServiceClientOctoCommand<IIdenti
             ["Comma-separated list of role IDs to assign"], false, 1);
     }
 
+    public override CommandDocumentation? GetDocumentation() =>
+        new(
+            Samples:
+            [
+                new CodeSample(arguments: [
+                    new CodeSampleArgument(_targetTenantId, "customer-project"),
+                    new CodeSampleArgument(_sourceTenantId, "octosystem"),
+                    new CodeSampleArgument(_sourceUserId, "<user-id>"),
+                    new CodeSampleArgument(_sourceUserName, "alice"),
+                    new CodeSampleArgument(_roleIds, "Development,DashboardViewer"),
+                ],
+                    description: "Basic usage"),
+            ],
+            Notes:
+            [
+                "All admin provisioning commands must be run from the **system tenant context**.",
+            ]
+        );
+
     public override async Task Execute()
     {
         var targetTenantId = CommandArgumentValue.GetArgumentScalarValue<string>(_targetTenantId);

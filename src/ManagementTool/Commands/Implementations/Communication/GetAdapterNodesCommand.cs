@@ -24,6 +24,15 @@ internal class GetAdapterNodesCommand : ServiceClientOctoCommand<ICommunicationS
         _jsonArg = CommandArgumentValue.AddArgument("j", "json", ["Output as raw JSON"], false);
     }
 
+    public override CommandDocumentation? GetDocumentation() =>
+        new(
+            Samples:
+            [
+                new CodeSample(arguments: [], description: "Returns the list of available pipeline node types from all connected adapters"),
+                new CodeSample(arguments: [new CodeSampleArgument(_jsonArg)], description: "Output as compact JSON"),
+            ]
+        );
+
     public override async Task Execute()
     {
         Logger.LogInformation("Getting adapter nodes for tenant '{TenantId}' at '{ServiceClientServiceUri}'",

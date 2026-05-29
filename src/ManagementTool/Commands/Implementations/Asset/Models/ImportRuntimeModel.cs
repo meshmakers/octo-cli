@@ -1,4 +1,4 @@
-﻿using Meshmakers.Common.CommandLineParser;
+using Meshmakers.Common.CommandLineParser;
 using Meshmakers.Octo.Communication.Contracts.DataTransferObjects;
 using Meshmakers.Octo.Frontend.ManagementTool.Services;
 using Meshmakers.Octo.Sdk.ServiceClient;
@@ -38,6 +38,19 @@ internal class ImportRuntimeModel : JobWithWaitOctoCommand
             _assetServicesClient.AccessToken.AccessToken = ServiceClient.AccessToken?.AccessToken;
         }
     }
+
+    public override CommandDocumentation? GetDocumentation() =>
+        new(
+            Samples:
+            [
+                new CodeSample(arguments: [
+                    new CodeSampleArgument(_fileArg, "./runtime-data.json"),
+                    new CodeSampleArgument(_waitForJobArg),
+                    new CodeSampleArgument(_replaceArg),
+                ],
+                    description: "Basic usage"),
+            ]
+        );
 
     public override async Task Execute()
     {

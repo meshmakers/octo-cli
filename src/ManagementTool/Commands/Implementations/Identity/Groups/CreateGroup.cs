@@ -25,6 +25,19 @@ internal class CreateGroup : ServiceClientOctoCommand<IIdentityServicesClient>
             ["Comma-separated list of role IDs to assign"], false, 1);
     }
 
+    public override CommandDocumentation? GetDocumentation() =>
+        new(
+            Samples:
+            [
+                new CodeSample(arguments: [
+                    new CodeSampleArgument(_name, "Engineering"),
+                    new CodeSampleArgument(_description, "Engineering team"),
+                    new CodeSampleArgument(_roleIds, "Development,CommunicationManagement"),
+                ],
+                    description: "Basic usage"),
+            ]
+        );
+
     public override async Task Execute()
     {
         var name = CommandArgumentValue.GetArgumentScalarValue<string>(_name);

@@ -1,4 +1,4 @@
-﻿using Meshmakers.Common.CommandLineParser;
+using Meshmakers.Common.CommandLineParser;
 using Meshmakers.Octo.Communication.Contracts.DataTransferObjects;
 using Meshmakers.Octo.Frontend.ManagementTool.Services;
 using Meshmakers.Octo.Sdk.ServiceClient.IdentityServices;
@@ -40,6 +40,23 @@ internal class AddOAuthIdentityProvider : ServiceClientOctoCommand<IIdentityServ
         _defaultGroupRtId = CommandArgumentValue.AddArgument("dgid", "defaultGroupRtId",
             ["Default group RtId for new users"], false, 1);
     }
+
+    public override CommandDocumentation? GetDocumentation() =>
+        new(
+            Samples:
+            [
+                new CodeSample(arguments: [
+                    new CodeSampleArgument(_name, "Google Login"),
+                    new CodeSampleArgument(_type, "google"),
+                    new CodeSampleArgument(_clientId, "your-client-id"),
+                    new CodeSampleArgument(_clientSecret, "your-client-secret"),
+                    new CodeSampleArgument(_enabled, "true"),
+                    new CodeSampleArgument(_allowSelfRegistration, "true"),
+                    new CodeSampleArgument(_defaultGroupRtId, "<default-group-rtid>"),
+                ],
+                    description: "Supports Google, Microsoft, Facebook"),
+            ]
+        );
 
     public override async Task Execute()
     {

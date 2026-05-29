@@ -23,6 +23,16 @@ internal class ListCatalogModels : ServiceClientOctoCommand<IAssetServicesClient
             ["Search term"], false, 1);
     }
 
+    public override CommandDocumentation? GetDocumentation() =>
+        new(
+            Samples:
+            [
+                new CodeSample(arguments: [], description: "List all models"),
+                new CodeSample(arguments: [new CodeSampleArgument(_searchArg, "Energy")], description: "Search for energy models"),
+                new CodeSample(arguments: [new CodeSampleArgument(_catalogNameArg, "PublicGitHubCatalog")], description: "List from specific catalog"),
+            ]
+        );
+
     public override async Task Execute()
     {
         string? catalogName = CommandArgumentValue.IsArgumentUsed(_catalogNameArg)

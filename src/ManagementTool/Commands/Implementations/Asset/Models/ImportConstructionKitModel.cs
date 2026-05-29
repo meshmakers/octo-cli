@@ -1,4 +1,4 @@
-﻿using Meshmakers.Common.CommandLineParser;
+using Meshmakers.Common.CommandLineParser;
 using Meshmakers.Octo.Frontend.ManagementTool.Services;
 using Meshmakers.Octo.Sdk.ServiceClient;
 using Meshmakers.Octo.Sdk.ServiceClient.AssetRepositoryServices.System;
@@ -31,6 +31,18 @@ internal class ImportConstructionKitModel : JobWithWaitOctoCommand
 
         _assetServicesClient.AccessToken.AccessToken = ServiceClient.AccessToken.AccessToken;
     }
+
+    public override CommandDocumentation? GetDocumentation() =>
+        new(
+            Samples:
+            [
+                new CodeSample(arguments: [
+                    new CodeSampleArgument(_fileArg, "./my-ck-model.yaml"),
+                    new CodeSampleArgument(_waitForJobArg),
+                ],
+                    description: "Basic usage"),
+            ]
+        );
 
     public override async Task Execute()
     {

@@ -1,4 +1,4 @@
-﻿using Meshmakers.Common.CommandLineParser;
+using Meshmakers.Common.CommandLineParser;
 using Meshmakers.Octo.Frontend.ManagementTool.Services;
 using Meshmakers.Octo.Sdk.ServiceClient.AssetRepositoryServices.System;
 using Microsoft.Extensions.Logging;
@@ -20,6 +20,14 @@ internal class UpdateSystemCkModelTenant : ServiceClientOctoCommand<IAssetServic
         _tenantIdArg = CommandArgumentValue.AddArgument("tid", "tenantId", ["Id of tenant"],
             true, 1);
     }
+
+    public override CommandDocumentation? GetDocumentation() =>
+        new(
+            Samples:
+            [
+                new CodeSample(arguments: [new CodeSampleArgument(_tenantIdArg, "newtenant")], description: "Basic usage"),
+            ]
+        );
 
     public override async Task Execute()
     {

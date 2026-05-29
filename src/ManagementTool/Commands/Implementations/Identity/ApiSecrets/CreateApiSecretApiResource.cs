@@ -1,4 +1,4 @@
-﻿using Meshmakers.Common.CommandLineParser;
+using Meshmakers.Common.CommandLineParser;
 using Meshmakers.Common.Shared.Services;
 using Meshmakers.Octo.Communication.Contracts.DataTransferObjects;
 using Meshmakers.Octo.Frontend.ManagementTool.Services;
@@ -34,6 +34,19 @@ internal class CreateApiSecretApiResource : ServiceClientOctoCommand<IIdentitySe
         _descriptionArg =
             CommandArgumentValue.AddArgument("d", "description", ["Description of API secret"], false, 1);
     }
+
+    public override CommandDocumentation? GetDocumentation() =>
+        new(
+            Samples:
+            [
+                new CodeSample(arguments: [
+                    new CodeSampleArgument(_nameArg, "myAPI"),
+                    new CodeSampleArgument(_expirationArg, "2025-12-31"),
+                    new CodeSampleArgument(_descriptionArg, "API secret"),
+                ],
+                    description: "Basic usage"),
+            ]
+        );
 
     public override async Task Execute()
     {

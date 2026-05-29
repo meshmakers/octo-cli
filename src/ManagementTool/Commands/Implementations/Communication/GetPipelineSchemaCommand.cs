@@ -28,6 +28,19 @@ internal class GetPipelineSchemaCommand : ServiceClientOctoCommand<ICommunicatio
             CommandArgumentValue.AddArgument("o", "outputFile", ["Output file path"], false, 1);
     }
 
+    public override CommandDocumentation? GetDocumentation() =>
+        new(
+            Samples:
+            [
+                new CodeSample(arguments: [new CodeSampleArgument(_adapterIdArg, "69cfa838092b710403248acd")], description: "Returns the JSON Schema describing valid pipeline definitions for a specific adapter"),
+                new CodeSample(arguments: [
+                    new CodeSampleArgument(_adapterIdArg, "69cfa838092b710403248acd"),
+                    new CodeSampleArgument(_outputFileArg, "./pipeline-schema.json"),
+                ],
+                    description: "Write schema to a file instead of stdout"),
+            ]
+        );
+
     public override async Task Execute()
     {
         var adapterId = CommandArgumentValue.GetArgumentScalarValue<string>(_adapterIdArg);

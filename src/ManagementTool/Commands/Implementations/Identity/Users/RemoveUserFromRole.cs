@@ -28,6 +28,18 @@ internal class RemoveUserFromRole : ServiceClientOctoCommand<IIdentityServicesCl
         _yesArg = CommandArgumentValue.AddArgument("y", "yes", ["Skip confirmation prompt"], false, 0);
     }
 
+    public override CommandDocumentation? GetDocumentation() =>
+        new(
+            Samples:
+            [
+                new CodeSample(arguments: [
+                    new CodeSampleArgument(_nameArg, "john.doe"),
+                    new CodeSampleArgument(_roleArg, "DataAnalyst"),
+                ],
+                    description: "Basic usage"),
+            ]
+        );
+
     public override async Task Execute()
     {
         var name = CommandArgumentValue.GetArgumentScalarValue<string>(_nameArg).ToLower();

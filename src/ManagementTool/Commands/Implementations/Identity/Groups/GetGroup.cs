@@ -24,6 +24,14 @@ internal class GetGroup : ServiceClientOctoCommand<IIdentityServicesClient>
         _id = CommandArgumentValue.AddArgument("id", "identifier", ["ID of the group"], true, 1);
     }
 
+    public override CommandDocumentation? GetDocumentation() =>
+        new(
+            Samples:
+            [
+                new CodeSample(arguments: [new CodeSampleArgument(_id, "<group-rtid>")], description: "Basic usage"),
+            ]
+        );
+
     public override async Task Execute()
     {
         var rtId = CommandArgumentValue.GetArgumentScalarValue<OctoObjectId>(_id);

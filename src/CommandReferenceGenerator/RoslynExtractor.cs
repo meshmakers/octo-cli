@@ -7,11 +7,11 @@ namespace Meshmakers.Octo.Frontend.CommandReferenceGenerator;
 
 public static class RoslynExtractor
 {
-    private static readonly Dictionary<string, ArgumentDescriptor[]> InheritedArgsByBaseClass = new()
+    private static readonly Dictionary<string, (string FieldName, ArgumentDescriptor Descriptor)[]> InheritedArgsByBaseClass = new()
     {
         ["JobWithWaitOctoCommand"] = new[]
         {
-            new ArgumentDescriptor("w", "wait", "Wait for a import job to complete", IsRequired: false, ValueCount: 0)
+            ("_waitForJobArg", new ArgumentDescriptor("w", "wait", "Wait for a import job to complete", IsRequired: false, ValueCount: 0)),
         },
     };
 
@@ -86,29 +86,26 @@ public static class RoslynExtractor
                 continue;
             }
 
-            var args = new List<ArgumentDescriptor>();
-            if (ctor.Body is not null)
-            {
-                foreach (var invocation in ctor.Body.DescendantNodes().OfType<InvocationExpressionSyntax>())
-                {
-                    if (!IsAddArgumentCall(invocation)) continue;
-                    args.Add(ExtractArgument(invocation, knownConstants));
-                }
-            }
+            var (args, argsByField) = ExtractAddArgumentCalls(ctor, knownConstants);
 
             var baseClassName = GetBaseClassName(classDecl);
             if (baseClassName != null && InheritedArgsByBaseClass.TryGetValue(baseClassName, out var inheritedArgs))
             {
-                args.AddRange(inheritedArgs);
+                foreach (var (fieldName, descriptor) in inheritedArgs)
+                {
+                    args.Add(descriptor);
+                    argsByField[fieldName] = descriptor;
+                }
             }
 
-            var sidecar = SidecarLoader.Load(sourceFilePath, classDecl.Identifier.Text);
+            var documentation = ExtractDocumentation(classDecl, argsByField, knownConstants);
+
             commands.Add(new CommandDescriptor(group, verb, description, args)
             {
                 ClassName = classDecl.Identifier.Text,
-                ExamplesMarkdown = sidecar.Examples,
-                NotesMarkdown = sidecar.Notes,
-                SeeAlsoMarkdown = sidecar.SeeAlso,
+                Samples = documentation.Samples,
+                Notes = documentation.Notes,
+                SeeAlso = documentation.SeeAlso,
             });
         }
 
@@ -148,6 +145,47 @@ public static class RoslynExtractor
     private static bool IsAddArgumentCall(InvocationExpressionSyntax invocation) =>
         invocation.Expression is MemberAccessExpressionSyntax memberAccess
         && memberAccess.Name.Identifier.Text == "AddArgument";
+
+    /// <summary>
+    ///     Walks the ctor body for <c>AddArgument(...)</c> calls. Captures the optional
+    ///     field-assignment target (e.g. <c>_tenantIdArg = CommandArgumentValue.AddArgument(...)</c>)
+    ///     so later sample-extraction can resolve <c>new CodeSampleArgument(_tenantIdArg, ...)</c>
+    ///     back to the matching <see cref="ArgumentDescriptor"/>.
+    /// </summary>
+    private static (List<ArgumentDescriptor> args, Dictionary<string, ArgumentDescriptor> byField) ExtractAddArgumentCalls(
+        ConstructorDeclarationSyntax ctor, IReadOnlyDictionary<string, string> knownConstants)
+    {
+        var args = new List<ArgumentDescriptor>();
+        var byField = new Dictionary<string, ArgumentDescriptor>();
+
+        if (ctor.Body is null) return (args, byField);
+
+        foreach (var node in ctor.Body.DescendantNodes())
+        {
+            if (node is AssignmentExpressionSyntax assign
+                && assign.Right is InvocationExpressionSyntax assignInvocation
+                && IsAddArgumentCall(assignInvocation))
+            {
+                var arg = ExtractArgument(assignInvocation, knownConstants);
+                args.Add(arg);
+                if (assign.Left is IdentifierNameSyntax fieldId)
+                    byField[fieldId.Identifier.Text] = arg;
+                continue;
+            }
+
+            // Standalone (non-assigned) AddArgument — extract for help table but skip field binding.
+            if (node is InvocationExpressionSyntax invocation
+                && IsAddArgumentCall(invocation)
+                && invocation.Parent is not AssignmentExpressionSyntax)
+            {
+                // Avoid double-counting if walking discovers the same invocation under an AssignmentExpression.
+                if (invocation.Ancestors().OfType<AssignmentExpressionSyntax>().Any()) continue;
+                args.Add(ExtractArgument(invocation, knownConstants));
+            }
+        }
+
+        return (args, byField);
+    }
 
     private static ArgumentDescriptor ExtractArgument(InvocationExpressionSyntax invocation,
         IReadOnlyDictionary<string, string>? knownConstants = null)
@@ -197,6 +235,179 @@ public static class RoslynExtractor
 
         return new ArgumentDescriptor(shortName, longName, help, isRequired, valueCount);
     }
+
+    // ---- Documentation extraction (GetDocumentation override) ----
+
+    private record struct ExtractedDocumentation(
+        IReadOnlyList<SampleDescriptor>? Samples,
+        IReadOnlyList<string>? Notes,
+        IReadOnlyList<SeeAlsoDescriptor>? SeeAlso);
+
+    private static ExtractedDocumentation ExtractDocumentation(ClassDeclarationSyntax classDecl,
+        IReadOnlyDictionary<string, ArgumentDescriptor> fieldToArg,
+        IReadOnlyDictionary<string, string> knownConstants)
+    {
+        var method = classDecl.Members.OfType<MethodDeclarationSyntax>()
+            .FirstOrDefault(m => m.Identifier.Text == "GetDocumentation"
+                                 && m.Modifiers.Any(mod => mod.IsKind(SyntaxKind.OverrideKeyword)));
+        if (method is null) return new(null, null, null);
+
+        var ctorExpr = FindCommandDocumentationCtor(method);
+        if (ctorExpr is null) return new(null, null, null);
+
+        var ctorArgs = ctorExpr.ArgumentList?.Arguments;
+        if (ctorArgs is null) return new(null, null, null);
+
+        ExpressionSyntax? samplesExpr = null, notesExpr = null, seeAlsoExpr = null;
+        for (var i = 0; i < ctorArgs.Value.Count; i++)
+        {
+            var entry = ctorArgs.Value[i];
+            var name = entry.NameColon?.Name.Identifier.Text ?? PositionalParamName(i);
+            switch (name)
+            {
+                case "Samples":
+                case "samples": samplesExpr = entry.Expression; break;
+                case "Notes":
+                case "notes": notesExpr = entry.Expression; break;
+                case "SeeAlso":
+                case "seeAlso": seeAlsoExpr = entry.Expression; break;
+            }
+        }
+
+        return new(
+            samplesExpr is null ? null : ExtractSamples(samplesExpr, fieldToArg, knownConstants),
+            notesExpr is null ? null : ExtractStringCollection(notesExpr, knownConstants),
+            seeAlsoExpr is null ? null : ExtractSeeAlso(seeAlsoExpr, knownConstants));
+    }
+
+    private static string PositionalParamName(int index) => index switch
+    {
+        0 => "Samples",
+        1 => "Notes",
+        2 => "SeeAlso",
+        _ => string.Empty,
+    };
+
+    private static BaseObjectCreationExpressionSyntax? FindCommandDocumentationCtor(MethodDeclarationSyntax method)
+    {
+        ExpressionSyntax? returnExpr = null;
+        if (method.ExpressionBody?.Expression is { } expr) returnExpr = expr;
+        else if (method.Body is not null)
+        {
+            var ret = method.Body.DescendantNodes().OfType<ReturnStatementSyntax>().FirstOrDefault();
+            returnExpr = ret?.Expression;
+        }
+        return returnExpr as BaseObjectCreationExpressionSyntax;
+    }
+
+    private static IReadOnlyList<SampleDescriptor>? ExtractSamples(ExpressionSyntax expr,
+        IReadOnlyDictionary<string, ArgumentDescriptor> fieldToArg,
+        IReadOnlyDictionary<string, string> knownConstants)
+    {
+        if (expr is not CollectionExpressionSyntax coll) return null;
+
+        var samples = new List<SampleDescriptor>();
+        foreach (var element in coll.Elements.OfType<ExpressionElementSyntax>())
+        {
+            if (element.Expression is not BaseObjectCreationExpressionSyntax ctor) continue;
+            var ctorArgs = ctor.ArgumentList?.Arguments;
+            if (ctorArgs is null || ctorArgs.Value.Count < 2) continue;
+
+            // Parse positional+named args for CodeSample(arguments, description, expectedOutput?).
+            ExpressionSyntax? argumentsExpr = null;
+            ExpressionSyntax? descriptionExpr = null;
+            ExpressionSyntax? expectedOutputExpr = null;
+            for (var i = 0; i < ctorArgs.Value.Count; i++)
+            {
+                var entry = ctorArgs.Value[i];
+                var name = entry.NameColon?.Name.Identifier.Text ?? PositionalSampleParam(i);
+                switch (name)
+                {
+                    case "arguments":
+                    case "Arguments": argumentsExpr = entry.Expression; break;
+                    case "description":
+                    case "Description": descriptionExpr = entry.Expression; break;
+                    case "expectedOutput":
+                    case "ExpectedOutput": expectedOutputExpr = entry.Expression; break;
+                }
+            }
+            if (argumentsExpr is null || descriptionExpr is null) continue;
+
+            var bindings = ExtractArgumentBindings(argumentsExpr, fieldToArg, knownConstants);
+            var desc = ExtractStringLiteral(descriptionExpr, knownConstants);
+            string? expectedOutput = expectedOutputExpr is null
+                ? null
+                : ExtractStringLiteral(expectedOutputExpr, knownConstants);
+
+            samples.Add(new SampleDescriptor(bindings, desc, expectedOutput));
+        }
+        return samples.Count == 0 ? null : samples;
+    }
+
+    private static string PositionalSampleParam(int index) => index switch
+    {
+        0 => "arguments",
+        1 => "description",
+        2 => "expectedOutput",
+        _ => string.Empty,
+    };
+
+    private static IReadOnlyList<SampleArgumentBinding> ExtractArgumentBindings(ExpressionSyntax expr,
+        IReadOnlyDictionary<string, ArgumentDescriptor> fieldToArg,
+        IReadOnlyDictionary<string, string> knownConstants)
+    {
+        var bindings = new List<SampleArgumentBinding>();
+        if (expr is not CollectionExpressionSyntax coll) return bindings;
+
+        foreach (var element in coll.Elements.OfType<ExpressionElementSyntax>())
+        {
+            if (element.Expression is not BaseObjectCreationExpressionSyntax ctor) continue;
+            var ctorArgs = ctor.ArgumentList?.Arguments;
+            if (ctorArgs is null || ctorArgs.Value.Count == 0) continue;
+
+            var fieldExpr = ctorArgs.Value[0].Expression;
+            if (fieldExpr is not IdentifierNameSyntax fieldId) continue;
+            if (!fieldToArg.TryGetValue(fieldId.Identifier.Text, out var argDesc)) continue;
+
+            string? value = ctorArgs.Value.Count >= 2
+                ? ExtractStringLiteral(ctorArgs.Value[1].Expression, knownConstants)
+                : null;
+
+            bindings.Add(new SampleArgumentBinding(argDesc, value));
+        }
+        return bindings;
+    }
+
+    private static IReadOnlyList<string>? ExtractStringCollection(ExpressionSyntax expr,
+        IReadOnlyDictionary<string, string> knownConstants)
+    {
+        if (expr is not CollectionExpressionSyntax coll) return null;
+        var items = new List<string>();
+        foreach (var element in coll.Elements.OfType<ExpressionElementSyntax>())
+            items.Add(ExtractStringLiteral(element.Expression, knownConstants));
+        return items.Count == 0 ? null : items;
+    }
+
+    private static IReadOnlyList<SeeAlsoDescriptor>? ExtractSeeAlso(ExpressionSyntax expr,
+        IReadOnlyDictionary<string, string> knownConstants)
+    {
+        if (expr is not CollectionExpressionSyntax coll) return null;
+
+        var links = new List<SeeAlsoDescriptor>();
+        foreach (var element in coll.Elements.OfType<ExpressionElementSyntax>())
+        {
+            if (element.Expression is not BaseObjectCreationExpressionSyntax ctor) continue;
+            var ctorArgs = ctor.ArgumentList?.Arguments;
+            if (ctorArgs is null || ctorArgs.Value.Count < 2) continue;
+
+            var text = ExtractStringLiteral(ctorArgs.Value[0].Expression, knownConstants);
+            var url = ExtractStringLiteral(ctorArgs.Value[1].Expression, knownConstants);
+            links.Add(new SeeAlsoDescriptor(text, url));
+        }
+        return links.Count == 0 ? null : links;
+    }
+
+    // ---- String / literal helpers ----
 
     private static string ExtractStringLiteral(ExpressionSyntax expr,
         IReadOnlyDictionary<string, string>? knownConstants = null)

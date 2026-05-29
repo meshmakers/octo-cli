@@ -28,6 +28,19 @@ internal class CreateUser : ServiceClientOctoCommand<IIdentityServicesClient>
     }
 
 
+    public override CommandDocumentation? GetDocumentation() =>
+        new(
+            Samples:
+            [
+                new CodeSample(arguments: [
+                    new CodeSampleArgument(_nameArg, "john.doe"),
+                    new CodeSampleArgument(_eMailArg, "john.doe@example.com"),
+                    new CodeSampleArgument(_passwordArg, "SecurePassword123"),
+                ],
+                    description: "Basic usage"),
+            ]
+        );
+
     public override async Task Execute()
     {
         var eMail = CommandArgumentValue.GetArgumentScalarValue<string>(_eMailArg).ToLower();

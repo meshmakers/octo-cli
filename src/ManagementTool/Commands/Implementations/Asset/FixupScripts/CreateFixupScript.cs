@@ -38,6 +38,20 @@ internal class CreateFixupScript : ServiceClientOctoCommand<ITenantClient>
         _replaceArg = CommandArgumentValue.AddArgument("r", "replace",
             ["When defined, an existing fixup script is replaced."], false, 0);}
 
+    public override CommandDocumentation? GetDocumentation() =>
+        new(
+            Samples:
+            [
+                new CodeSample(arguments: [
+                    new CodeSampleArgument(_name, "Migration Script"),
+                    new CodeSampleArgument(_fileArg, "./migration.js"),
+                    new CodeSampleArgument(_orderNumber, "10"),
+                    new CodeSampleArgument(_enabled, "true"),
+                ],
+                    description: "Basic usage"),
+            ]
+        );
+
     public override async Task Execute()
     {
         var filePath = CommandArgumentValue.GetArgumentScalarValue<string>(_fileArg);

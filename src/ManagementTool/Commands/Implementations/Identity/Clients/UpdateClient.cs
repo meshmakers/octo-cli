@@ -1,4 +1,4 @@
-﻿using Meshmakers.Common.CommandLineParser;
+using Meshmakers.Common.CommandLineParser;
 using Meshmakers.Common.Shared;
 using Meshmakers.Octo.Frontend.ManagementTool.Services;
 using Meshmakers.Octo.Sdk.ServiceClient.IdentityServices;
@@ -30,6 +30,18 @@ internal class UpdateClient : ServiceClientOctoCommand<IIdentityServicesClient>
         _frontChannelLogoutUri = CommandArgumentValue.AddArgument("fclo", "frontChannelLogoutUri",
             ["Front-channel logout URI for Single Logout (SLO)"], false, 1);
     }
+
+    public override CommandDocumentation? GetDocumentation() =>
+        new(
+            Samples:
+            [
+                new CodeSample(arguments: [
+                    new CodeSampleArgument(_clientId, "my-web-app"),
+                    new CodeSampleArgument(_clientName, "Updated App Name"),
+                ],
+                    description: "Basic usage"),
+            ]
+        );
 
     public override async Task Execute()
     {

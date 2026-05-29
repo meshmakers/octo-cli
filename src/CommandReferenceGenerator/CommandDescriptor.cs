@@ -8,7 +8,22 @@ public sealed record CommandDescriptor(
 {
     public string? ClassName { get; init; }
 
-    public string? ExamplesMarkdown { get; init; }
-    public string? NotesMarkdown { get; init; }
-    public string? SeeAlsoMarkdown { get; init; }
+    public IReadOnlyList<SampleDescriptor>? Samples { get; init; }
+    public IReadOnlyList<string>? Notes { get; init; }
+    public IReadOnlyList<SeeAlsoDescriptor>? SeeAlso { get; init; }
 }
+
+public sealed record SampleDescriptor(
+    IReadOnlyList<SampleArgumentBinding> Arguments,
+    string Description,
+    string? ExpectedOutput = null);
+
+/// <summary>
+///     A single (argument, value) pair inside a <see cref="SampleDescriptor"/>. The argument is resolved
+///     to its <see cref="ArgumentDescriptor"/> at extraction time, so the renderer can use the current
+///     <c>ShortName</c>/<c>LongName</c> without the sample itself naming them.
+///     <see cref="Value"/> is null when the argument is a flag.
+/// </summary>
+public sealed record SampleArgumentBinding(ArgumentDescriptor Argument, string? Value);
+
+public sealed record SeeAlsoDescriptor(string Text, string Url);

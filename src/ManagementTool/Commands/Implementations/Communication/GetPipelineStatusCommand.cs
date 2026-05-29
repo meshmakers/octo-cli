@@ -26,6 +26,19 @@ internal class GetPipelineStatusCommand : ServiceClientOctoCommand<ICommunicatio
         _jsonArg = CommandArgumentValue.AddArgument("j", "json", ["Output as raw JSON"], false);
     }
 
+    public override CommandDocumentation? GetDocumentation() =>
+        new(
+            Samples:
+            [
+                new CodeSample(arguments: [new CodeSampleArgument(_idArg, "cc0000000000000000000003")], description: "Basic usage"),
+                new CodeSample(arguments: [
+                    new CodeSampleArgument(_idArg, "cc0000000000000000000003"),
+                    new CodeSampleArgument(_jsonArg),
+                ],
+                    description: "Output as compact JSON"),
+            ]
+        );
+
     public override async Task Execute()
     {
         var id = CommandArgumentValue.GetArgumentScalarValue<string>(_idArg);

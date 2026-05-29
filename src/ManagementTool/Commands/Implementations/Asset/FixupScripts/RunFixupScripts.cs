@@ -5,15 +5,15 @@ using Microsoft.Extensions.Options;
 
 namespace Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Asset.FixupScripts;
 
-internal class RunFixupScripts(
-    ILogger<RunFixupScripts> logger,
-    IOptions<OctoToolOptions> options,
-    IBotServicesClient botServicesClient,
-    IAuthenticationService authenticationService)
-    : JobWithWaitOctoCommand(logger, Constants.BotServicesGroup,
-        "RunFixupScripts", "Run fixup scripts", options, botServicesClient,
-        authenticationService)
+internal class RunFixupScripts : JobWithWaitOctoCommand
 {
+    public RunFixupScripts(ILogger<RunFixupScripts> logger, IOptions<OctoToolOptions> options,
+        IBotServicesClient botServicesClient, IAuthenticationService authenticationService)
+        : base(logger, Constants.BotServicesGroup, "RunFixupScripts", "Run fixup scripts", options,
+            botServicesClient, authenticationService)
+    {
+    }
+
     public override async Task Execute()
     {
         Logger.LogInformation(

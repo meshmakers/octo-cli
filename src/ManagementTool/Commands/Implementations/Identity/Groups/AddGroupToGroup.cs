@@ -22,6 +22,18 @@ internal class AddGroupToGroup : ServiceClientOctoCommand<IIdentityServicesClien
             ["ID of the child group to add"], true, 1);
     }
 
+    public override CommandDocumentation? GetDocumentation() =>
+        new(
+            Samples:
+            [
+                new CodeSample(arguments: [
+                    new CodeSampleArgument(_id, "<parent-group-rtid>"),
+                    new CodeSampleArgument(_childGroupId, "<child-group-rtid>"),
+                ],
+                    description: "Basic usage"),
+            ]
+        );
+
     public override async Task Execute()
     {
         var rtId = CommandArgumentValue.GetArgumentScalarValue<OctoObjectId>(_id);

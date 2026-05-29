@@ -1,4 +1,4 @@
-﻿using Meshmakers.Common.CommandLineParser;
+using Meshmakers.Common.CommandLineParser;
 using Meshmakers.Octo.Frontend.ManagementTool.Services;
 using Meshmakers.Octo.Sdk.ServiceClient.IdentityServices;
 using Microsoft.Extensions.Logging;
@@ -32,6 +32,18 @@ internal class UpdateApiScope : ServiceClientOctoCommand<IIdentityServicesClient
         _descriptionArg =
             CommandArgumentValue.AddArgument("d", "description", ["Description of API scope"], false, 1);
     }
+
+    public override CommandDocumentation? GetDocumentation() =>
+        new(
+            Samples:
+            [
+                new CodeSample(arguments: [
+                    new CodeSampleArgument(_nameArg, "myAPI.admin"),
+                    new CodeSampleArgument(_newNameArg, "myAPI.superadmin"),
+                ],
+                    description: "Basic usage"),
+            ]
+        );
 
     public override async Task Execute()
     {

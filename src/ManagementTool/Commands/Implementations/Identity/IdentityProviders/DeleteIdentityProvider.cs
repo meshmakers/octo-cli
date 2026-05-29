@@ -28,6 +28,14 @@ internal class DeleteIdentityProvider : ServiceClientOctoCommand<IIdentityServic
         _yesArg = CommandArgumentValue.AddArgument("y", "yes", ["Skip confirmation prompt"], false, 0);
     }
 
+    public override CommandDocumentation? GetDocumentation() =>
+        new(
+            Samples:
+            [
+                new CodeSample(arguments: [new CodeSampleArgument(_id, "provider-id")], description: "Basic usage"),
+            ]
+        );
+
     public override async Task Execute()
     {
         var rtId = CommandArgumentValue.GetArgumentScalarValue<OctoObjectId>(_id);

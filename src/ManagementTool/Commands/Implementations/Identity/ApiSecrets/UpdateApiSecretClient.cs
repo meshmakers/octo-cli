@@ -1,4 +1,4 @@
-﻿using Meshmakers.Common.CommandLineParser;
+using Meshmakers.Common.CommandLineParser;
 using Meshmakers.Octo.Frontend.ManagementTool.Services;
 using Meshmakers.Octo.Sdk.ServiceClient.IdentityServices;
 using Microsoft.Extensions.Logging;
@@ -30,6 +30,19 @@ internal class UpdateApiSecretClient : ServiceClientOctoCommand<IIdentityService
         _descriptionArg =
             CommandArgumentValue.AddArgument("d", "description", ["Description of API secret"], false, 1);
     }
+
+    public override CommandDocumentation? GetDocumentation() =>
+        new(
+            Samples:
+            [
+                new CodeSample(arguments: [
+                    new CodeSampleArgument(_clientIdArg, "my-client"),
+                    new CodeSampleArgument(_secretValueArg, "sha256-encoded-value"),
+                    new CodeSampleArgument(_expirationArg, "2026-12-31"),
+                ],
+                    description: "Basic usage"),
+            ]
+        );
 
     public override async Task Execute()
     {

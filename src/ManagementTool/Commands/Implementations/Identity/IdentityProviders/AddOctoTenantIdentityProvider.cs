@@ -34,6 +34,25 @@ internal class AddOctoTenantIdentityProvider : ServiceClientOctoCommand<IIdentit
             ["Default group RtId for new users"], false, 1);
     }
 
+    public override CommandDocumentation? GetDocumentation() =>
+        new(
+            Samples:
+            [
+                new CodeSample(arguments: [
+                    new CodeSampleArgument(_name, "Parent Tenant Auth"),
+                    new CodeSampleArgument(_parentTenantId, "octosystem"),
+                    new CodeSampleArgument(_enabled, "true"),
+                    new CodeSampleArgument(_allowSelfRegistration, "true"),
+                    new CodeSampleArgument(_defaultGroupRtId, "<default-group-rtid>"),
+                ],
+                    description: "Delegates authentication to a parent tenant for cross-tenant access."),
+            ],
+            SeeAlso:
+            [
+                new SeeAlsoLink("Cross-Tenant Authentication", "../../../../identityService/cross-tenant-authentication.md"),
+            ]
+        );
+
     public override async Task Execute()
     {
         var name = CommandArgumentValue.GetArgumentScalarValue<string>(_name);

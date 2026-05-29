@@ -291,6 +291,173 @@ public class RoslynExtractorTests
     }
 
     [Fact]
+    public void Extracts_GetDocumentation_override_samples_with_arg_bindings()
+    {
+        var source = """
+            namespace Test;
+            internal class FooCommand : Command<X>
+            {
+                private readonly IArgument _tenantIdArg;
+
+                public FooCommand(ILogger<FooCommand> logger, IOptions<X> options)
+                    : base(logger, "Foo", "Does foo.", options)
+                {
+                    _tenantIdArg = CommandArgumentValue.AddArgument("tid", "tenantId", ["Id of tenant"], true, 1);
+                }
+
+                public override CommandDocumentation? GetDocumentation() =>
+                    new(Samples:
+                    [
+                        new CodeSample([new CodeSampleArgument(_tenantIdArg, "meshtest")], "Basic usage"),
+                    ]);
+
+                public override Task Execute() => Task.CompletedTask;
+            }
+            """;
+
+        var commands = RoslynExtractor.Extract(source);
+
+        Assert.Single(commands);
+        var samples = commands[0].Samples;
+        Assert.NotNull(samples);
+        Assert.Single(samples!);
+        var sample = samples![0];
+        Assert.Equal("Basic usage", sample.Description);
+        Assert.Single(sample.Arguments);
+        Assert.Equal("tid", sample.Arguments[0].Argument.Short);
+        Assert.Equal("meshtest", sample.Arguments[0].Value);
+    }
+
+    [Fact]
+    public void Extracts_flag_binding_without_value()
+    {
+        var source = """
+            namespace Test;
+            internal class FooCommand : Command<X>
+            {
+                private readonly IArgument _waitArg;
+
+                public FooCommand(ILogger<FooCommand> logger, IOptions<X> options)
+                    : base(logger, "Foo", "Does foo.", options)
+                {
+                    _waitArg = CommandArgumentValue.AddArgument("w", "wait", ["Wait"], false, 0);
+                }
+
+                public override CommandDocumentation? GetDocumentation() =>
+                    new(Samples:
+                    [
+                        new CodeSample([new CodeSampleArgument(_waitArg)], "Wait inline"),
+                    ]);
+
+                public override Task Execute() => Task.CompletedTask;
+            }
+            """;
+
+        var commands = RoslynExtractor.Extract(source);
+
+        Assert.Single(commands);
+        var sample = commands[0].Samples![0];
+        Assert.Single(sample.Arguments);
+        Assert.Equal("w", sample.Arguments[0].Argument.Short);
+        Assert.Null(sample.Arguments[0].Value);
+    }
+
+    [Fact]
+    public void Extracts_GetDocumentation_notes_and_seeAlso()
+    {
+        var source = """
+            namespace Test;
+            internal class FooCommand : Command<X>
+            {
+                public FooCommand(ILogger<FooCommand> logger, IOptions<X> options)
+                    : base(logger, "Foo", "Does foo.", options) { }
+
+                public override CommandDocumentation? GetDocumentation() =>
+                    new(
+                        Notes:
+                        [
+                            "First note.",
+                            "Second note.",
+                        ],
+                        SeeAlso:
+                        [
+                            new SeeAlsoLink("LogIn", "../general/LogIn.md"),
+                        ]);
+
+                public override Task Execute() => Task.CompletedTask;
+            }
+            """;
+
+        var commands = RoslynExtractor.Extract(source);
+
+        Assert.Single(commands);
+        var cmd = commands[0];
+        Assert.Equal(2, cmd.Notes!.Count);
+        Assert.Equal("First note.", cmd.Notes[0]);
+        Assert.Equal("Second note.", cmd.Notes[1]);
+        Assert.Single(cmd.SeeAlso!);
+        Assert.Equal("LogIn", cmd.SeeAlso![0].Text);
+        Assert.Equal("../general/LogIn.md", cmd.SeeAlso[0].Url);
+    }
+
+    [Fact]
+    public void Extracts_expected_output_in_sample()
+    {
+        var source = """"
+            namespace Test;
+            internal class FooCommand : Command<X>
+            {
+                public FooCommand(ILogger<FooCommand> logger, IOptions<X> options)
+                    : base(logger, "Status", "Shows status.", options) { }
+
+                public override CommandDocumentation? GetDocumentation() =>
+                    new(Samples:
+                    [
+                        new CodeSample(
+                            [],
+                            "Show all",
+                            """
+                            NAME    STATE
+                            foo     OK
+                            """),
+                    ]);
+
+                public override Task Execute() => Task.CompletedTask;
+            }
+            """";
+
+        var commands = RoslynExtractor.Extract(source);
+
+        Assert.Single(commands);
+        var sample = commands[0].Samples![0];
+        Assert.NotNull(sample.ExpectedOutput);
+        Assert.Contains("NAME", sample.ExpectedOutput!);
+        Assert.Contains("foo     OK", sample.ExpectedOutput!);
+    }
+
+    [Fact]
+    public void Returns_null_documentation_when_no_override()
+    {
+        var source = """
+            namespace Test;
+            internal class FooCommand : Command<X>
+            {
+                public FooCommand(ILogger<FooCommand> logger, IOptions<X> options)
+                    : base(logger, "Foo", "Does foo.", options) { }
+
+                public override Task Execute() => Task.CompletedTask;
+            }
+            """;
+
+        var commands = RoslynExtractor.Extract(source);
+
+        Assert.Single(commands);
+        Assert.Null(commands[0].Samples);
+        Assert.Null(commands[0].Notes);
+        Assert.Null(commands[0].SeeAlso);
+    }
+
+    [Fact]
     public void Captures_class_name_on_descriptor()
     {
         var source = """

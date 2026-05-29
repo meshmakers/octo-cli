@@ -20,6 +20,15 @@ internal class RefreshCatalogsCommand : ServiceClientOctoCommand<IAssetServicesC
             ["Catalog name to refresh (optional, refreshes all if omitted)"], false, 1);
     }
 
+    public override CommandDocumentation? GetDocumentation() =>
+        new(
+            Samples:
+            [
+                new CodeSample(arguments: [], description: "Refresh all catalogs"),
+                new CodeSample(arguments: [new CodeSampleArgument(_catalogNameArg, "PublicGitHubCatalog")], description: "Refresh specific catalog"),
+            ]
+        );
+
     public override async Task Execute()
     {
         string? catalogName = CommandArgumentValue.IsArgumentUsed(_catalogNameArg)

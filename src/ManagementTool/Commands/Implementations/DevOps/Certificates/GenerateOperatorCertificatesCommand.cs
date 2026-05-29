@@ -24,6 +24,19 @@ public class GenerateOperatorCertificatesCommand : Command<OctoToolOptions>
             ["Namespace of operator, e. g. octo-operator-system."], true, 1);
     }
 
+    public override CommandDocumentation? GetDocumentation() =>
+        new(
+            Samples:
+            [
+                new CodeSample(arguments: [
+                    new CodeSampleArgument(_outputArg, "./certs"),
+                    new CodeSampleArgument(_serverNameArg, "octo-mesh-op1-communication-operator"),
+                    new CodeSampleArgument(_namespaceArg, "octo-operator-system"),
+                ],
+                    description: "Basic usage"),
+            ]
+        );
+
     public override Task Execute()
     {
         var outputPath = CommandArgumentValue.GetArgumentScalarValue<string>(_outputArg);

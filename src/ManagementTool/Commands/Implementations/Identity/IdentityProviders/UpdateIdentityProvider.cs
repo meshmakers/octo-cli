@@ -43,6 +43,29 @@ internal class UpdateIdentityProvider : ServiceClientOctoCommand<IIdentityServic
             ["Default group RtId for new users"], false, 1);
     }
 
+    public override CommandDocumentation? GetDocumentation() =>
+        new(
+            Samples:
+            [
+                new CodeSample(arguments: [
+                    new CodeSampleArgument(_rtId, "provider-id"),
+                    new CodeSampleArgument(_name, "Updated Name"),
+                    new CodeSampleArgument(_enabled, "true"),
+                    new CodeSampleArgument(_allowSelfRegistration, "false"),
+                    new CodeSampleArgument(_defaultGroupRtId, "<default-group-rtid>"),
+                ],
+                    description: "Works for all provider types. Fetches the existing provider, preserves type-specific properties, and applies the changes"),
+                new CodeSample(arguments: [
+                    new CodeSampleArgument(_rtId, "provider-id"),
+                    new CodeSampleArgument(_name, "Updated Name"),
+                    new CodeSampleArgument(_enabled, "true"),
+                    new CodeSampleArgument(_clientId, "new-client-id"),
+                    new CodeSampleArgument(_clientSecret, "new-client-secret"),
+                ],
+                    description: "For OAuth-based providers, you can also update client credentials"),
+            ]
+        );
+
     public override async Task Execute()
     {
         var rtId = CommandArgumentValue.GetArgumentScalarValue<OctoObjectId>(_rtId);

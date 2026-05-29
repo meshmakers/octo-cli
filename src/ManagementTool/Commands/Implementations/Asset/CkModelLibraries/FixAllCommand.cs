@@ -32,6 +32,19 @@ internal class FixAllCommand : JobWithWaitOctoCommand
         _assetServicesClient.AccessToken.AccessToken = ServiceClient.AccessToken.AccessToken;
     }
 
+    public override CommandDocumentation? GetDocumentation() =>
+        new(
+            Samples:
+            [
+                new CodeSample(arguments: [new CodeSampleArgument(_waitForJobArg)], description: "Interactive with wait"),
+                new CodeSample(arguments: [
+                    new CodeSampleArgument(_waitForJobArg),
+                    new CodeSampleArgument(_yesArg),
+                ],
+                    description: "Non-interactive (for CI/CD)"),
+            ]
+        );
+
     public override async Task Execute()
     {
         var tenantId = Options.Value.TenantId;

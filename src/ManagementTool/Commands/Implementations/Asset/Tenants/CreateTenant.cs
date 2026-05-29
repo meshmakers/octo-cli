@@ -1,4 +1,4 @@
-﻿using Meshmakers.Common.CommandLineParser;
+using Meshmakers.Common.CommandLineParser;
 using Meshmakers.Octo.Frontend.ManagementTool.Services;
 using Meshmakers.Octo.Sdk.ServiceClient.AssetRepositoryServices.System;
 using Meshmakers.Octo.Sdk.ServiceClient.IdentityServices;
@@ -30,6 +30,18 @@ internal class CreateTenant : ServiceClientOctoCommand<IAssetServicesClient>
         _noProvisionArg = CommandArgumentValue.AddArgument("np", "no-provision",
             ["Skip admin provisioning of the current user"], false, 0);
     }
+
+    public override CommandDocumentation? GetDocumentation() =>
+        new(
+            Samples:
+            [
+                new CodeSample(arguments: [
+                    new CodeSampleArgument(_tenantIdArg, "newtenant"),
+                    new CodeSampleArgument(_databaseArg, "newtenant_db"),
+                ],
+                    description: "Basic usage"),
+            ]
+        );
 
     public override async Task Execute()
     {

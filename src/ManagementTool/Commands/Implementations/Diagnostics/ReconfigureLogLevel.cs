@@ -66,6 +66,20 @@ public class ReconfigureLogLevel : ServiceClientOctoCommand<IIdentityServicesCli
         _reportingServicesClient.AccessToken.AccessToken = ServiceClient.AccessToken.AccessToken;
     }
 
+    public override CommandDocumentation? GetDocumentation() =>
+        new(
+            Samples:
+            [
+                new CodeSample(arguments: [
+                    new CodeSampleArgument(_serviceName, "AssetRepository"),
+                    new CodeSampleArgument(_loggerName, "Meshmakers.*"),
+                    new CodeSampleArgument(_minLogLevel, "Debug"),
+                    new CodeSampleArgument(_maxLogLevel, "Error"),
+                ],
+                    description: "Basic usage"),
+            ]
+        );
+
     public override async Task Execute()
     {
         var serviceName = CommandArgumentValue.GetArgumentScalarValue<string>(_serviceName);

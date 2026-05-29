@@ -26,6 +26,18 @@ public class AddScopeToClient : ServiceClientOctoCommand<IIdentityServicesClient
             1);
     }
 
+    public override CommandDocumentation? GetDocumentation() =>
+        new(
+            Samples:
+            [
+                new CodeSample(arguments: [
+                    new CodeSampleArgument(_clientId, "my-web-app"),
+                    new CodeSampleArgument(_scopeName, "assetSystemAPI.full_access"),
+                ],
+                    description: "Basic usage"),
+            ]
+        );
+
     public override async Task Execute()
     {
         var clientId = CommandArgumentValue.GetArgumentScalarValue<string>(_clientId);

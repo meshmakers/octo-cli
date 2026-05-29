@@ -23,6 +23,19 @@ internal class DeployPipelineCommand : ServiceClientOctoCommand<ICommunicationSe
         _fileArg = CommandArgumentValue.AddArgument("f", "file", ["Path to pipeline definition file (YAML/JSON)"], true, 1);
     }
 
+    public override CommandDocumentation? GetDocumentation() =>
+        new(
+            Samples:
+            [
+                new CodeSample(arguments: [
+                    new CodeSampleArgument(_adapterIdArg, "69cfa838092b710403248acd"),
+                    new CodeSampleArgument(_pipelineIdArg, "cc0000000000000000000003"),
+                    new CodeSampleArgument(_fileArg, "./my-pipeline.yaml"),
+                ],
+                    description: "Deploys a pipeline definition from a YAML or JSON file"),
+            ]
+        );
+
     public override async Task Execute()
     {
         var adapterId = CommandArgumentValue.GetArgumentScalarValue<string>(_adapterIdArg);

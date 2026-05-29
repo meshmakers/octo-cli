@@ -1,4 +1,4 @@
-﻿using Meshmakers.Common.CommandLineParser;
+using Meshmakers.Common.CommandLineParser;
 using Meshmakers.Common.Shared.Services;
 using Meshmakers.Octo.Frontend.ManagementTool.Services;
 using Meshmakers.Octo.Sdk.ServiceClient.IdentityServices;
@@ -26,6 +26,14 @@ internal class GetApiSecretsApiResource : ServiceClientOctoCommand<IIdentityServ
             true,
             1);
     }
+
+    public override CommandDocumentation? GetDocumentation() =>
+        new(
+            Samples:
+            [
+                new CodeSample(arguments: [new CodeSampleArgument(_nameArg, "myAPI")], description: "Basic usage"),
+            ]
+        );
 
     public override async Task Execute()
     {

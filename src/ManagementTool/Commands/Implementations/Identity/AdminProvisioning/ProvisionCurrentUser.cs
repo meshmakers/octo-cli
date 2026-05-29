@@ -20,6 +20,18 @@ internal class ProvisionCurrentUser : ServiceClientOctoCommand<IIdentityServices
             ["Target tenant ID"], true, 1);
     }
 
+    public override CommandDocumentation? GetDocumentation() =>
+        new(
+            Samples:
+            [
+                new CodeSample(arguments: [new CodeSampleArgument(_targetTenantId, "customer-project")], description: "Provision yourself in a target tenant with all available roles and TenantOwners group membership"),
+            ],
+            Notes:
+            [
+                "All admin provisioning commands must be run from the **system tenant context**.",
+            ]
+        );
+
     public override async Task Execute()
     {
         var targetTenantId = CommandArgumentValue.GetArgumentScalarValue<string>(_targetTenantId);

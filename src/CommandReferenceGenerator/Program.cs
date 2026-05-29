@@ -27,8 +27,9 @@ var extraConstantFiles = parentDir != null
     ? Directory.GetFiles(parentDir, "*.cs", SearchOption.TopDirectoryOnly)
     : Array.Empty<string>();
 
-// First pass: collect all constants from all sources (with exception safety)
+// First pass: collect constants per file once, then aggregate.
 var constants = new Dictionary<string, string>();
+var constantCountByPath = new Dictionary<string, int>();
 foreach (var extraPath in extraConstantFiles)
 {
     try
@@ -46,7 +47,9 @@ foreach (var (path, src) in sourcesByPath)
 {
     try
     {
-        foreach (var kv in RoslynExtractor.CollectConstants(src))
+        var perFile = RoslynExtractor.CollectConstants(src);
+        constantCountByPath[path] = perFile.Count;
+        foreach (var kv in perFile)
         {
             constants[kv.Key] = kv.Value;
         }
@@ -68,11 +71,10 @@ foreach (var (path, src) in sourcesByPath)
 {
     var fileName = Path.GetFileName(path);
     int commandsThisFile = 0;
-    int constantsThisFile = 0;
+    int constantsThisFile = constantCountByPath.GetValueOrDefault(path, 0);
 
     try
     {
-        constantsThisFile = RoslynExtractor.CollectConstants(src).Count;
         var commands = RoslynExtractor.Extract(src, path, constants);
         foreach (var cmd in commands)
         {

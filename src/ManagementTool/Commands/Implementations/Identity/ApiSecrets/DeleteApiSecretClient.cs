@@ -31,6 +31,18 @@ internal class DeleteApiSecretClient : ServiceClientOctoCommand<IIdentityService
         _yesArg = CommandArgumentValue.AddArgument("y", "yes", ["Skip confirmation prompt"], false, 0);
     }
 
+    public override CommandDocumentation? GetDocumentation() =>
+        new(
+            Samples:
+            [
+                new CodeSample(arguments: [
+                    new CodeSampleArgument(_clientIdArg, "my-client"),
+                    new CodeSampleArgument(_secretValueArg, "sha256-encoded-value"),
+                ],
+                    description: "Basic usage"),
+            ]
+        );
+
     public override async Task Execute()
     {
         var clientId = CommandArgumentValue.GetArgumentScalarValue<string>(_clientIdArg);

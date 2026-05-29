@@ -29,6 +29,24 @@ internal class GetPipelineDebugPointsCommand : ServiceClientOctoCommand<ICommuni
         _jsonArg = CommandArgumentValue.AddArgument("j", "json", ["Output as raw JSON"], false);
     }
 
+    public override CommandDocumentation? GetDocumentation() =>
+        new(
+            Samples:
+            [
+                new CodeSample(arguments: [
+                    new CodeSampleArgument(_idArg, "cc0000000000000000000003"),
+                    new CodeSampleArgument(_executionIdArg, "7c011b03-b738-4be7-948c-78ee28e4b233"),
+                ],
+                    description: "Returns the debug point node tree for a specific pipeline execution"),
+                new CodeSample(arguments: [
+                    new CodeSampleArgument(_idArg, "cc0000000000000000000003"),
+                    new CodeSampleArgument(_executionIdArg, "7c011b03-b738-4be7-948c-78ee28e4b233"),
+                    new CodeSampleArgument(_jsonArg),
+                ],
+                    description: "Output as compact JSON"),
+            ]
+        );
+
     public override async Task Execute()
     {
         var id = CommandArgumentValue.GetArgumentScalarValue<string>(_idArg);

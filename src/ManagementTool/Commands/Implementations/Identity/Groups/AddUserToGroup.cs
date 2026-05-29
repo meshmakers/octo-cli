@@ -21,6 +21,18 @@ internal class AddUserToGroup : ServiceClientOctoCommand<IIdentityServicesClient
         _userId = CommandArgumentValue.AddArgument("uid", "userId", ["ID of the user to add"], true, 1);
     }
 
+    public override CommandDocumentation? GetDocumentation() =>
+        new(
+            Samples:
+            [
+                new CodeSample(arguments: [
+                    new CodeSampleArgument(_id, "<group-rtid>"),
+                    new CodeSampleArgument(_userId, "<user-id>"),
+                ],
+                    description: "Basic usage"),
+            ]
+        );
+
     public override async Task Execute()
     {
         var rtId = CommandArgumentValue.GetArgumentScalarValue<OctoObjectId>(_id);

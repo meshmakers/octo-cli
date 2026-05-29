@@ -25,6 +25,14 @@ internal class GetEmailDomainGroupRule : ServiceClientOctoCommand<IIdentityServi
             ["ID of the email domain group rule"], true, 1);
     }
 
+    public override CommandDocumentation? GetDocumentation() =>
+        new(
+            Samples:
+            [
+                new CodeSample(arguments: [new CodeSampleArgument(_id, "<rule-rtid>")], description: "Basic usage"),
+            ]
+        );
+
     public override async Task Execute()
     {
         var rtId = CommandArgumentValue.GetArgumentScalarValue<OctoObjectId>(_id);
