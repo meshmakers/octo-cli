@@ -378,6 +378,8 @@ internal static class Program
         services.AddTransient<ICommand, GetPipelineExecutionsCommand>();
         services.AddTransient<ICommand, GetLatestPipelineExecutionCommand>();
         services.AddTransient<ICommand, GetPipelineDebugPointsCommand>();
+        services.AddTransient<ICommand, SetPipelineDebugCommand>();
+        services.AddTransient<ICommand, GetPipelineDebugCommand>();
 
         // Communication - Triggers
         services.AddTransient<ICommand, DeployTriggersCommand>();

@@ -312,6 +312,8 @@ All communication commands accept plain runtime object IDs (e.g. `69cfa838092b71
 | `GetPipelineExecutions` | `--identifier <rtId>`, `--json` (optional) | List pipeline execution history |
 | `GetLatestPipelineExecution` | `--identifier <rtId>`, `--json` (optional) | Get the most recent pipeline execution |
 | `GetPipelineDebugPoints` | `--identifier <rtId>`, `--executionId <guid>`, `--json` (optional) | Get debug points for a specific execution |
+| `SetPipelineDebug` | `--identifier <rtId>`, `--enabled <true\|false>` | Enable or disable debug capture for a pipeline |
+| `GetPipelineDebug` | `--identifier <rtId>`, `--json` (optional) | Get the debug state of a pipeline |
 
 ### Triggers
 
@@ -354,6 +356,18 @@ octo-cli -c ExecutePipeline --identifier cc0000000000000000000003
 
 # Check data flow status
 octo-cli -c GetDataFlowStatus --identifier cc0000000000000000000002
+
+# Enable debug capture for a pipeline
+octo-cli -c SetPipelineDebug --identifier cc0000000000000000000003 --enabled true
+
+# Disable debug capture for a pipeline
+octo-cli -c SetPipelineDebug --identifier cc0000000000000000000003 --enabled false
+
+# Get pipeline debug state as formatted JSON
+octo-cli -c GetPipelineDebug --identifier cc0000000000000000000003
+
+# Get pipeline debug state as compact JSON
+octo-cli -c GetPipelineDebug --identifier cc0000000000000000000003 --json
 ```
 
 ## Confirmation Dialogs for Destructive Commands
