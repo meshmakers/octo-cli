@@ -22,7 +22,6 @@ public static class MarkdownRenderer
         AppendExamples(sb, cmd);
         AppendOptions(sb, cmd);
         AppendNotes(sb, cmd);
-        AppendSeeAlso(sb, cmd);
 
         return sb.ToString();
     }
@@ -99,19 +98,6 @@ public static class MarkdownRenderer
             sb.Append(note);
             if (!note.EndsWith('\n')) sb.Append('\n');
             sb.Append('\n');
-        }
-    }
-
-    private static void AppendSeeAlso(StringBuilder sb, CommandDescriptor cmd)
-    {
-        if (cmd.SeeAlso is not { Count: > 0 }) return;
-
-        sb.Append('\n');
-        sb.Append("## See Also\n");
-        sb.Append('\n');
-        foreach (var link in cmd.SeeAlso)
-        {
-            sb.Append("- [").Append(link.Text).Append("](").Append(link.Url).Append(")\n");
         }
     }
 

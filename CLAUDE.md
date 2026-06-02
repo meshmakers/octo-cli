@@ -474,11 +474,6 @@ internal class FooCommand : ServiceClientOctoCommand<IFooClient>
             [
                 "Requires the caller to be in the `TenantOwners` group.",
                 "Idempotent — re-running with the same arguments produces the same result.",
-            ],
-            SeeAlso:
-            [
-                new SeeAlsoLink("LogIn", "../general/LogIn.md"),
-                new SeeAlsoLink("Tenant Lifecycle", "../../../identityService/tenant-lifecycle.md"),
             ]);
 
     public override async Task Execute() { /* ... */ }
@@ -487,12 +482,12 @@ internal class FooCommand : ServiceClientOctoCommand<IFooClient>
 
 ### Conventions
 
-- Use **explicit type names** (`new CodeSample(...)`, `new CodeSampleArgument(...)`, `new SeeAlsoLink(...)`) and **named arguments** (`arguments:`, `description:`, `expectedOutput:`) inside the documentation tree. The top-level `new(Samples: …, Notes: …, SeeAlso: …)` keeps the target-typed `new(` because the method return type makes it unambiguous; everything nested below should be explicit so the reader doesn't have to mentally type-check.
+- Use **explicit type names** (`new CodeSample(...)`, `new CodeSampleArgument(...)`) and **named arguments** (`arguments:`, `description:`, `expectedOutput:`) inside the documentation tree. The top-level `new(Samples: …, Notes: …)` keeps the target-typed `new(` because the method return type makes it unambiguous; everything nested below should be explicit so the reader doesn't have to mentally type-check.
 - `CodeSample(IEnumerable<CodeSampleArgument> arguments, string description, string? expectedOutput = null)` — arguments are typed bindings, not free-form strings. The renderer composes `octo-cli -c <verb> -<short> "value"...` at format time from the live `IArgument.ShortTerm`. Samples with three or more bindings render multi-line with PowerShell-7 backtick continuation; shorter invocations stay on a single line.
 - `CodeSampleArgument(IArgument, string)` for arguments with values; `CodeSampleArgument(IArgument)` for flags. Constructor enforces the right shape against the argument's `MandatoryValuesCount`.
 - `ExpectedOutput` is documentation-only — `--help` does not render it (consistent with `kubectl`-style CLIs).
-- `SeeAlsoLink(text, url)` — relative paths (`../general/LogIn.md`) for in-repo links, absolute URLs for external.
-- Skip the override entirely when the auto-canonical example suffices and there are no notes or related-doc links to add — keeps the class clean.
+- Cross-references to non-command pages (concept docs, related sections) belong on handwritten `index.md` landing pages per command-reference section in `octo-documentation`, not on individual command pages — keeps generator output focused on the command itself.
+- Skip the override entirely when the auto-canonical example suffices and there are no notes to add — keeps the class clean.
 
 ### Where output goes
 

@@ -10,7 +10,6 @@ public sealed record CommandDescriptor(
 
     public IReadOnlyList<SampleDescriptor>? Samples { get; init; }
     public IReadOnlyList<string>? Notes { get; init; }
-    public IReadOnlyList<SeeAlsoDescriptor>? SeeAlso { get; init; }
 }
 
 public sealed record SampleDescriptor(
@@ -25,5 +24,3 @@ public sealed record SampleDescriptor(
 ///     <see cref="Value"/> is null when the argument is a flag.
 /// </summary>
 public sealed record SampleArgumentBinding(ArgumentDescriptor Argument, string? Value);
-
-public sealed record SeeAlsoDescriptor(string Text, string Url);

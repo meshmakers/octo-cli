@@ -105,7 +105,6 @@ public static class RoslynExtractor
                 ClassName = classDecl.Identifier.Text,
                 Samples = documentation.Samples,
                 Notes = documentation.Notes,
-                SeeAlso = documentation.SeeAlso,
             });
         }
 
@@ -240,8 +239,7 @@ public static class RoslynExtractor
 
     private record struct ExtractedDocumentation(
         IReadOnlyList<SampleDescriptor>? Samples,
-        IReadOnlyList<string>? Notes,
-        IReadOnlyList<SeeAlsoDescriptor>? SeeAlso);
+        IReadOnlyList<string>? Notes);
 
     private static ExtractedDocumentation ExtractDocumentation(ClassDeclarationSyntax classDecl,
         IReadOnlyDictionary<string, ArgumentDescriptor> fieldToArg,
@@ -250,15 +248,15 @@ public static class RoslynExtractor
         var method = classDecl.Members.OfType<MethodDeclarationSyntax>()
             .FirstOrDefault(m => m.Identifier.Text == "GetDocumentation"
                                  && m.Modifiers.Any(mod => mod.IsKind(SyntaxKind.OverrideKeyword)));
-        if (method is null) return new(null, null, null);
+        if (method is null) return new(null, null);
 
         var ctorExpr = FindCommandDocumentationCtor(method);
-        if (ctorExpr is null) return new(null, null, null);
+        if (ctorExpr is null) return new(null, null);
 
         var ctorArgs = ctorExpr.ArgumentList?.Arguments;
-        if (ctorArgs is null) return new(null, null, null);
+        if (ctorArgs is null) return new(null, null);
 
-        ExpressionSyntax? samplesExpr = null, notesExpr = null, seeAlsoExpr = null;
+        ExpressionSyntax? samplesExpr = null, notesExpr = null;
         for (var i = 0; i < ctorArgs.Value.Count; i++)
         {
             var entry = ctorArgs.Value[i];
@@ -269,22 +267,18 @@ public static class RoslynExtractor
                 case "samples": samplesExpr = entry.Expression; break;
                 case "Notes":
                 case "notes": notesExpr = entry.Expression; break;
-                case "SeeAlso":
-                case "seeAlso": seeAlsoExpr = entry.Expression; break;
             }
         }
 
         return new(
             samplesExpr is null ? null : ExtractSamples(samplesExpr, fieldToArg, knownConstants),
-            notesExpr is null ? null : ExtractStringCollection(notesExpr, knownConstants),
-            seeAlsoExpr is null ? null : ExtractSeeAlso(seeAlsoExpr, knownConstants));
+            notesExpr is null ? null : ExtractStringCollection(notesExpr, knownConstants));
     }
 
     private static string PositionalParamName(int index) => index switch
     {
         0 => "Samples",
         1 => "Notes",
-        2 => "SeeAlso",
         _ => string.Empty,
     };
 
@@ -386,25 +380,6 @@ public static class RoslynExtractor
         foreach (var element in coll.Elements.OfType<ExpressionElementSyntax>())
             items.Add(ExtractStringLiteral(element.Expression, knownConstants));
         return items.Count == 0 ? null : items;
-    }
-
-    private static IReadOnlyList<SeeAlsoDescriptor>? ExtractSeeAlso(ExpressionSyntax expr,
-        IReadOnlyDictionary<string, string> knownConstants)
-    {
-        if (expr is not CollectionExpressionSyntax coll) return null;
-
-        var links = new List<SeeAlsoDescriptor>();
-        foreach (var element in coll.Elements.OfType<ExpressionElementSyntax>())
-        {
-            if (element.Expression is not BaseObjectCreationExpressionSyntax ctor) continue;
-            var ctorArgs = ctor.ArgumentList?.Arguments;
-            if (ctorArgs is null || ctorArgs.Value.Count < 2) continue;
-
-            var text = ExtractStringLiteral(ctorArgs.Value[0].Expression, knownConstants);
-            var url = ExtractStringLiteral(ctorArgs.Value[1].Expression, knownConstants);
-            links.Add(new SeeAlsoDescriptor(text, url));
-        }
-        return links.Count == 0 ? null : links;
     }
 
     // ---- String / literal helpers ----
