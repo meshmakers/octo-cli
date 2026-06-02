@@ -46,10 +46,6 @@ internal class AddOctoTenantIdentityProvider : ServiceClientOctoCommand<IIdentit
                     new CodeSampleArgument(_defaultGroupRtId, "<default-group-rtid>"),
                 ],
                     description: "Delegates authentication to a parent tenant for cross-tenant access."),
-            ],
-            SeeAlso:
-            [
-                new SeeAlsoLink("Cross-Tenant Authentication", "../../../../identityService/cross-tenant-authentication.md"),
             ]
         );
 
