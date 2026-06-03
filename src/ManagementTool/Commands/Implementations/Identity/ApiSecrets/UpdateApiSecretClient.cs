@@ -1,4 +1,4 @@
-﻿using Meshmakers.Common.CommandLineParser;
+using Meshmakers.Common.CommandLineParser;
 using Meshmakers.Octo.Frontend.ManagementTool.Services;
 using Meshmakers.Octo.Sdk.ServiceClient.IdentityServices;
 using Microsoft.Extensions.Logging;
@@ -15,7 +15,7 @@ internal class UpdateApiSecretClient : ServiceClientOctoCommand<IIdentityService
 
     public UpdateApiSecretClient(ILogger<UpdateApiSecretClient> logger, IOptions<OctoToolOptions> options,
         IIdentityServicesClient identityServicesClient, IAuthenticationService authenticationService)
-        : base(logger, "User Management", "UpdateApiSecretClient", "Updates an API secret for a client.", options,
+        : base(logger, Constants.IdentityServicesGroup, "UpdateApiSecretClient", "Updates an API secret for a client.", options,
             identityServicesClient,
             authenticationService)
     {
@@ -28,8 +28,21 @@ internal class UpdateApiSecretClient : ServiceClientOctoCommand<IIdentityService
         _expirationArg =
             CommandArgumentValue.AddArgument("e", "expirationDate", ["Expiration date of secret"], false, 1);
         _descriptionArg =
-            CommandArgumentValue.AddArgument("d", "description", ["Description of scope scope"], false, 1);
+            CommandArgumentValue.AddArgument("d", "description", ["Description of API secret"], false, 1);
     }
+
+    public override CommandDocumentation? GetDocumentation() =>
+        new(
+            Samples:
+            [
+                new CodeSample(arguments: [
+                    new CodeSampleArgument(_clientIdArg, "my-client"),
+                    new CodeSampleArgument(_secretValueArg, "sha256-encoded-value"),
+                    new CodeSampleArgument(_expirationArg, "2026-12-31"),
+                ],
+                    description: "Basic usage"),
+            ]
+        );
 
     public override async Task Execute()
     {

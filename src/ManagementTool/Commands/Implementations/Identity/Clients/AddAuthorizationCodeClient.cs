@@ -1,4 +1,4 @@
-﻿using IdentityModel;
+using IdentityModel;
 using Meshmakers.Common.CommandLineParser;
 using Meshmakers.Common.Shared;
 using Meshmakers.Octo.Communication.Contracts;
@@ -37,6 +37,20 @@ internal class AddAuthorizationCodeClient : ServiceClientOctoCommand<IIdentitySe
         _frontChannelLogoutUri = CommandArgumentValue.AddArgument("fclo", "frontChannelLogoutUri",
             ["Front-channel logout URI for Single Logout (SLO)"], false, 1);
     }
+
+    public override CommandDocumentation? GetDocumentation() =>
+        new(
+            Samples:
+            [
+                new CodeSample(arguments: [
+                    new CodeSampleArgument(_clientId, "my-web-app"),
+                    new CodeSampleArgument(_clientName, "My Web Application"),
+                    new CodeSampleArgument(_clientUri, "https://myapp.example.com/"),
+                    new CodeSampleArgument(_redirectUri, "https://myapp.example.com/callback"),
+                ],
+                    description: "Basic usage"),
+            ]
+        );
 
     public override async Task Execute()
     {

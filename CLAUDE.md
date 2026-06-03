@@ -127,7 +127,7 @@ Environment variables are prefixed with `OCTO_`.
 |----------|----------|---------|
 | Identity | users, roles, clients (+ mirror commands: GetClientMirrors, ProvisionClientInExistingTenants, ProvisionClientInTenant, UnprovisionClientFromTenant, SetClientAutoProvision), identityProviders, groups, emailDomainGroupRules, externalTenantUserMappings, adminProvisioning, apiResources, apiScopes | Identity Services |
 | Asset | tenants, models, blueprints (ListBlueprints, InstallBlueprint, GetBlueprintHistory, PreviewBlueprintUpdate, UpdateBlueprint, ListBlueprintBackups, RollbackBlueprint, ListBlueprintInstallations, UninstallBlueprint), timeSeries (EnableStreamData, DisableStreamData, ActivateArchive, DisableArchive, EnableArchive, RetryArchiveActivation, DeleteArchive, FreezeRollupArchive, UnfreezeRollupArchive, RewindRollupWatermark, ListRollupsForArchive) | Asset Repository |
-| Bots | notifications | Bot Services |
+| Bots | Dump, Restore, RunFixupScripts | Bot Services |
 | Communication | enable/disable, adapters, pipelines (incl. MovePipelines for bulk reassignment to a different adapter), triggers, pools, dataFlows, workloads (GetWorkloadsByChart, UpdateWorkloadChartVersion, DeployWorkload, UndeployWorkload) | Communication Controller |
 | Reporting | enable/disable | Report Services |
 | DevOps | certificates | Local operations |
@@ -300,7 +300,6 @@ All communication commands accept plain runtime object IDs (e.g. `69cfa838092b71
 | `GetAdapter` | `--identifier <rtId>`, `--json` (optional) | Get adapter configuration |
 | `GetAdapterNodes` | | List available pipeline nodes from connected adapters |
 | `GetPipelineSchema` | `--adapterId <rtId>`, `--outputFile` (optional) | Get pipeline JSON schema for an adapter |
-| `DeployAdapter` | `--identifier <rtId>` | Deploy adapter configuration update |
 
 ### Pipelines
 
@@ -327,9 +326,6 @@ All communication commands accept plain runtime object IDs (e.g. `69cfa838092b71
 | Command | Parameters | Description |
 |---------|-----------|-------------|
 | `GetPools` | `--json` (optional) | List all pools for the tenant |
-| `GetPool` | `--identifier <rtId>`, `--json` (optional) | Get pool configuration |
-| `DeployPoolAdapters` | `--poolId <rtId>`, `--adapterId <rtId>` (optional) | Deploy all or a specific adapter in a pool |
-| `UndeployPoolAdapters` | `--poolId <rtId>`, `--adapterId <rtId>` (optional) | Undeploy all or a specific adapter from a pool |
 
 ### Data Flows
 
@@ -441,3 +437,104 @@ After making ANY code changes, you MUST update:
 | `README.md` | Project overview, usage examples |
 | `CLAUDE.md` | Project structure, architecture changes |
 | Command help text | When command parameters change |
+
+## Command Reference Documentation
+
+All command documentation lives in the **command class itself** — there are no sidecar `.docs.md` files. `CommandReferenceGenerator` (Roslyn-based) parses each `.cs` file under `src/ManagementTool/Commands/Implementations/**`, extracts metadata from the constructor (`base(...)` call + `AddArgument(...)` assignments), and walks an optional `GetDocumentation()` override for richer per-command content. The rendered Markdown is published to `octo-documentation` via the `documentation-main-collect` release pipeline.
+
+### What gets extracted automatically
+
+- **Verb** — second-to-last constructor argument (or last, for the no-group ctor overload).
+- **Description** — last constructor argument; the renderer uses it as the page's intro paragraph.
+- **Group** — first constructor argument (when present); used as the sidebar category.
+- **Arguments** — every `_field = CommandArgumentValue.AddArgument(...)` call in the ctor. The field name is captured so `GetDocumentation()` samples can refer back to it.
+- **Inherited args** — for commands deriving from `JobWithWaitOctoCommand`, the `-w`/`--wait` flag is appended automatically (mirrored from the base class via `RoslynExtractor.InheritedArgsByBaseClass`).
+- **Canonical example** — auto-built from the required arguments (`octo-cli -c <verb> -<short> <long>...`) when no `GetDocumentation()` override is present.
+
+### `GetDocumentation()` override
+
+When the auto-generated content isn't enough, override `GetDocumentation()` on `Command<T>` (defined in `Meshmakers.Common.CommandLineParser`):
+
+```csharp
+using Meshmakers.Common.CommandLineParser;
+
+internal class FooCommand : ServiceClientOctoCommand<IFooClient>
+{
+    private readonly IArgument _targetArg;
+
+    public FooCommand(/* ... */)
+        : base(logger, Constants.SomeGroup, "Foo", "Does foo.", options, fooClient, authenticationService)
+    {
+        _targetArg = CommandArgumentValue.AddArgument("t", "target", ["Target id"], true, 1);
+    }
+
+    public override CommandDocumentation? GetDocumentation() =>
+        new(
+            Samples:
+            [
+                // Reference _targetArg by field — renaming "t"/"target" in AddArgument auto-updates the sample.
+                new CodeSample(
+                    arguments: [new CodeSampleArgument(_targetArg, "bar")],
+                    description: "Basic usage"),
+                new CodeSample(
+                    arguments: [new CodeSampleArgument(_targetArg, "baz")],
+                    description: "Verbose with expected output",
+                    expectedOutput: """
+                    ID    NAME
+                    42    baz
+                    """),
+            ],
+            Notes:
+            [
+                "Requires the caller to be in the `TenantOwners` group.",
+                "Idempotent — re-running with the same arguments produces the same result.",
+            ]);
+
+    public override async Task Execute() { /* ... */ }
+}
+```
+
+### Conventions
+
+- Use **explicit type names** (`new CodeSample(...)`, `new CodeSampleArgument(...)`) and **named arguments** (`arguments:`, `description:`, `expectedOutput:`) inside the documentation tree. The top-level `new(Samples: …, Notes: …)` keeps the target-typed `new(` because the method return type makes it unambiguous; everything nested below should be explicit so the reader doesn't have to mentally type-check.
+- `CodeSample(IEnumerable<CodeSampleArgument> arguments, string description, string? expectedOutput = null)` — arguments are typed bindings, not free-form strings. The renderer composes `octo-cli -c <verb> -<short> "value"...` at format time from the live `IArgument.ShortTerm`. Samples with three or more bindings render multi-line with PowerShell-7 backtick continuation; shorter invocations stay on a single line.
+- `CodeSampleArgument(IArgument, string)` for arguments with values; `CodeSampleArgument(IArgument)` for flags. Constructor enforces the right shape against the argument's `MandatoryValuesCount`.
+- `ExpectedOutput` is documentation-only — `--help` does not render it (consistent with `kubectl`-style CLIs).
+- Cross-references to non-command pages (concept docs, related sections) belong on handwritten `index.md` landing pages per command-reference section in `octo-documentation`, not on individual command pages — keeps generator output focused on the command itself.
+- Skip the override entirely when the auto-canonical example suffices and there are no notes to add — keeps the class clean.
+
+### Where output goes
+
+The generator emits to `bin/Release/documentation/technologyGuide/tools/octo-cli/command-reference/` during CI builds. `octo-cli-pipeline.yml` invokes `createCommandReference.ps1`, and the resulting tree is published as the `_octo-cli` artifact via `handle-artifacts.yml`.
+
+### End-to-end flow
+
+```
+   dev edits command class (.cs)              ← only step a developer ever does
+            │
+            ▼
+   octo-cli-CI builds the branch
+            │
+            ▼
+   _octo-cli artifact (contains the regenerated command-reference tree)
+            │
+            ▼
+   Azure DevOps release: documentation-main-collect
+   • Task Group UpdateDocumentationRepo:
+       Delete files in octo-documentation's command-reference/
+         (Contents `**`, excludes `_category_.json` and `**/_category_.json`)
+       Copy Files from _octo-cli artifact into the same path
+       Commit + push to octo-documentation main
+            │
+            ▼
+   octo-documentation-CI rebuilds Docusaurus
+            │
+            ▼
+   docs.meshmakers.cloud (auto-published)
+```
+
+Net effect: editing a `GetDocumentation()` override, an `AddArgument(...)`
+help string, or a base() description in any command class is the **single**
+step needed to update the public docs site. No manual edits in
+`octo-documentation` — handwritten pages there are limited to `intro.md`
+and `common-workflows.md`.

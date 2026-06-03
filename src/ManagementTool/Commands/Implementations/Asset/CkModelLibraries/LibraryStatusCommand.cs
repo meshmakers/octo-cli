@@ -23,6 +23,23 @@ internal class LibraryStatusCommand : ServiceClientOctoCommand<IAssetServicesCli
             ["Show only installed models"], false, 0);
     }
 
+    public override CommandDocumentation? GetDocumentation() =>
+        new(
+            Samples:
+            [
+                new CodeSample(arguments: [], description: "Full status"),
+                new CodeSample(arguments: [new CodeSampleArgument(_needsActionArg)],
+                    description: "Only models needing attention",
+                    expectedOutput: """
+                    NAME                      INSTALLED    CATALOG      STATE           ACTION
+                    ------------------------- ------------ ------------ --------------- --------------------
+                    System                    2.0.7        2.0.7        Available       Service-Managed
+                    Basic                     2.0.2        2.0.2        Available       -
+                    Industry.Energy           -            2.0.0        Not Installed   Install
+                    """),
+            ]
+        );
+
     public override async Task Execute()
     {
         var tenantId = Options.Value.TenantId;

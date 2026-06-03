@@ -22,6 +22,26 @@ internal class CheckUpgradeCommand : ServiceClientOctoCommand<IAssetServicesClie
         _modelIdArg = CommandArgumentValue.AddArgument("m", "modelId", ["Model ID (e.g., Industry.Energy-2.0.0)"], true, 1);
     }
 
+    public override CommandDocumentation? GetDocumentation() =>
+        new(
+            Samples:
+            [
+                new CodeSample(arguments: [
+                    new CodeSampleArgument(_catalogNameArg, "PublicGitHubCatalog"),
+                    new CodeSampleArgument(_modelIdArg, "Basic-2.0.2"),
+                ],
+                    description: "Basic usage",
+                    expectedOutput: """
+                    Model:              Basic
+                    Installed Version:  2.0.0
+                    Target Version:     2.0.2
+                    Upgrade Needed:     True
+                    Migration Path:     True
+                    Breaking Changes:   False
+                    """),
+            ]
+        );
+
     public override async Task Execute()
     {
         var tenantId = Options.Value.TenantId;

@@ -25,6 +25,19 @@ internal class ExecutePipelineCommand : ServiceClientOctoCommand<ICommunicationS
         _inputFileArg = CommandArgumentValue.AddArgument("f", "inputFile", ["Path to pipeline input file"], false, 1);
     }
 
+    public override CommandDocumentation? GetDocumentation() =>
+        new(
+            Samples:
+            [
+                new CodeSample(arguments: [new CodeSampleArgument(_idArg, "cc0000000000000000000003")], description: "Triggers a pipeline execution and returns the execution ID"),
+                new CodeSample(arguments: [
+                    new CodeSampleArgument(_idArg, "cc0000000000000000000003"),
+                    new CodeSampleArgument(_inputFileArg, "./input.json"),
+                ],
+                    description: "Optionally provide input data from a file"),
+            ]
+        );
+
     public override async Task Execute()
     {
         var id = CommandArgumentValue.GetArgumentScalarValue<string>(_idArg);

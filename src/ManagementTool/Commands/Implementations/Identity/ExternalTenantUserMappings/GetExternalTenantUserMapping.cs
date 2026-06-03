@@ -26,6 +26,14 @@ internal class GetExternalTenantUserMapping : ServiceClientOctoCommand<IIdentity
             ["ID of the external tenant user mapping"], true, 1);
     }
 
+    public override CommandDocumentation? GetDocumentation() =>
+        new(
+            Samples:
+            [
+                new CodeSample(arguments: [new CodeSampleArgument(_id, "<mapping-rtid>")], description: "Basic usage"),
+            ]
+        );
+
     public override async Task Execute()
     {
         var rtId = CommandArgumentValue.GetArgumentScalarValue<OctoObjectId>(_id);

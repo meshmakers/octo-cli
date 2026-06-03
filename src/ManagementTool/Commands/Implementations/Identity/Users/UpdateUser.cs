@@ -27,6 +27,18 @@ internal class UpdateUser : ServiceClientOctoCommand<IIdentityServicesClient>
             1);
     }
 
+    public override CommandDocumentation? GetDocumentation() =>
+        new(
+            Samples:
+            [
+                new CodeSample(arguments: [
+                    new CodeSampleArgument(_nameArg, "john.doe"),
+                    new CodeSampleArgument(_eMailArg, "new.email@example.com"),
+                ],
+                    description: "Basic usage"),
+            ]
+        );
+
     public override async Task Execute()
     {
         var name = CommandArgumentValue.GetArgumentScalarValue<string>(_nameArg).ToLower();

@@ -1,4 +1,4 @@
-﻿using Meshmakers.Common.CommandLineParser;
+using Meshmakers.Common.CommandLineParser;
 using Meshmakers.Common.Shared.Services;
 using Meshmakers.Octo.Communication.Contracts.DataTransferObjects;
 using Meshmakers.Octo.Frontend.ManagementTool.Services;
@@ -31,8 +31,21 @@ internal class CreateApiSecretClient : ServiceClientOctoCommand<IIdentityService
         _expirationArg =
             CommandArgumentValue.AddArgument("e", "expirationDate", ["Expiration date of secret"], false, 1);
         _descriptionArg =
-            CommandArgumentValue.AddArgument("d", "description", ["Description of scope scope"], false, 1);
+            CommandArgumentValue.AddArgument("d", "description", ["Description of API secret"], false, 1);
     }
+
+    public override CommandDocumentation? GetDocumentation() =>
+        new(
+            Samples:
+            [
+                new CodeSample(arguments: [
+                    new CodeSampleArgument(_clientIdArg, "my-client"),
+                    new CodeSampleArgument(_expirationArg, "2025-12-31"),
+                    new CodeSampleArgument(_descriptionArg, "Production secret"),
+                ],
+                    description: "Basic usage"),
+            ]
+        );
 
     public override async Task Execute()
     {

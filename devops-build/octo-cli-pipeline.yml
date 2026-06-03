@@ -50,4 +50,13 @@ steps:
     runtime: 'win-x64'
     project: 'src/ManagementTool/*.csproj' 
 - template: dotnet-create-package.yml
+- task: PowerShell@2
+  displayName: 'Generate command-reference docs'
+  inputs:
+    targetType: 'filePath'
+    filePath: '$(Build.SourcesDirectory)/devops-build/createCommandReference.ps1'
+    workingDirectory: '$(Build.SourcesDirectory)'
 - template: handle-artifacts.yml
+  parameters:
+    apiDocumentationPaths:
+      - '$(Build.SourcesDirectory)/bin/Release/documentation'

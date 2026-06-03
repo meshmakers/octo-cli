@@ -32,6 +32,24 @@ internal class ImportFromCatalogCommand : JobWithWaitOctoCommand
         _assetServicesClient.AccessToken.AccessToken = ServiceClient.AccessToken.AccessToken;
     }
 
+    public override CommandDocumentation? GetDocumentation() =>
+        new(
+            Samples:
+            [
+                new CodeSample(arguments: [
+                    new CodeSampleArgument(_catalogNameArg, "PublicGitHubCatalog"),
+                    new CodeSampleArgument(_modelIdArg, "Industry.Energy-2.0.0"),
+                    new CodeSampleArgument(_waitForJobArg),
+                ],
+                    description: "Import with wait"),
+                new CodeSample(arguments: [
+                    new CodeSampleArgument(_catalogNameArg, "PublicGitHubCatalog"),
+                    new CodeSampleArgument(_modelIdArg, "Industry.Energy-2.0.0"),
+                ],
+                    description: "Import without waiting (returns job IDs)"),
+            ]
+        );
+
     public override async Task Execute()
     {
         var tenantId = Options.Value.TenantId;

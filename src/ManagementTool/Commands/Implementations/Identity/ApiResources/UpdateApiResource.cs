@@ -27,11 +27,23 @@ internal class UpdateApiResource : ServiceClientOctoCommand<IIdentityServicesCli
             CommandArgumentValue.AddArgument("dn", "displayName", ["Display name of resource"], false, 1);
 
         _descriptionArg =
-            CommandArgumentValue.AddArgument("d", "description", ["Description of scope resource"], false, 1);
+            CommandArgumentValue.AddArgument("d", "description", ["Description of API resource"], false, 1);
 
         _scopesArg =
             CommandArgumentValue.AddArgument("s", "scopes", ["Scopes to add to resource. Split them with ,"], false, 1);
     }
+
+    public override CommandDocumentation? GetDocumentation() =>
+        new(
+            Samples:
+            [
+                new CodeSample(arguments: [
+                    new CodeSampleArgument(_nameArg, "myAPI"),
+                    new CodeSampleArgument(_displayNameArg, "Updated API Name"),
+                ],
+                    description: "Basic usage"),
+            ]
+        );
 
     public override async Task Execute()
     {

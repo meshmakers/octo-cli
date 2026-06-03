@@ -15,7 +15,7 @@ internal class DeleteApiScope : ServiceClientOctoCommand<IIdentityServicesClient
     public DeleteApiScope(ILogger<DeleteApiScope> logger, IOptions<OctoToolOptions> options,
         IIdentityServicesClient identityServicesClient, IAuthenticationService authenticationService,
         IConfirmationService confirmationService)
-        : base(logger, Constants.IdentityServicesGroup, "DeleteApiScope", "Deletes a client.", options,
+        : base(logger, Constants.IdentityServicesGroup, "DeleteApiScope", "Deletes an API scope.", options,
             identityServicesClient,
             authenticationService)
     {
@@ -26,6 +26,14 @@ internal class DeleteApiScope : ServiceClientOctoCommand<IIdentityServicesClient
             1);
         _yesArg = CommandArgumentValue.AddArgument("y", "yes", ["Skip confirmation prompt"], false, 0);
     }
+
+    public override CommandDocumentation? GetDocumentation() =>
+        new(
+            Samples:
+            [
+                new CodeSample(arguments: [new CodeSampleArgument(_name, "myAPI.admin")], description: "Basic usage"),
+            ]
+        );
 
     public override async Task Execute()
     {

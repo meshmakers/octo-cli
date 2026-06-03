@@ -1,4 +1,4 @@
-﻿using Meshmakers.Common.CommandLineParser;
+using Meshmakers.Common.CommandLineParser;
 using Meshmakers.Common.CommandLineParser.Commands;
 using Meshmakers.Octo.Frontend.ManagementTool.Services;
 using Microsoft.Extensions.Logging;
@@ -25,7 +25,7 @@ internal class ConfigOctoCommand : Command<OctoToolOptions>
 
         _assetServicesUriArg = CommandArgumentValue.AddArgument("asu", "assetServicesUri",
             ["URI of asset repository services (e. g. 'https://localhost:5001/')"], 1);
-        _botServicesUriArg = CommandArgumentValue.AddArgument("bsu", "bobServicesUri",
+        _botServicesUriArg = CommandArgumentValue.AddArgument("bsu", "botServicesUri",
             ["URI of bot services (e. g. 'https://localhost:5009/')"], 1);
         _identityServicesUriArg = CommandArgumentValue.AddArgument("isu", "identityServicesUri",
             ["URI of identity services (e. g. 'https://localhost:5003/')"], true, 1);
@@ -38,6 +38,21 @@ internal class ConfigOctoCommand : Command<OctoToolOptions>
         _reportingServicesUriArg = CommandArgumentValue.AddArgument("rsu", "reportingServicesUri",
             ["URI of reporting services (e. g. 'https://localhost:5007/')"], 1);
     }
+
+    public override CommandDocumentation? GetDocumentation() =>
+        new(
+            Samples:
+            [
+                new CodeSample(arguments: [
+                    new CodeSampleArgument(_identityServicesUriArg, "https://localhost:5003/"),
+                    new CodeSampleArgument(_assetServicesUriArg, "https://localhost:5001/"),
+                    new CodeSampleArgument(_botServicesUriArg, "https://localhost:5009/"),
+                    new CodeSampleArgument(_communicationServicesUriArg, "https://localhost:5015/"),
+                    new CodeSampleArgument(_tenantIdArg, "meshtest"),
+                ],
+                    description: "Basic usage"),
+            ]
+        );
 
     public override Task Execute()
     {

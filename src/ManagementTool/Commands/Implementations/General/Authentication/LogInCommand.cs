@@ -1,4 +1,4 @@
-﻿using System.Diagnostics;
+using System.Diagnostics;
 using Meshmakers.Common.CommandLineParser;
 using Meshmakers.Common.CommandLineParser.Commands;
 using Meshmakers.Octo.Communication.Contracts;
@@ -26,6 +26,14 @@ internal class LogInCommand : Command<OctoToolOptions>
         _interactiveArg = CommandArgumentValue.AddArgument("i", "interactive",
             ["Interactive by opening a browser for device log-In"], false);
     }
+
+    public override CommandDocumentation? GetDocumentation() =>
+        new(
+            Samples:
+            [
+                new CodeSample(arguments: [new CodeSampleArgument(_interactiveArg)], description: "Basic usage"),
+            ]
+        );
 
     public override async Task Execute()
     {

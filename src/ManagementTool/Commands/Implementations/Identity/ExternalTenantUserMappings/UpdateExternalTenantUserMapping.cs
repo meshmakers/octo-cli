@@ -25,6 +25,18 @@ internal class UpdateExternalTenantUserMapping : ServiceClientOctoCommand<IIdent
             ["Comma-separated list of role IDs to assign"], false, 1);
     }
 
+    public override CommandDocumentation? GetDocumentation() =>
+        new(
+            Samples:
+            [
+                new CodeSample(arguments: [
+                    new CodeSampleArgument(_id, "<mapping-rtid>"),
+                    new CodeSampleArgument(_roleIds, "Development,TenantManagement"),
+                ],
+                    description: "Basic usage"),
+            ]
+        );
+
     public override async Task Execute()
     {
         var rtId = CommandArgumentValue.GetArgumentScalarValue<OctoObjectId>(_id);

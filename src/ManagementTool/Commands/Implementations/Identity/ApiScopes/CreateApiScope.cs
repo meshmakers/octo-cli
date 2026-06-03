@@ -1,4 +1,4 @@
-﻿using Meshmakers.Common.CommandLineParser;
+using Meshmakers.Common.CommandLineParser;
 using Meshmakers.Octo.Communication.Contracts.DataTransferObjects;
 using Meshmakers.Octo.Frontend.ManagementTool.Services;
 using Meshmakers.Octo.Sdk.ServiceClient.IdentityServices;
@@ -17,7 +17,7 @@ internal class CreateApiScope : ServiceClientOctoCommand<IIdentityServicesClient
     public CreateApiScope(ILogger<CreateApiScope> logger, IOptions<OctoToolOptions> options,
         IIdentityServicesClient identityServicesClient, IAuthenticationService authenticationService)
         : base(logger, Constants.IdentityServicesGroup, "CreateApiScope",
-            "Adds a new client using grant type 'ClientCredentials'.", options,
+            "Creates a new API scope.", options,
             identityServicesClient, authenticationService)
     {
         _nameArg = CommandArgumentValue.AddArgument("n", "name", ["Name of scope, must be unique"],
@@ -28,8 +28,22 @@ internal class CreateApiScope : ServiceClientOctoCommand<IIdentityServicesClient
         _displayNameArg =
             CommandArgumentValue.AddArgument("dn", "displayName", ["Display name of scope"], false, 1);
         _descriptionArg =
-            CommandArgumentValue.AddArgument("d", "description", ["Description of scope scope"], false, 1);
+            CommandArgumentValue.AddArgument("d", "description", ["Description of API scope"], false, 1);
     }
+
+    public override CommandDocumentation? GetDocumentation() =>
+        new(
+            Samples:
+            [
+                new CodeSample(arguments: [
+                    new CodeSampleArgument(_nameArg, "myAPI.admin"),
+                    new CodeSampleArgument(_displayNameArg, "Admin Access"),
+                    new CodeSampleArgument(_descriptionArg, "Full administrative access"),
+                    new CodeSampleArgument(_isEnabledArg, "true"),
+                ],
+                    description: "Basic usage"),
+            ]
+        );
 
     public override async Task Execute()
     {

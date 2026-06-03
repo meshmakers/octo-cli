@@ -30,6 +30,19 @@ internal class UpdateEmailDomainGroupRule : ServiceClientOctoCommand<IIdentitySe
             ["Optional description of the rule"], false, 1);
     }
 
+    public override CommandDocumentation? GetDocumentation() =>
+        new(
+            Samples:
+            [
+                new CodeSample(arguments: [
+                    new CodeSampleArgument(_id, "<rule-rtid>"),
+                    new CodeSampleArgument(_emailDomainPattern, "meshmakers.com"),
+                    new CodeSampleArgument(_targetGroupRtId, "<new-target-group-rtid>"),
+                ],
+                    description: "Basic usage"),
+            ]
+        );
+
     public override async Task Execute()
     {
         var rtId = CommandArgumentValue.GetArgumentScalarValue<OctoObjectId>(_id);

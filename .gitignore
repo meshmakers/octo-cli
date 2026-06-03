@@ -352,3 +352,6 @@ MigrationBackup/
 .ionide/
 
 .DS_Store
+# CommandReferenceGenerator output (regenerated per build, not committed)
+generated-command-reference/
+generated-stderr.txt

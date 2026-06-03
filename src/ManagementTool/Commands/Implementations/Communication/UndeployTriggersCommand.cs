@@ -2,6 +2,7 @@ using Meshmakers.Octo.Frontend.ManagementTool.Services;
 using Meshmakers.Octo.Sdk.ServiceClient.CommunicationControllerServices;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Meshmakers.Common.CommandLineParser;
 
 namespace Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Communication;
 
@@ -14,6 +15,14 @@ internal class UndeployTriggersCommand : ServiceClientOctoCommand<ICommunication
             communicationServicesClient, authenticationService)
     {
     }
+
+    public override CommandDocumentation? GetDocumentation() =>
+        new(
+            Samples:
+            [
+                new CodeSample(arguments: [], description: "Deactivates all pipeline triggers for the current tenant"),
+            ]
+        );
 
     public override async Task Execute()
     {

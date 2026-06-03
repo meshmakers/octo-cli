@@ -22,6 +22,18 @@ internal class UpdateGroupRoles : ServiceClientOctoCommand<IIdentityServicesClie
             ["Comma-separated list of role IDs to assign"], true, 1);
     }
 
+    public override CommandDocumentation? GetDocumentation() =>
+        new(
+            Samples:
+            [
+                new CodeSample(arguments: [
+                    new CodeSampleArgument(_id, "<group-rtid>"),
+                    new CodeSampleArgument(_roleIds, "Development,DashboardViewer,ReportingViewer"),
+                ],
+                    description: "Replace all roles assigned to a group"),
+            ]
+        );
+
     public override async Task Execute()
     {
         var rtId = CommandArgumentValue.GetArgumentScalarValue<OctoObjectId>(_id);

@@ -1,4 +1,4 @@
-﻿using IdentityModel;
+using IdentityModel;
 using Meshmakers.Common.CommandLineParser;
 using Meshmakers.Octo.Communication.Contracts;
 using Meshmakers.Octo.Communication.Contracts.DataTransferObjects;
@@ -37,6 +37,19 @@ internal class AddClientCredentialsClient : ServiceClientOctoCommand<IIdentitySe
                 "Use for service-to-service / CI-CD identities that must reach many tenants with a single ClientId/secret pair."
             ], false, 0);
     }
+
+    public override CommandDocumentation? GetDocumentation() =>
+        new(
+            Samples:
+            [
+                new CodeSample(arguments: [
+                    new CodeSampleArgument(_clientId, "my-service"),
+                    new CodeSampleArgument(_clientName, "My Background Service"),
+                    new CodeSampleArgument(_clientSecret, "MySecretKey123"),
+                ],
+                    description: "Basic usage"),
+            ]
+        );
 
     public override async Task Execute()
     {

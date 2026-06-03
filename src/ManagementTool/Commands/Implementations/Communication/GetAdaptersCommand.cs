@@ -30,6 +30,14 @@ internal class GetAdaptersCommand : ServiceClientOctoCommand<ICommunicationServi
         _jsonArg = CommandArgumentValue.AddArgument("j", "json", ["Output as raw JSON"], false);
     }
 
+    public override CommandDocumentation? GetDocumentation() =>
+        new(
+            Samples:
+            [
+                new CodeSample(arguments: [new CodeSampleArgument(_jsonArg)], description: "Output as compact JSON"),
+            ]
+        );
+
     public override async Task Execute()
     {
         Logger.LogInformation("Getting adapters for tenant '{TenantId}' at '{ServiceClientServiceUri}'",

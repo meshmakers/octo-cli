@@ -1,4 +1,4 @@
-﻿using IdentityModel;
+using IdentityModel;
 using Meshmakers.Common.CommandLineParser;
 using Meshmakers.Octo.Communication.Contracts;
 using Meshmakers.Octo.Communication.Contracts.DataTransferObjects;
@@ -31,6 +31,19 @@ internal class AddDeviceCodeClient : ServiceClientOctoCommand<IIdentityServicesC
             ["ApiSecret that is used for client credential authentication"], true,
             1);
     }
+
+    public override CommandDocumentation? GetDocumentation() =>
+        new(
+            Samples:
+            [
+                new CodeSample(arguments: [
+                    new CodeSampleArgument(_clientId, "my-device"),
+                    new CodeSampleArgument(_clientName, "My IoT Device"),
+                    new CodeSampleArgument(_clientSecret, "DeviceSecret123"),
+                ],
+                    description: "Basic usage"),
+            ]
+        );
 
     public override async Task Execute()
     {

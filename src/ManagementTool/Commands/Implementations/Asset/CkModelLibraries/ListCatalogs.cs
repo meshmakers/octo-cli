@@ -2,6 +2,7 @@ using Meshmakers.Octo.Frontend.ManagementTool.Services;
 using Meshmakers.Octo.Sdk.ServiceClient.AssetRepositoryServices.System;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Meshmakers.Common.CommandLineParser;
 
 namespace Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Asset.CkModelLibraries;
 
@@ -14,6 +15,23 @@ internal class ListCatalogs : ServiceClientOctoCommand<IAssetServicesClient>
             options, assetServicesClient, authenticationService)
     {
     }
+
+    public override CommandDocumentation? GetDocumentation() =>
+        new(
+            Samples:
+            [
+                new CodeSample(arguments: [],
+                    description: "Basic usage",
+                    expectedOutput: """
+                    NAME                           DESCRIPTION
+                    ------------------------------- ----------------------------------------
+                    EmbeddedResourceCatalog        Embedded resource catalog
+                    LocalFileSystemCatalog         Local file system catalog at '~/.octo/local-catalog'
+                    PrivateGitHubCatalog           Private GitHub catalog for development and testing
+                    PublicGitHubCatalog            Public GitHub catalog
+                    """),
+            ]
+        );
 
     public override async Task Execute()
     {

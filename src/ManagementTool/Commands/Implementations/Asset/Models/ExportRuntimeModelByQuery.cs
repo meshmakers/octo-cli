@@ -1,4 +1,4 @@
-﻿using Meshmakers.Common.CommandLineParser;
+using Meshmakers.Common.CommandLineParser;
 using Meshmakers.Octo.ConstructionKit.Contracts;
 using Meshmakers.Octo.Frontend.ManagementTool.Services;
 using Meshmakers.Octo.Sdk.ServiceClient;
@@ -35,6 +35,18 @@ internal class ExportRuntimeModelByQuery : JobOctoCommand
 
         _assetServicesClient.AccessToken.AccessToken = ServiceClient.AccessToken.AccessToken;
     }
+
+    public override CommandDocumentation? GetDocumentation() =>
+        new(
+            Samples:
+            [
+                new CodeSample(arguments: [
+                    new CodeSampleArgument(_fileArg, "./export.zip"),
+                    new CodeSampleArgument(_queryIdArg, "query-id"),
+                ],
+                    description: "Basic usage"),
+            ]
+        );
 
     public override async Task Execute()
     {

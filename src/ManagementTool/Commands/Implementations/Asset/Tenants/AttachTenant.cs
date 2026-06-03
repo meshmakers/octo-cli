@@ -1,4 +1,4 @@
-﻿using Meshmakers.Common.CommandLineParser;
+using Meshmakers.Common.CommandLineParser;
 using Meshmakers.Octo.Frontend.ManagementTool.Services;
 using Meshmakers.Octo.Sdk.ServiceClient.AssetRepositoryServices.System;
 using Microsoft.Extensions.Logging;
@@ -22,6 +22,18 @@ internal class AttachTenant : ServiceClientOctoCommand<IAssetServicesClient>
         _databaseArg = CommandArgumentValue.AddArgument("db", "database", ["Name of database"], true,
             1);
     }
+
+    public override CommandDocumentation? GetDocumentation() =>
+        new(
+            Samples:
+            [
+                new CodeSample(arguments: [
+                    new CodeSampleArgument(_tenantIdArg, "newtenant"),
+                    new CodeSampleArgument(_databaseArg, "existing_db"),
+                ],
+                    description: "Basic usage"),
+            ]
+        );
 
     public override async Task Execute()
     {

@@ -1,4 +1,4 @@
-﻿using Meshmakers.Common.CommandLineParser;
+using Meshmakers.Common.CommandLineParser;
 using Meshmakers.Octo.Communication.Contracts.DataTransferObjects;
 using Meshmakers.Octo.Frontend.ManagementTool.Services;
 using Meshmakers.Octo.Sdk.ServiceClient.IdentityServices;
@@ -42,6 +42,23 @@ internal class AddAzureEntryIdIdentityProvider : ServiceClientOctoCommand<IIdent
         _defaultGroupRtId = CommandArgumentValue.AddArgument("dgid", "defaultGroupRtId",
             ["Default group RtId for new users"], false, 1);
     }
+
+    public override CommandDocumentation? GetDocumentation() =>
+        new(
+            Samples:
+            [
+                new CodeSample(arguments: [
+                    new CodeSampleArgument(_name, "Azure AD"),
+                    new CodeSampleArgument(_tenantId, "your-tenant-id"),
+                    new CodeSampleArgument(_clientId, "your-client-id"),
+                    new CodeSampleArgument(_clientSecret, "your-client-secret"),
+                    new CodeSampleArgument(_enabled, "true"),
+                    new CodeSampleArgument(_allowSelfRegistration, "true"),
+                    new CodeSampleArgument(_defaultGroupRtId, "<default-group-rtid>"),
+                ],
+                    description: "Basic usage"),
+            ]
+        );
 
     public override async Task Execute()
     {

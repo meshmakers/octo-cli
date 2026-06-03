@@ -26,6 +26,19 @@ internal class CreateEmailDomainGroupRule : ServiceClientOctoCommand<IIdentitySe
             ["Optional description of the rule"], false, 1);
     }
 
+    public override CommandDocumentation? GetDocumentation() =>
+        new(
+            Samples:
+            [
+                new CodeSample(arguments: [
+                    new CodeSampleArgument(_emailDomainPattern, "meshmakers.com"),
+                    new CodeSampleArgument(_targetGroupRtId, "<target-group-rtid>"),
+                    new CodeSampleArgument(_description, "Auto-assign meshmakers employees"),
+                ],
+                    description: "Basic usage"),
+            ]
+        );
+
     public override async Task Execute()
     {
         var emailDomainPattern = CommandArgumentValue.GetArgumentScalarValue<string>(_emailDomainPattern);

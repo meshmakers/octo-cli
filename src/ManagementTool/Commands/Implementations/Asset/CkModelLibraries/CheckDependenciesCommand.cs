@@ -22,6 +22,28 @@ internal class CheckDependenciesCommand : ServiceClientOctoCommand<IAssetService
         _modelIdArg = CommandArgumentValue.AddArgument("m", "modelId", ["Model ID (e.g., Industry.Energy-2.0.0)"], true, 1);
     }
 
+    public override CommandDocumentation? GetDocumentation() =>
+        new(
+            Samples:
+            [
+                new CodeSample(arguments: [
+                    new CodeSampleArgument(_catalogNameArg, "PublicGitHubCatalog"),
+                    new CodeSampleArgument(_modelIdArg, "Industry.Energy-2.0.0"),
+                ],
+                    description: "Basic usage",
+                    expectedOutput: """
+                    Industry.Energy v2.0.0  [INSTALL]
+                      Industry.Basic v2.1.0  [INSTALL]
+                        Basic v2.0.2  [NONE] (installed: v2.0.2)
+                        System v2.0.7  [NONE] (service-managed: v2.0.7)
+                    
+                    Models to import (2):
+                      Industry.Basic-2.1.0
+                      Industry.Energy-2.0.0
+                    """),
+            ]
+        );
+
     public override async Task Execute()
     {
         var tenantId = Options.Value.TenantId;

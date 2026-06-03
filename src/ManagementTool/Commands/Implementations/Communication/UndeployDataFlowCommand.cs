@@ -19,6 +19,14 @@ internal class UndeployDataFlowCommand : ServiceClientOctoCommand<ICommunication
         _idArg = CommandArgumentValue.AddArgument("id", "identifier", ["The data flow runtime ID"], true, 1);
     }
 
+    public override CommandDocumentation? GetDocumentation() =>
+        new(
+            Samples:
+            [
+                new CodeSample(arguments: [new CodeSampleArgument(_idArg, "cc0000000000000000000002")], description: "Basic usage"),
+            ]
+        );
+
     public override async Task Execute()
     {
         var id = CommandArgumentValue.GetArgumentScalarValue<string>(_idArg);

@@ -30,6 +30,20 @@ internal class CreateExternalTenantUserMapping : ServiceClientOctoCommand<IIdent
             ["Comma-separated list of role IDs to assign"], false, 1);
     }
 
+    public override CommandDocumentation? GetDocumentation() =>
+        new(
+            Samples:
+            [
+                new CodeSample(arguments: [
+                    new CodeSampleArgument(_sourceTenantId, "octosystem"),
+                    new CodeSampleArgument(_sourceUserId, "<user-id-from-parent>"),
+                    new CodeSampleArgument(_sourceUserName, "alice"),
+                    new CodeSampleArgument(_roleIds, "Development,DashboardViewer"),
+                ],
+                    description: "Basic usage"),
+            ]
+        );
+
     public override async Task Execute()
     {
         var sourceTenantId = CommandArgumentValue.GetArgumentScalarValue<string>(_sourceTenantId);

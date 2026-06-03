@@ -31,6 +31,14 @@ internal class GetExternalTenantUserMappings : ServiceClientOctoCommand<IIdentit
             ["Filter by source tenant ID"], false, 1);
     }
 
+    public override CommandDocumentation? GetDocumentation() =>
+        new(
+            Samples:
+            [
+                new CodeSample(arguments: [new CodeSampleArgument(_sourceTenantId, "octosystem")], description: "Basic usage"),
+            ]
+        );
+
     public override async Task Execute()
     {
         Logger.LogInformation("Getting external tenant user mappings from '{ServiceClientServiceUri}'",

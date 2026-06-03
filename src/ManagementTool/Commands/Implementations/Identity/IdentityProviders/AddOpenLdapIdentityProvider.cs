@@ -1,4 +1,4 @@
-﻿using Meshmakers.Common.CommandLineParser;
+using Meshmakers.Common.CommandLineParser;
 using Meshmakers.Octo.Communication.Contracts.DataTransferObjects;
 using Meshmakers.Octo.Frontend.ManagementTool.Services;
 using Meshmakers.Octo.Sdk.ServiceClient.IdentityServices;
@@ -43,6 +43,23 @@ internal class AddOpenLdapIdentityProvider : ServiceClientOctoCommand<IIdentityS
         _defaultGroupRtId = CommandArgumentValue.AddArgument("dgid", "defaultGroupRtId",
             ["Default group RtId for new users"], false, 1);
     }
+
+    public override CommandDocumentation? GetDocumentation() =>
+        new(
+            Samples:
+            [
+                new CodeSample(arguments: [
+                    new CodeSampleArgument(_name, "OpenLDAP"),
+                    new CodeSampleArgument(_host, "ldap.example.com"),
+                    new CodeSampleArgument(_port, "389"),
+                    new CodeSampleArgument(_userBaseDn, "cn=users,dc=example,dc=com"),
+                    new CodeSampleArgument(_userNameAttribute, "uid"),
+                    new CodeSampleArgument(_enabled, "true"),
+                    new CodeSampleArgument(_allowSelfRegistration, "false"),
+                ],
+                    description: "Basic usage"),
+            ]
+        );
 
     public override async Task Execute()
     {
