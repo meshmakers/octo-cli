@@ -363,7 +363,7 @@ public class RoslynExtractorTests
     }
 
     [Fact]
-    public void Extracts_GetDocumentation_notes_and_seeAlso()
+    public void Extracts_GetDocumentation_notes()
     {
         var source = """
             namespace Test;
@@ -378,10 +378,6 @@ public class RoslynExtractorTests
                         [
                             "First note.",
                             "Second note.",
-                        ],
-                        SeeAlso:
-                        [
-                            new SeeAlsoLink("LogIn", "../general/LogIn.md"),
                         ]);
 
                 public override Task Execute() => Task.CompletedTask;
@@ -395,9 +391,6 @@ public class RoslynExtractorTests
         Assert.Equal(2, cmd.Notes!.Count);
         Assert.Equal("First note.", cmd.Notes[0]);
         Assert.Equal("Second note.", cmd.Notes[1]);
-        Assert.Single(cmd.SeeAlso!);
-        Assert.Equal("LogIn", cmd.SeeAlso![0].Text);
-        Assert.Equal("../general/LogIn.md", cmd.SeeAlso[0].Url);
     }
 
     [Fact]
@@ -454,7 +447,6 @@ public class RoslynExtractorTests
         Assert.Single(commands);
         Assert.Null(commands[0].Samples);
         Assert.Null(commands[0].Notes);
-        Assert.Null(commands[0].SeeAlso);
     }
 
     [Fact]

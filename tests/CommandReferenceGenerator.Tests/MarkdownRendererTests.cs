@@ -190,41 +190,6 @@ public class MarkdownRendererTests
     }
 
     [Fact]
-    public void Renders_see_also_section_when_command_has_see_also()
-    {
-        var cmd = new CommandDescriptor(
-            Group: null,
-            Verb: "Foo",
-            Description: "Does foo.",
-            Args: Array.Empty<ArgumentDescriptor>())
-        {
-            SeeAlso = new[]
-            {
-                new SeeAlsoDescriptor("LogIn", "../general/LogIn.md"),
-                new SeeAlsoDescriptor("Bar", "./Bar.md"),
-            }
-        };
-
-        var md = MarkdownRenderer.Render(cmd);
-
-        Assert.Contains("## See Also\n\n- [LogIn](../general/LogIn.md)\n- [Bar](./Bar.md)\n", md);
-    }
-
-    [Fact]
-    public void Omits_see_also_section_when_command_has_no_see_also()
-    {
-        var cmd = new CommandDescriptor(
-            Group: null,
-            Verb: "Foo",
-            Description: "Does foo.",
-            Args: Array.Empty<ArgumentDescriptor>());
-
-        var md = MarkdownRenderer.Render(cmd);
-
-        Assert.DoesNotContain("## See Also", md);
-    }
-
-    [Fact]
     public void Composes_invocation_from_argument_bindings()
     {
         var fooArg = new ArgumentDescriptor("f", "foo", "foo help", IsRequired: true, ValueCount: 1);

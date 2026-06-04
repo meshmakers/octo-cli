@@ -29,6 +29,12 @@ steps:
 - checkout: self
   clean: true
 - template: set-version.yml
+- task: DotNetCoreCLI@2
+  displayName: 'Run tests'
+  inputs:
+    command: 'test'
+    projects: 'Octo.Cli.sln'
+    arguments: '-c Release /p:OctoNugetPrivateServer=$(nugetPrivateServer)'
 - template: dotnet-publish-to-zip.yml
   parameters:
     exeName: 'octo-cli'
