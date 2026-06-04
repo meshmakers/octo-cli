@@ -229,6 +229,7 @@ internal static class Program
         services.AddTransient<ICommand, AddContextCommand>();
         services.AddTransient<ICommand, RemoveContextCommand>();
         services.AddTransient<ICommand, UseContextCommand>();
+        services.AddTransient<ICommand, ListContextsCommand>();
 
         services.AddTransient<ICommand, ImportConstructionKitModel>();
         services.AddTransient<ICommand, ImportRuntimeModel>();

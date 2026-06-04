@@ -45,7 +45,7 @@ src/
 │   │       ├── DevOps/       # Certificate generation commands
 │   │       ├── General/      # Authentication and context commands
 │   │       │   ├── Authentication/  # LogIn, AuthStatus
-│   │       │   └── Context/         # AddContext, RemoveContext, UseContext
+│   │       │   └── Context/         # AddContext, RemoveContext, UseContext, ListContexts
 │   │       ├── Identity/     # User, role, client, provider, group, email domain rules, external mapping, admin provisioning commands
 │   │       └── Reporting/    # Report service commands
 │   ├── Services/             # Service layer (AuthenticationService, ContextManager, etc.)
@@ -132,7 +132,7 @@ Environment variables are prefixed with `OCTO_`.
 | Reporting | enable/disable | Report Services |
 | DevOps | certificates | Local operations |
 | General | login, loginClientCredentials, authStatus, config | Local operations |
-| Context | addContext, removeContext, useContext | Local operations |
+| Context | addContext, removeContext, useContext, listContexts | Local operations |
 
 ## Common Operations
 
@@ -141,8 +141,11 @@ Environment variables are prefixed with `OCTO_`.
 octo-cli -c AddContext -n dev -isu https://localhost:5003/ -tid octosystem
 octo-cli -c AddContext -n prod -isu https://id.example.com/ -tid customer1
 octo-cli -c UseContext -n dev       # Switch to dev context
-octo-cli -c UseContext              # List all contexts (no -n arg)
+octo-cli -c UseContext              # List all contexts (no -n arg, legacy shortcut)
 octo-cli -c RemoveContext -n prod   # Remove a context
+octo-cli -c ListContexts            # Tabular list of all contexts with auth status
+octo-cli -c ListContexts -n dev     # Detail view of one context (all service URIs)
+octo-cli -c ListContexts -j         # JSON output for scripting (tokens never included)
 
 # Login via device code flow (tokens saved to active context)
 octo-cli -c LogIn
