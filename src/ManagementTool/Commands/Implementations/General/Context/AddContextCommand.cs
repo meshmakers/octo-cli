@@ -16,6 +16,7 @@ internal class AddContextCommand : Command<OctoToolOptions>
     private readonly IArgument _botServicesUriArg;
     private readonly IArgument _communicationServicesUriArg;
     private readonly IArgument _reportingServicesUriArg;
+    private readonly IArgument _aiServicesUriArg;
     private readonly IArgument _adminPanelUriArg;
     private readonly IArgument _tenantIdArg;
 
@@ -37,6 +38,8 @@ internal class AddContextCommand : Command<OctoToolOptions>
             ["URI of communication services (e. g. 'https://localhost:5015/')"], 1);
         _reportingServicesUriArg = CommandArgumentValue.AddArgument("rsu", "reportingServicesUri",
             ["URI of reporting services (e. g. 'https://localhost:5007/')"], 1);
+        _aiServicesUriArg = CommandArgumentValue.AddArgument("aisu", "aiServicesUri",
+            ["URI of AI services (e. g. 'https://localhost:5019/')"], 1);
         _adminPanelUriArg = CommandArgumentValue.AddArgument("apu", "adminPanelUri",
             ["URI of admin panel (e. g. 'https://localhost:5005/')"], 1);
         _tenantIdArg = CommandArgumentValue.AddArgument("tid", "tenantId",
@@ -79,6 +82,12 @@ internal class AddContextCommand : Command<OctoToolOptions>
         {
             toolOptions.ReportingServiceUrl =
                 CommandArgumentValue.GetArgumentScalarValue<string>(_reportingServicesUriArg).ToLower();
+        }
+
+        if (CommandArgumentValue.IsArgumentUsed(_aiServicesUriArg))
+        {
+            toolOptions.AiServiceUrl =
+                CommandArgumentValue.GetArgumentScalarValue<string>(_aiServicesUriArg).ToLower();
         }
 
         if (CommandArgumentValue.IsArgumentUsed(_adminPanelUriArg))

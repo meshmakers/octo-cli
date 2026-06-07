@@ -15,6 +15,7 @@ internal class ConfigOctoCommand : Command<OctoToolOptions>
     private readonly IContextManager _contextManager;
     private readonly IArgument _identityServicesUriArg;
     private readonly IArgument _reportingServicesUriArg;
+    private readonly IArgument _aiServicesUriArg;
     private readonly IArgument _tenantIdArg;
 
     public ConfigOctoCommand(ILogger<ConfigOctoCommand> logger, IOptions<OctoToolOptions> options,
@@ -37,6 +38,8 @@ internal class ConfigOctoCommand : Command<OctoToolOptions>
             ["Id of tenant (e. g. 'meshtest')"], 1);
         _reportingServicesUriArg = CommandArgumentValue.AddArgument("rsu", "reportingServicesUri",
             ["URI of reporting services (e. g. 'https://localhost:5007/')"], 1);
+        _aiServicesUriArg = CommandArgumentValue.AddArgument("aisu", "aiServicesUri",
+            ["URI of AI services (e. g. 'https://localhost:5019/')"], 1);
     }
 
     public override CommandDocumentation? GetDocumentation() =>
@@ -76,6 +79,10 @@ internal class ConfigOctoCommand : Command<OctoToolOptions>
 
         Options.Value.ReportingServiceUrl = CommandArgumentValue.IsArgumentUsed(_reportingServicesUriArg)
             ? CommandArgumentValue.GetArgumentScalarValue<string>(_reportingServicesUriArg).ToLower()
+            : null;
+
+        Options.Value.AiServiceUrl = CommandArgumentValue.IsArgumentUsed(_aiServicesUriArg)
+            ? CommandArgumentValue.GetArgumentScalarValue<string>(_aiServicesUriArg).ToLower()
             : null;
 
         Options.Value.AdminPanelUrl = CommandArgumentValue.IsArgumentUsed(_adminPanelUriArg)
