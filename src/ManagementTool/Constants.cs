@@ -15,6 +15,7 @@ internal static class Constants
     public const string CommunicationServicesGroup = "Communication Services";
     public const string AssetRepositoryServicesGroup = "Asset Repository Services";
     public const string ReportingServicesGroup = "Reporting Services";
+    public const string AiServicesGroup = "AI Services";
     public const string DiagnosticsGroup = "Diagnostics";
     public const string DevOpsGroup = "DevOps";
     public const string ContextGroup = "Context Management";

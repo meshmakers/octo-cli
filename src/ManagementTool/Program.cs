@@ -3,6 +3,7 @@ using Meshmakers.Common.CommandLineParser.Commands;
 using Meshmakers.Common.Shared.Services;
 using Meshmakers.Octo.Communication.Contracts;
 using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations;
+using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Ai;
 using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Asset.Blueprints;
 using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Asset.CkModelLibraries;
 using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Asset.FixupScripts;
@@ -29,6 +30,7 @@ using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Identity.
 using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Reporting;
 using Meshmakers.Octo.Frontend.ManagementTool.Services;
 using Meshmakers.Octo.Sdk.ServiceClient.AdminPanel.System;
+using Meshmakers.Octo.Sdk.ServiceClient.AiServices;
 using Meshmakers.Octo.Sdk.ServiceClient.AssetRepositoryServices.System;
 using Meshmakers.Octo.Sdk.ServiceClient.AssetRepositoryServices.Tenants;
 using Meshmakers.Octo.Sdk.ServiceClient.Authentication;
@@ -106,6 +108,7 @@ internal static class Program
             options.BotServiceUrl = activeContext.OctoToolOptions.BotServiceUrl;
             options.CommunicationServiceUrl = activeContext.OctoToolOptions.CommunicationServiceUrl;
             options.ReportingServiceUrl = activeContext.OctoToolOptions.ReportingServiceUrl;
+            options.AiServiceUrl = activeContext.OctoToolOptions.AiServiceUrl;
             options.AdminPanelUrl = activeContext.OctoToolOptions.AdminPanelUrl;
             options.TenantId = activeContext.OctoToolOptions.TenantId;
         });
@@ -174,6 +177,14 @@ internal static class Program
                     options.TenantId = toolOptions.Value.TenantId;
                 });
 
+        services.AddOptions<AiServiceClientOptions>()
+            .Configure<IOptions<OctoToolOptions>>(
+                (options, toolOptions) =>
+                {
+                    options.EndpointUri = toolOptions.Value.AiServiceUrl;
+                    options.TenantId = toolOptions.Value.TenantId;
+                });
+
         services.AddOptions<IdentityServiceClientOptions>()
             .Configure<IOptions<OctoToolOptions>>(
                 (options, toolOptions) =>
@@ -206,6 +217,7 @@ internal static class Program
         services.AddSingleton<ICommunicationServiceClientAccessToken, ServiceClientAccessToken>();
         services.AddSingleton<IStreamDataServiceClientAccessToken, ServiceClientAccessToken>();
         services.AddSingleton<IReportingServicesClientAccessToken, ServiceClientAccessToken>();
+        services.AddSingleton<IAiServiceClientAccessToken, ServiceClientAccessToken>();
 
         services.AddSingleton<ITenantClient, TenantClient>();
         services.AddSingleton<IAssetServicesClient, AssetServicesClient>();
@@ -218,6 +230,7 @@ internal static class Program
         services.AddSingleton<ICommunicationServicesClient, CommunicationServicesClient>();
         services.AddSingleton<IStreamDataServicesClient, StreamDataServicesClient>();
         services.AddSingleton<IReportingServicesClient, ReportingServicesClient>();
+        services.AddSingleton<IAiServicesClient, AiServicesClient>();
 
         services.AddTransient<ICommand, ConfigOctoCommand>();
         services.AddTransient<ICommand, SetupCommand>();
@@ -363,6 +376,9 @@ internal static class Program
 
         services.AddTransient<ICommand, EnableCommunicationCommand>();
         services.AddTransient<ICommand, DisableCommunicationCommand>();
+
+        services.AddTransient<ICommand, EnableAiCommand>();
+        services.AddTransient<ICommand, DisableAiCommand>();
 
         // Communication - Adapters
         services.AddTransient<ICommand, GetAdaptersCommand>();

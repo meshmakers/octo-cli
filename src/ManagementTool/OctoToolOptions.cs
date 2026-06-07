@@ -7,6 +7,7 @@ public class OctoToolOptions
     public string? IdentityServiceUrl { get; set; }
     public string? CommunicationServiceUrl { get; set; }
     public string? ReportingServiceUrl { get; set; }
+    public string? AiServiceUrl { get; set; }
 
     public string? AdminPanelUrl { get; set; }
     public string? TenantId { get; set; }
