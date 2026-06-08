@@ -130,6 +130,7 @@ Environment variables are prefixed with `OCTO_`.
 | Bots | Dump, Restore, RunFixupScripts | Bot Services |
 | Communication | enable/disable, adapters, pipelines (incl. MovePipelines for bulk reassignment to a different adapter), triggers, pools, dataFlows, workloads (GetWorkloadsByChart, UpdateWorkloadChartVersion, DeployWorkload, UndeployWorkload) | Communication Controller |
 | Reporting | enable/disable | Report Services |
+| AI Services | EnableAi, DisableAi, RedeemAiTicket (anonymous — bastion-side), GetAiCredentialsStatus, RevokeAiCredentials | AI Services |
 | DevOps | certificates | Local operations |
 | General | login, loginClientCredentials, authStatus, config | Local operations |
 | Context | addContext, removeContext, useContext, listContexts | Local operations |
@@ -289,6 +290,31 @@ octo-cli -c AddOctoTenantIdentityProvider -n "ParentTenant" -e true -ptid <paren
 
 # Identity providers with self-registration and default group
 octo-cli -c AddAzureEntryIdIdentityProvider -n "Azure" -e true -t <tenantId> -cid <clientId> -cs <secret> -asr false -dgid <groupRtId>
+
+# AI Services — tenant lifecycle (run after EnableCommunication)
+octo-cli -c EnableAi
+octo-cli -c DisableAi
+
+# AI credential bastion flow (#4123) — register an Anthropic subscription token on a tenant.
+#   Two-machine pattern: a tenant admin mints a one-time code via Refinery Studio
+#   ("Issue ticket" panel on the AI Console). The code is handed out-of-band to the
+#   operator on the bastion machine, who has just completed `claude /login`. The
+#   operator then redeems the code together with the freshly minted Anthropic
+#   tokens — anonymously, no OctoMesh user session required. The code is the auth
+#   artefact; it can be redeemed exactly once and expires after a few minutes.
+octo-cli -c RedeemAiTicket \
+  -tid meshtest \
+  -tc TWUL9NMV7LU8 \
+  -at sk-ant-oat01-... \
+  -rt sk-ant-ort01-... \
+  -aex 2027-01-01T00:00:00Z \
+  -rex 2027-12-31T00:00:00Z
+
+# Inspect or revoke the active tenant's lease — both require an authenticated
+# tenant-scoped session (current context's TenantId + AiServiceUrl must be set).
+octo-cli -c GetAiCredentialsStatus
+octo-cli -c RevokeAiCredentials      # destructive — prompts for confirmation
+octo-cli -c RevokeAiCredentials -y   # skip confirmation
 ```
 
 ## Communication Services Commands
