@@ -31,7 +31,7 @@
     <ItemGroup>
         <PackageReference Include="Meshmakers.Common.CommandLineParser" Version="$(MeshmakerVersion)" />
         <PackageReference Include="Meshmakers.Common.Configuration" Version="$(MeshmakerVersion)" />
-        <PackageReference Include="Meshmakers.Octo.Sdk.ServiceClient" Version="$(OctoVersion)" />
+        <PackageReference Include="Meshmakers.Octo.Sdk.ServiceClient" Version="$(OctoCoreLibVersion)" />
         <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="8.19.1" />
     </ItemGroup>
 

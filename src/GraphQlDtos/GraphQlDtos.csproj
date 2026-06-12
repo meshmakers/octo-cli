@@ -6,10 +6,10 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <PackageReference Include="Meshmakers.Octo.ConstructionKit.MsBuildTasks" Version="$(OctoVersion)" PrivateAssets="all"/>
-        <PackageReference Include="Meshmakers.Octo.Sdk.SourceGeneration" Version="$(OctoVersion)" OutputItemType="Analyzer" ReferenceOutputAssembly="false" PrivateAssets="all"/>
+        <PackageReference Include="Meshmakers.Octo.ConstructionKit.MsBuildTasks" Version="$(OctoCoreLibVersion)" PrivateAssets="all"/>
+        <PackageReference Include="Meshmakers.Octo.Sdk.SourceGeneration" Version="$(OctoCoreLibVersion)" OutputItemType="Analyzer" ReferenceOutputAssembly="false" PrivateAssets="all"/>
         <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="8.19.1" />
-        <PackageReference Include="Meshmakers.Octo.Sdk.ServiceClient" Version="$(OctoVersion)"/>
-        <PackageReference Include="Meshmakers.Octo.Communication.Contracts" Version="$(OctoVersion)"/>
+        <PackageReference Include="Meshmakers.Octo.Sdk.ServiceClient" Version="$(OctoCoreLibVersion)"/>
+        <PackageReference Include="Meshmakers.Octo.Communication.Contracts" Version="$(OctoCoreLibVersion)"/>
     </ItemGroup>
 </Project>
