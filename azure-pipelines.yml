@@ -1,0 +1,103 @@
+# Root-level CI pipeline using shared templates from octo-pipeline-templates.
+#
+# Coexists with devops-build/octo-cli-pipeline.yml during the Phase 1-services
+# pilot. Once parity is verified, def 89 yamlFilename can be flipped to this
+# file. CLI is the unusual member of the services train: NO Docker build,
+# NO NuGet output; instead it publishes self-contained binaries for four
+# runtime targets, a Chocolatey package, and a generated command-reference
+# doc tree.
+#
+# Shared templates from octo-pipeline-templates@tpl-v0.3.0 (update-build-number,
+# set-version, handle-artifacts) are used in their standard shape. The
+# cli-specific publish/package/docs steps stay in devops-build/ because they
+# are unique to this repo — adding them to the shared template repo would
+# benefit no other consumer. devops-build/ therefore stays even after the
+# yamlFilename flip, just slimmer:
+#   keep: dotnet-publish-to-zip.yml, dotnet-create-package.yml, createCommandReference.ps1
+#   drop: octo-cli-pipeline.yml, update-build-number.yml, set-version.yml, handle-artifacts.yml
+#
+# CLI-specific build matrix preserved:
+#   - 4 dotnet publish runs (linux-x64, linux-arm64, osx-arm64, win-x64) →
+#     self-contained ZIPs in $(Build.ArtifactStagingDirectory)/setup/
+#   - dotnet-create-package — Chocolatey nuspec with SHA-512 checksum on
+#     the win-x64 ZIP
+#   - createCommandReference.ps1 — Roslyn-based extractor over all command
+#     classes → bin/Release/documentation/technologyGuide/tools/octo-cli/
+#     command-reference/, picked up by handle-artifacts.apiDocumentationPaths
+
+name: $(MajorVersion).$(MinorVersion).$(date:yyMM).$(DayOfMonth)$(rev:rrr)-$(Build.SourceBranchName)
+
+resources:
+  repositories:
+    - repository: pipelineTemplates
+      type: github
+      name: meshmakers/octo-pipeline-templates
+      endpoint: meshmakers-access-token
+      ref: refs/tags/tpl-v0.3.0
+
+trigger:
+  batch: true
+  branches:
+    include:
+      - dev/*
+      - test/*
+      - main
+  tags:
+    exclude:
+      - '*'
+
+variables:
+  - group: ApiKeys-mm-cloud
+  - group: OctoDefault
+  - name: isRelease
+    value: ${{ startsWith(variables['Build.SourceBranch'], 'refs/tags/r') }}
+  - name: isMain
+    value: ${{ eq(variables['Build.SourceBranch'], 'refs/heads/main') }}
+  - name: isTest
+    value: ${{ startsWith(variables['Build.SourceBranch'], 'refs/heads/test') }}
+
+pool:
+  name: meshmakers-ci-agents
+
+steps:
+  - template: templates/steps/update-build-number.yml@pipelineTemplates
+  - checkout: self
+    clean: true
+  - template: templates/steps/set-version.yml@pipelineTemplates
+  - task: DotNetCoreCLI@2
+    displayName: 'Run tests'
+    inputs:
+      command: 'test'
+      projects: 'Octo.Cli.sln'
+      arguments: '-c Release /p:OctoNugetPrivateServer=$(nugetPrivateServer)'
+  - template: devops-build/dotnet-publish-to-zip.yml
+    parameters:
+      exeName: 'octo-cli'
+      runtime: 'linux-x64'
+      project: 'src/ManagementTool/*.csproj'
+  - template: devops-build/dotnet-publish-to-zip.yml
+    parameters:
+      exeName: 'octo-cli'
+      runtime: 'linux-arm64'
+      project: 'src/ManagementTool/*.csproj'
+  - template: devops-build/dotnet-publish-to-zip.yml
+    parameters:
+      exeName: 'octo-cli'
+      runtime: 'osx-arm64'
+      project: 'src/ManagementTool/*.csproj'
+  - template: devops-build/dotnet-publish-to-zip.yml
+    parameters:
+      exeName: 'octo-cli'
+      runtime: 'win-x64'
+      project: 'src/ManagementTool/*.csproj'
+  - template: devops-build/dotnet-create-package.yml
+  - task: PowerShell@2
+    displayName: 'Generate command-reference docs'
+    inputs:
+      targetType: 'filePath'
+      filePath: '$(Build.SourcesDirectory)/devops-build/createCommandReference.ps1'
+      workingDirectory: '$(Build.SourcesDirectory)'
+  - template: templates/steps/handle-artifacts.yml@pipelineTemplates
+    parameters:
+      apiDocumentationPaths:
+        - '$(Build.SourcesDirectory)/bin/Release/documentation'
