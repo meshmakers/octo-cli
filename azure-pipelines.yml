@@ -7,7 +7,7 @@
 # runtime targets, a Chocolatey package, and a generated command-reference
 # doc tree.
 #
-# Shared templates from octo-pipeline-templates@tpl-v0.3.0 (update-build-number,
+# Shared templates from octo-pipeline-templates@tpl-v0.3.1 (update-build-number,
 # set-version, handle-artifacts) are used in their standard shape. The
 # cli-specific publish/package/docs steps stay in devops-build/ because they
 # are unique to this repo — adding them to the shared template repo would
@@ -33,7 +33,7 @@ resources:
       type: github
       name: meshmakers/octo-pipeline-templates
       endpoint: meshmakers-access-token
-      ref: refs/tags/tpl-v0.3.0
+      ref: refs/tags/tpl-v0.3.1
 
 trigger:
   batch: true
