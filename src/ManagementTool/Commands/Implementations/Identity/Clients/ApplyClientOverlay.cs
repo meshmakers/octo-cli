@@ -73,12 +73,27 @@ internal class ApplyClientOverlay : ServiceClientOctoCommand<IIdentityServicesCl
         var clientId = CommandArgumentValue.GetArgumentScalarValue<string>(_clientId);
         var overlayName = CommandArgumentValue.GetArgumentScalarValue<string>(_overlayName);
 
+        var redirectUris = ParseCommaSeparatedList(_redirectUris);
+        var postLogoutRedirectUris = ParseCommaSeparatedList(_postLogoutRedirectUris);
+        var allowedCorsOrigins = ParseCommaSeparatedList(_allowedCorsOrigins);
+
+        // Client-side guard: matches the server's 400 on empty payloads. Catches the
+        // common typo case (`-r " , "` trims to zero entries) before a roundtrip so the
+        // operator gets a CLI-shaped error instead of a wrapped HTTP exception.
+        if ((redirectUris == null || redirectUris.Count == 0) &&
+            (postLogoutRedirectUris == null || postLogoutRedirectUris.Count == 0) &&
+            (allowedCorsOrigins == null || allowedCorsOrigins.Count == 0))
+        {
+            throw new ToolException(
+                "At least one of -r / -plr / -co must contain a non-whitespace URI.");
+        }
+
         var dto = new ApplyOverlayUrisDto
         {
             OverlayName = overlayName,
-            RedirectUris = ParseCommaSeparatedList(_redirectUris),
-            PostLogoutRedirectUris = ParseCommaSeparatedList(_postLogoutRedirectUris),
-            AllowedCorsOrigins = ParseCommaSeparatedList(_allowedCorsOrigins)
+            RedirectUris = redirectUris,
+            PostLogoutRedirectUris = postLogoutRedirectUris,
+            AllowedCorsOrigins = allowedCorsOrigins
         };
 
         Logger.LogInformation(
