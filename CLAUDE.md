@@ -125,7 +125,7 @@ Environment variables are prefixed with `OCTO_`.
 
 | Category | Commands | Service |
 |----------|----------|---------|
-| Identity | users, roles, clients (+ mirror commands: GetClientMirrors, ProvisionClientInExistingTenants, ProvisionClientInTenant, UnprovisionClientFromTenant, SetClientAutoProvision), identityProviders, groups, emailDomainGroupRules, externalTenantUserMappings, adminProvisioning, apiResources, apiScopes | Identity Services |
+| Identity | users, roles, clients (+ mirror commands: GetClientMirrors, ProvisionClientInExistingTenants, ProvisionClientInTenant, UnprovisionClientFromTenant, SetClientAutoProvision, ApplyClientOverlay), identityProviders, groups, emailDomainGroupRules, externalTenantUserMappings, adminProvisioning, apiResources, apiScopes | Identity Services |
 | Asset | tenants, models, blueprints (ListBlueprints, InstallBlueprint, GetBlueprintHistory, PreviewBlueprintUpdate, UpdateBlueprint, ListBlueprintBackups, RollbackBlueprint, ListBlueprintInstallations, UninstallBlueprint), timeSeries (EnableStreamData, DisableStreamData, ActivateArchive, DisableArchive, EnableArchive, RetryArchiveActivation, DeleteArchive, FreezeRollupArchive, UnfreezeRollupArchive, RewindRollupWatermark, ListRollupsForArchive) | Asset Repository |
 | Bots | Dump, Restore, RunFixupScripts | Bot Services |
 | Communication | enable/disable, adapters, pipelines (incl. MovePipelines for bulk reassignment to a different adapter), triggers, pools, dataFlows, workloads (GetWorkloadsByChart, UpdateWorkloadChartVersion, DeployWorkload, UndeployWorkload) | Communication Controller |
@@ -284,6 +284,15 @@ octo-cli -c UnprovisionClientFromTenant -id ci-deploy -ctid acme
 # Flip the AutoProvisionInChildTenants flag on an existing client.
 # Note: flipping true does NOT auto-backfill — use ProvisionClientInExistingTenants for that.
 octo-cli -c SetClientAutoProvision -id ci-deploy -e true
+
+# Client overlay URIs (AB#4209 Step 4) — append operator-scoped URIs onto blueprint-managed
+# clients (e.g. local-dev callbacks on the Refinery Studio client) without modifying the
+# blueprint. Entries are written with Source = "overlay:<OverlayName>" and survive blueprint
+# re-apply via the Step 2a preservation pass. Idempotent — duplicates silently skipped.
+octo-cli -c ApplyClientOverlay -id octo-data-refinery-studio -n local-dev \
+  -r "http://localhost:4200/auth-callback,http://localhost:4200/silent-callback" \
+  -plr "http://localhost:4200/" \
+  -co "http://localhost:4200"
 
 # OctoTenant identity provider (cross-tenant auth)
 octo-cli -c AddOctoTenantIdentityProvider -n "ParentTenant" -e true -ptid <parentTenantId>

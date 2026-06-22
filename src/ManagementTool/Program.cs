@@ -284,6 +284,9 @@ internal static class Program
         services.AddTransient<ICommand, UnprovisionClientFromTenant>();
         services.AddTransient<ICommand, SetClientAutoProvision>();
 
+        // AB#4209 Step 4 PR 2 — overlay URI write for blueprint-managed clients
+        services.AddTransient<ICommand, ApplyClientOverlay>();
+
         services.AddTransient<ICommand, GetIdentityProviders>();
         services.AddTransient<ICommand, AddOAuthIdentityProvider>();
         services.AddTransient<ICommand, AddOpenLdapIdentityProvider>();
