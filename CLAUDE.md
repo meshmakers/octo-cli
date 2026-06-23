@@ -125,7 +125,7 @@ Environment variables are prefixed with `OCTO_`.
 
 | Category | Commands | Service |
 |----------|----------|---------|
-| Identity | users, roles, clients (+ mirror commands: GetClientMirrors, ProvisionClientInExistingTenants, ProvisionClientInTenant, UnprovisionClientFromTenant, SetClientAutoProvision, ApplyClientOverlay), identityProviders, groups, emailDomainGroupRules, externalTenantUserMappings, adminProvisioning, apiResources, apiScopes | Identity Services |
+| Identity | users, roles, clients (+ mirror commands: GetClientMirrors, ProvisionClientInExistingTenants, ProvisionClientInTenant, UnprovisionClientFromTenant, SetClientAutoProvision, ApplyClientOverlay, CleanClientOverlays), identityProviders, groups, emailDomainGroupRules, externalTenantUserMappings, adminProvisioning, apiResources, apiScopes | Identity Services |
 | Asset | tenants, models, blueprints (ListBlueprints, InstallBlueprint, GetBlueprintHistory, PreviewBlueprintUpdate, UpdateBlueprint, ListBlueprintBackups, RollbackBlueprint, ListBlueprintInstallations, UninstallBlueprint), timeSeries (EnableStreamData, DisableStreamData, ActivateArchive, DisableArchive, EnableArchive, RetryArchiveActivation, DeleteArchive, FreezeRollupArchive, UnfreezeRollupArchive, RewindRollupWatermark, ListRollupsForArchive) | Asset Repository |
 | Bots | Dump, Restore, RunFixupScripts | Bot Services |
 | Communication | enable/disable, adapters, pipelines (incl. MovePipelines for bulk reassignment to a different adapter), triggers, pools, dataFlows, workloads (GetWorkloadsByChart, UpdateWorkloadChartVersion, DeployWorkload, UndeployWorkload) | Communication Controller |
@@ -293,6 +293,15 @@ octo-cli -c ApplyClientOverlay -id octo-data-refinery-studio -n local-dev \
   -r "http://localhost:4200/auth-callback,http://localhost:4200/silent-callback" \
   -plr "http://localhost:4200/" \
   -co "http://localhost:4200"
+
+# Strip overlay URIs (AB#4209 Step 5) — destructive cleanup before a sanitised tenant dump.
+# Without -n: removes every overlay:* source. With -n: removes only overlay:<name>.
+# Typical workflow before sharing a dump:
+#   octo-cli -c CleanClientOverlays -y && octo-cli -c DumpTenant -tid mytenant ...
+# After dumping, restore the local-dev overlays via the cmdlet (idempotent):
+#   Apply-IdentityOverlay
+octo-cli -c CleanClientOverlays                         # strip all overlay:* (prompts)
+octo-cli -c CleanClientOverlays -n local-dev -y         # strip only overlay:local-dev, skip prompt
 
 # OctoTenant identity provider (cross-tenant auth)
 octo-cli -c AddOctoTenantIdentityProvider -n "ParentTenant" -e true -ptid <parentTenantId>

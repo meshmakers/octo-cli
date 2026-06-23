@@ -286,6 +286,8 @@ internal static class Program
 
         // AB#4209 Step 4 PR 2 — overlay URI write for blueprint-managed clients
         services.AddTransient<ICommand, ApplyClientOverlay>();
+        // AB#4209 Step 5 PR 4' — overlay URI cleanup (companion to ApplyClientOverlay)
+        services.AddTransient<ICommand, CleanClientOverlays>();
 
         services.AddTransient<ICommand, GetIdentityProviders>();
         services.AddTransient<ICommand, AddOAuthIdentityProvider>();
