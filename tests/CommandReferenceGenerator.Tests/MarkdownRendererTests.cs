@@ -315,4 +315,64 @@ public class MarkdownRendererTests
 
         Assert.Contains("**Output:**\n\n```\nNAME   STATE\nfoo    OK\n```", md);
     }
+
+    [Fact]
+    public void Escapes_angle_brackets_in_prose_so_mdx_does_not_parse_them_as_jsx()
+    {
+        // Repro for build 36358: literal `<OverlayName>` in the command description made
+        // Docusaurus' MDX parser look for a closing tag and fail the docs build.
+        var arg = new ArgumentDescriptor(
+            "n", "overlayName",
+            "Operator-meaningful overlay name. Becomes the suffix of 'overlay:<OverlayName>'.",
+            IsRequired: true, ValueCount: 1);
+        var cmd = new CommandDescriptor(
+            Group: null,
+            Verb: "ApplyClientOverlay",
+            Description: "Writes Source = 'overlay:<OverlayName>' on the client.",
+            Args: new[] { arg })
+        {
+            Samples = new[]
+            {
+                new SampleDescriptor(
+                    new[] { new SampleArgumentBinding(arg, "local-dev") },
+                    "Apply the <local-dev> overlay"),
+            },
+            Notes = new[] { "Source label is 'overlay:<OverlayName>'." }
+        };
+
+        var md = MarkdownRenderer.Render(cmd);
+
+        // Prose fields: every `<` / `>` must be entity-encoded.
+        Assert.Contains("Writes Source = 'overlay:&lt;OverlayName&gt;' on the client.", md);
+        Assert.Contains("Apply the &lt;local-dev&gt; overlay:", md);
+        Assert.Contains("Source label is 'overlay:&lt;OverlayName&gt;'.", md);
+        Assert.Contains(
+            "| `-n` | `--overlayName` | yes | Operator-meaningful overlay name. " +
+            "Becomes the suffix of 'overlay:&lt;OverlayName&gt;'. |",
+            md);
+
+        // No literal `<X>` may survive in prose contexts.
+        Assert.DoesNotContain("<OverlayName>", md);
+        Assert.DoesNotContain("<local-dev>", md);
+    }
+
+    [Fact]
+    public void Does_not_escape_inside_code_fences()
+    {
+        // The canonical example renders `<long>` placeholders inside a ```powershell fence.
+        // Code fences are inert in MDX — those angle brackets must pass through unchanged.
+        var cmd = new CommandDescriptor(
+            Group: null,
+            Verb: "Foo",
+            Description: "Does foo.",
+            Args: new[]
+            {
+                new ArgumentDescriptor("t", "target", "Target id", IsRequired: true, ValueCount: 1),
+            });
+
+        var md = MarkdownRenderer.Render(cmd);
+
+        Assert.Contains("octo-cli -c Foo -t <target>", md);
+        Assert.DoesNotContain("&lt;target&gt;", md);
+    }
 }

@@ -16,7 +16,7 @@ public static class MarkdownRenderer
         sb.Append('\n');
         sb.Append('#').Append(' ').Append(cmd.Verb).Append('\n');
         sb.Append('\n');
-        sb.Append(cmd.Description).Append('\n');
+        sb.Append(EscapeMdxText(cmd.Description)).Append('\n');
         sb.Append('\n');
 
         AppendExamples(sb, cmd);
@@ -36,7 +36,7 @@ public static class MarkdownRenderer
             for (var i = 0; i < cmd.Samples.Count; i++)
             {
                 var sample = cmd.Samples[i];
-                sb.Append(sample.Description);
+                sb.Append(EscapeMdxText(sample.Description));
                 // Only append ":" if the description doesn't already end with terminal punctuation.
                 if (sample.Description.Length > 0 && !".:!?".Contains(sample.Description[^1]))
                     sb.Append(':');
@@ -80,7 +80,9 @@ public static class MarkdownRenderer
         foreach (var arg in cmd.Args)
         {
             var required = arg.IsRequired ? "yes" : "no";
-            var helpForCell = arg.Help.Replace("\n", "<br/>");
+            // Escape MDX-special chars BEFORE inserting the literal <br/>, otherwise
+            // the line-break we want to render would be escaped too.
+            var helpForCell = EscapeMdxText(arg.Help).Replace("\n", "<br/>");
             sb.Append("| `-").Append(arg.Short).Append("` | `--").Append(arg.Long)
               .Append("` | ").Append(required).Append(" | ").Append(helpForCell).Append(" |\n");
         }
@@ -95,7 +97,7 @@ public static class MarkdownRenderer
         sb.Append('\n');
         foreach (var note in cmd.Notes)
         {
-            sb.Append(note);
+            sb.Append(EscapeMdxText(note));
             if (!note.EndsWith('\n')) sb.Append('\n');
             sb.Append('\n');
         }
@@ -121,6 +123,16 @@ public static class MarkdownRenderer
         }
         return sb.ToString();
     }
+
+    /// <summary>
+    ///     Escapes `&lt;` and `&gt;` in free-form prose so Docusaurus' MDX parser doesn't
+    ///     interpret literal placeholders like <c>&lt;OverlayName&gt;</c> as opening JSX tags
+    ///     and fail the docs build with <c>end-tag-mismatch</c>. Applied only to prose fields
+    ///     (description, sample description, arg help, notes); code fences and the canonical
+    ///     <c>&lt;long&gt;</c> placeholder live inside fenced blocks where MDX is inert.
+    /// </summary>
+    private static string EscapeMdxText(string s)
+        => s.Replace("<", "&lt;").Replace(">", "&gt;");
 
     /// <summary>
     ///     Canonical example used when a command has no <c>GetDocumentation()</c> override:
