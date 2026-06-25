@@ -127,7 +127,7 @@ Environment variables are prefixed with `OCTO_`.
 |----------|----------|---------|
 | Identity | users, roles, clients (+ mirror commands: GetClientMirrors, ProvisionClientInExistingTenants, ProvisionClientInTenant, UnprovisionClientFromTenant, SetClientAutoProvision, ApplyClientOverlay, CleanClientOverlays), identityProviders, groups, emailDomainGroupRules, externalTenantUserMappings, adminProvisioning, apiResources, apiScopes | Identity Services |
 | Asset | tenants, models, blueprints (ListBlueprints, InstallBlueprint, GetBlueprintHistory, PreviewBlueprintUpdate, UpdateBlueprint, ListBlueprintBackups, RollbackBlueprint, ListBlueprintInstallations, UninstallBlueprint), timeSeries (EnableStreamData, DisableStreamData, ActivateArchive, DisableArchive, EnableArchive, RetryArchiveActivation, DeleteArchive, FreezeRollupArchive, UnfreezeRollupArchive, RewindRollupWatermark, ListRollupsForArchive) | Asset Repository |
-| Bots | Dump, Restore, RunFixupScripts | Bot Services |
+| Bots | Dump, Restore, ExportArchiveData, ImportArchiveData, RunFixupScripts | Bot Services |
 | Communication | enable/disable, adapters, pipelines (incl. MovePipelines for bulk reassignment to a different adapter), triggers, pools, dataFlows, workloads (GetWorkloadsByChart, UpdateWorkloadChartVersion, DeployWorkload, UndeployWorkload) | Communication Controller |
 | Reporting | enable/disable | Report Services |
 | AI Services | EnableAi, DisableAi, RedeemAiTicket (anonymous — bastion-side), GetAiCredentialsStatus, RevokeAiCredentials | AI Services |
@@ -210,6 +210,20 @@ octo-cli -c RetryArchiveActivation -id 69fda707d47638c68edc7fea # only from Fail
 octo-cli -c DeleteArchive -id 69fda707d47638c68edc7fea          # destructive — drops table, lose data
 octo-cli -c DeleteArchive -id 69fda707d47638c68edc7fea -y       # skip confirmation
 octo-cli -c DisableStreamData
+
+# Archive data export / import (AB#4230) — move archive row data between tenants/environments.
+# Export the whole archive to a ZIP (starts a bot job, waits, then downloads the result).
+octo-cli -c ExportArchiveData -tid mytenant -aid 69fda707d47638c68edc7fea -o ./archive-export.zip
+# Export only a half-open time slice [fromUtc, toUtc) (ISO-8601 UTC; omit both for whole archive).
+octo-cli -c ExportArchiveData -tid mytenant -aid 69fda707d47638c68edc7fea \
+  -from 2026-05-11T00:00:00Z -to 2026-05-12T00:00:00Z -o ./archive-slice.zip
+# Import a ZIP into a target archive. The target archive MUST be Disabled during import (§7.1):
+#   octo-cli -c DisableArchive -id <archiveRtId>
+#   octo-cli -c ImportArchiveData -tid mytenant -aid <archiveRtId> -i ./archive-export.zip -w
+#   octo-cli -c EnableArchive -id <archiveRtId>
+# Default mode is InsertOnly; use Upsert for windowed (time-range / rollup) archives.
+octo-cli -c ImportArchiveData -tid mytenant -aid 69fda707d47638c68edc7fea -i ./archive-export.zip -m Upsert -w
+# -w waits for the job to finish and surfaces the bot's error (schema mismatch / archive-not-Disabled) verbatim.
 
 # Rollup archive operations (rollup-archives concept §9)
 octo-cli -c ListRollupsForArchive -id <sourceArchiveRtId>       # list rollups attached to a source archive

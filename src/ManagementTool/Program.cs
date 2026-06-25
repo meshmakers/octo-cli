@@ -335,6 +335,8 @@ internal static class Program
         services.AddTransient<ICommand, UpdateSystemCkModelTenant>();
         services.AddTransient<ICommand, DumpTenant>();
         services.AddTransient<ICommand, RestoreTenant>();
+        services.AddTransient<ICommand, ExportArchiveData>();
+        services.AddTransient<ICommand, ImportArchiveData>();
 
         services.AddTransient<ICommand, GetUsers>();
         services.AddTransient<ICommand, CreateUser>();
