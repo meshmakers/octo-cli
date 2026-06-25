@@ -13,6 +13,7 @@ internal class RestoreTenant : JobWithWaitOctoCommand
     private readonly IArgument _tenantIdArg;
     private readonly IArgument _fileArg;
     private readonly IArgument _oldDatabaseNameArg;
+    private readonly IArgument _restoreArchiveDataArg;
 
     public RestoreTenant(ILogger<RestoreTenant> logger, IOptions<OctoToolOptions> options,
         IBotServicesClient botServicesClient, IAuthenticationService authenticationService)
@@ -26,6 +27,9 @@ internal class RestoreTenant : JobWithWaitOctoCommand
             1);
         _fileArg = CommandArgumentValue.AddArgument("f", "file", ["File of backup (*.tar.gz)"], true, 1);
         _oldDatabaseNameArg = CommandArgumentValue.AddArgument("oldDb", "oldDatabaseName", ["Name of the old database (if different to new database name)"], false, 1);
+        _restoreArchiveDataArg = CommandArgumentValue.AddArgument("rad", "restore-archive-data",
+            ["Restore CrateDB archive data contained in an '*.octobak.zip' backup (no-op on a plain '*.tar.gz')"],
+            false, 0);
     }
 
     public override CommandDocumentation? GetDocumentation() =>
@@ -39,6 +43,19 @@ internal class RestoreTenant : JobWithWaitOctoCommand
                     new CodeSampleArgument(_waitForJobArg),
                 ],
                     description: "Basic usage"),
+                new CodeSample(arguments: [
+                    new CodeSampleArgument(_tenantIdArg, "mytenant"),
+                    new CodeSampleArgument(_databaseArg, "mytenant_db"),
+                    new CodeSampleArgument(_fileArg, "./backup.octobak.zip"),
+                    new CodeSampleArgument(_restoreArchiveDataArg),
+                    new CodeSampleArgument(_waitForJobArg),
+                ],
+                    description: "Restore CrateDB archive data from an '*.octobak.zip' backup"),
+            ],
+            Notes:
+            [
+                "--restore-archive-data restores archives to their backed-up state; it is a no-op on a plain '*.tar.gz' backup.",
+                "The target tenant's archive schemas must match those in the backup; mismatched archives are skipped and reported.",
             ]
         );
 
@@ -53,9 +70,11 @@ internal class RestoreTenant : JobWithWaitOctoCommand
             oldDatabaseName = CommandArgumentValue.GetArgumentScalarValue<string>(_oldDatabaseNameArg);
         }
 
+        var restoreArchiveData = CommandArgumentValue.IsArgumentUsed(_restoreArchiveDataArg);
+
         Logger.LogInformation(
-            "Restoring tenant \'{TenantId}\' (database \'{DatabaseName}\') at \'{ServiceClientServiceUri}\'. Old database name: \'{oldDatabaseName}\'", tenantId,
-            databaseName, ServiceClient.ServiceUri, oldDatabaseName ?? databaseName);
+            "Restoring tenant \'{TenantId}\' (database \'{DatabaseName}\') at \'{ServiceClientServiceUri}\'. Old database name: \'{oldDatabaseName}\', restore archive data: {RestoreArchiveData}", tenantId,
+            databaseName, ServiceClient.ServiceUri, oldDatabaseName ?? databaseName, restoreArchiveData);
 
         if (string.IsNullOrEmpty(tenantId))
         {
@@ -68,7 +87,8 @@ internal class RestoreTenant : JobWithWaitOctoCommand
         }
         
         var response = await ServiceClient.RestoreRepositoryWithTusAsync(tenantId, databaseName, filePath, oldDatabaseName,
-            progress =>
+            restoreArchiveData: restoreArchiveData,
+            progressCallback: progress =>
             {
                 Logger.LogInformation("Upload progress: {Progress:P0}", progress);
             });
