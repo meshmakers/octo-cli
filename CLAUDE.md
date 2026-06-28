@@ -126,7 +126,7 @@ Environment variables are prefixed with `OCTO_`.
 | Category | Commands | Service |
 |----------|----------|---------|
 | Identity | users, roles, clients (+ mirror commands: GetClientMirrors, ProvisionClientInExistingTenants, ProvisionClientInTenant, UnprovisionClientFromTenant, SetClientAutoProvision, ApplyClientOverlay, CleanClientOverlays), identityProviders, groups, emailDomainGroupRules, externalTenantUserMappings, adminProvisioning, apiResources, apiScopes | Identity Services |
-| Asset | tenants, models, blueprints (ListBlueprints, InstallBlueprint, GetBlueprintHistory, PreviewBlueprintUpdate, UpdateBlueprint, ListBlueprintBackups, RollbackBlueprint, ListBlueprintInstallations, UninstallBlueprint), timeSeries (EnableStreamData, DisableStreamData, ActivateArchive, DisableArchive, EnableArchive, RetryArchiveActivation, DeleteArchive, FreezeRollupArchive, UnfreezeRollupArchive, RewindRollupWatermark, ListRollupsForArchive) | Asset Repository |
+| Asset | tenants, models, blueprints (ListBlueprints, InstallBlueprint, GetBlueprintHistory, PreviewBlueprintUpdate, UpdateBlueprint, ListBlueprintBackups, RollbackBlueprint, ListBlueprintInstallations, UninstallBlueprint), timeSeries (EnableStreamData, DisableStreamData, ActivateArchive, DisableArchive, EnableArchive, RetryArchiveActivation, DeleteArchive, FreezeRollupArchive, UnfreezeRollupArchive, RewindRollupWatermark, ListRollupsForArchive, RecomputeArchive, ListRecomputeJobs) | Asset Repository |
 | Bots | Dump, Restore, ExportArchiveData, ImportArchiveData, RunFixupScripts | Bot Services |
 | Communication | enable/disable, adapters, pipelines (incl. MovePipelines for bulk reassignment to a different adapter), triggers, pools, dataFlows, workloads (GetWorkloadsByChart, UpdateWorkloadChartVersion, DeployWorkload, UndeployWorkload) | Communication Controller |
 | Reporting | enable/disable | Report Services |
@@ -231,6 +231,11 @@ octo-cli -c FreezeRollupArchive -id <rollupRtId> -u 2026-05-11T14:00:00Z   # set
 octo-cli -c UnfreezeRollupArchive -id <rollupRtId>              # clear FrozenUntil (idempotent)
 octo-cli -c UnfreezeRollupArchive -id <rollupRtId> -ag          # accept resulting gaps
 octo-cli -c RewindRollupWatermark -id <rollupRtId> -t 2026-05-11T10:00:00Z # re-aggregate from boundary
+
+# Optimistic rollup recompute (AB#4184) — recompute a window range with no-mixed-read swap
+octo-cli -c RecomputeArchive -id <rollupRtId> -f 2026-05-11T00:00:00Z -t 2026-05-12T00:00:00Z   # recompute [from, to)
+octo-cli -c RecomputeArchive -id <rollupRtId> -f 2026-05-11T00:00:00Z -t 2026-05-12T00:00:00Z -s <rtId>  # scoped to one entity
+octo-cli -c ListRecomputeJobs -id <rollupRtId>                 # recent recompute jobs (debug failures)
 
 # Groups management
 octo-cli -c GetGroups
