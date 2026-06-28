@@ -289,6 +289,13 @@ internal static class Program
         // AB#4209 Step 5 PR 4' — overlay URI cleanup (companion to ApplyClientOverlay)
         services.AddTransient<ICommand, CleanClientOverlays>();
 
+        // AB#4183 — client role / group assignment
+        services.AddTransient<ICommand, AddClientToRole>();
+        services.AddTransient<ICommand, RemoveClientFromRole>();
+        services.AddTransient<ICommand, UpdateClientRoles>();
+        services.AddTransient<ICommand, AddClientToGroup>();
+        services.AddTransient<ICommand, RemoveClientFromGroup>();
+
         services.AddTransient<ICommand, GetIdentityProviders>();
         services.AddTransient<ICommand, AddOAuthIdentityProvider>();
         services.AddTransient<ICommand, AddOpenLdapIdentityProvider>();

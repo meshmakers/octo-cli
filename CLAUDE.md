@@ -243,6 +243,14 @@ octo-cli -c RemoveUserFromGroup -id <groupId> -uid <userId>
 octo-cli -c AddGroupToGroup -id <parentGroupId> -cgid <childGroupId>
 octo-cli -c RemoveGroupFromGroup -id <parentGroupId> -cgid <childGroupId>
 
+# Client role / group assignment (AB#4183) — lets a client_credentials client act as a
+# role-protected caller. Roles flow into the client's access token (direct + group-inherited).
+octo-cli -c AddClientToRole -id ci-deploy -r DataAnalyst          # assign a role by name
+octo-cli -c RemoveClientFromRole -id ci-deploy -r DataAnalyst     # remove a role (-y to skip confirm)
+octo-cli -c UpdateClientRoles -id ci-deploy -rids "660...02,660...09"  # replace-all by role id
+octo-cli -c AddClientToGroup -id <groupRtId> -cid <clientRtId>    # add client (by RtId) to a group
+octo-cli -c RemoveClientFromGroup -id <groupRtId> -cid <clientRtId>
+
 # Email domain group rules
 octo-cli -c GetEmailDomainGroupRules
 octo-cli -c CreateEmailDomainGroupRule -edp "meshmakers.com" -tgid <groupRtId>
@@ -448,6 +456,7 @@ All destructive commands (Delete, Clean, Reset, Remove) require interactive user
 | `DeleteUser` | `delete user '{name}'` |
 | `ResetPassword` | `reset the password for user '{name}'` |
 | `RemoveUserFromRole` | `remove user '{name}' from role '{roleName}'` |
+| `RemoveClientFromRole` | `remove client '{clientId}' from role '{roleName}'` |
 | `DeleteRole` | `delete role '{name}'` |
 | `DeleteClient` | `delete client '{clientId}'` |
 | `DeleteIdentityProvider` | `delete identity provider '{rtId}'` |
