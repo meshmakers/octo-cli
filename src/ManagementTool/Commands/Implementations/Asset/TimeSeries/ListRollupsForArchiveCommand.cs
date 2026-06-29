@@ -56,6 +56,16 @@ public class ListRollupsForArchiveCommand : ServiceClientOctoCommand<IStreamData
                 r.LastAggregatedBucketEnd?.ToString("O") ?? "<unset>",
                 r.FrozenUntil?.ToString("O") ?? "<not frozen>",
                 r.AggregationCount);
+            // Recompute health (AB#4184) — surfaced as a second line so the steady-state view stays
+            // compact while failures / pending work are still visible for debugging.
+            Logger.LogInformation(
+                "      recompute: inProgress={InProgress}, dirtyWindows={Dirty}, pendingRanges={Pending}, lastSuccess={Success}, lastFailure={Failure}{Reason}",
+                r.RecomputeInProgress,
+                r.DirtyWindowsPending,
+                r.PendingRecomputeRanges,
+                r.LastRecomputeSuccessAt?.ToString("O") ?? "<never>",
+                r.LastRecomputeFailureAt?.ToString("O") ?? "<none>",
+                string.IsNullOrEmpty(r.LastRecomputeFailureReason) ? "" : $" ({r.LastRecomputeFailureReason})");
         }
     }
 }
