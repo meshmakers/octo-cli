@@ -74,6 +74,12 @@ The CLI supports multiple authentication methods:
    - User authenticates in browser
    - CLI receives access token plus a refresh token (device flow requests `offline_access`)
    - Token stored in the active context's `Authentication` block in `~/.octo-cli/contexts.json`
+   - **`--if-needed` (`-in`)**: non-disruptive variant. Before starting the device
+     flow, the command checks whether the stored access token is still valid; if not,
+     it tries a silent refresh-token exchange. The device flow is only started when
+     both fail. Combine with `-i` so the browser opens automatically in that fallback
+     case. Ideal for setup scripts that re-run often (e.g. tenant init) — the user is
+     only prompted when the refresh token is missing or expired.
 
 2. **Client Credentials Flow** (non-interactive — pipelines, cron jobs, headless servers, container entrypoints, batch scripts, bots, etc.):
    - Operator creates a per-tenant client once: `octo-cli -c AddClientCredentialsClient -id <id> -n "<name>" -s <secret>`
@@ -150,6 +156,10 @@ octo-cli -c ListContexts -j         # JSON output for scripting (tokens never in
 
 # Login via device code flow (tokens saved to active context)
 octo-cli -c LogIn
+
+# Non-disruptive login: reuse the valid token or refresh it silently, and only
+# open a browser if neither works (great for re-runnable setup scripts).
+octo-cli -c LogIn -i --if-needed
 
 # Non-interactive login (pipelines, cron jobs, headless scripts, etc.)
 # Tenant comes from the active context.
