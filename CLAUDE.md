@@ -132,7 +132,7 @@ Environment variables are prefixed with `OCTO_`.
 | Category | Commands | Service |
 |----------|----------|---------|
 | Identity | users, roles, clients (+ mirror commands: GetClientMirrors, ProvisionClientInExistingTenants, ProvisionClientInTenant, UnprovisionClientFromTenant, SetClientAutoProvision, ApplyClientOverlay, CleanClientOverlays), identityProviders, groups, emailDomainGroupRules, externalTenantUserMappings, adminProvisioning, apiResources, apiScopes | Identity Services |
-| Asset | tenants, models, blueprints (ListBlueprints, InstallBlueprint, GetBlueprintHistory, PreviewBlueprintUpdate, UpdateBlueprint, ListBlueprintBackups, RollbackBlueprint, ListBlueprintInstallations, UninstallBlueprint), timeSeries (EnableStreamData, DisableStreamData, ActivateArchive, DisableArchive, EnableArchive, RetryArchiveActivation, DeleteArchive, FreezeRollupArchive, UnfreezeRollupArchive, RewindRollupWatermark, ListRollupsForArchive, RecomputeArchive, ListRecomputeJobs, AddComputedColumn, RemoveComputedColumn) | Asset Repository |
+| Asset | tenants, models, blueprints (ListBlueprints, InstallBlueprint, GetBlueprintHistory, PreviewBlueprintUpdate, UpdateBlueprint, ListBlueprintBackups, RollbackBlueprint, ListBlueprintInstallations, UninstallBlueprint), timeSeries (EnableStreamData, DisableStreamData, ActivateArchive, DisableArchive, EnableArchive, RetryArchiveActivation, DeleteArchive, FreezeRollupArchive, UnfreezeRollupArchive, RewindRollupWatermark, ListRollupsForArchive, RecomputeArchive, ListRecomputeJobs, AddComputedColumn, RemoveComputedColumn, UpdateComputedColumnFormula) | Asset Repository |
 | Bots | Dump, Restore, ExportArchiveData, ImportArchiveData, RunFixupScripts | Bot Services |
 | Communication | enable/disable, adapters, pipelines (incl. MovePipelines for bulk reassignment to a different adapter), triggers, pools, dataFlows, workloads (GetWorkloadsByChart, UpdateWorkloadChartVersion, DeployWorkload, UndeployWorkload) | Communication Controller |
 | Reporting | enable/disable | Report Services |
@@ -251,6 +251,7 @@ octo-cli -c ListRecomputeJobs -id <rollupRtId>                 # recent recomput
 octo-cli -c AddComputedColumn -id <archiveRtId> -n powerFactor -f "activePower / apparentPower" -r Double
 octo-cli -c AddComputedColumn -id <archiveRtId> -n flag -f "voltage > 230" -r Boolean -x false  # not indexed
 octo-cli -c RemoveComputedColumn -id <archiveRtId> -n powerFactor    # rejected if another computed column references it
+octo-cli -c UpdateComputedColumnFormula -id <archiveRtId> -n powerFactor -f "activePower / (apparentPower + 1)"  # optimistic backfill + atomic swap
 
 # Groups management
 octo-cli -c GetGroups
