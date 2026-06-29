@@ -8,7 +8,6 @@ namespace Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations;
 
 internal class ConfigOctoCommand : Command<OctoToolOptions>
 {
-    private readonly IArgument _adminPanelUriArg;
     private readonly IArgument _assetServicesUriArg;
     private readonly IArgument _botServicesUriArg;
     private readonly IArgument _communicationServicesUriArg;
@@ -32,8 +31,6 @@ internal class ConfigOctoCommand : Command<OctoToolOptions>
             ["URI of identity services (e. g. 'https://localhost:5003/')"], true, 1);
         _communicationServicesUriArg = CommandArgumentValue.AddArgument("csu", "communicationServicesUri",
             ["URI of communication services (e. g. 'https://localhost:5015/')"], 1);
-        _adminPanelUriArg = CommandArgumentValue.AddArgument("apu", "adminPanelUri",
-            ["URI of admin panel (e. g. 'https://localhost:5005/')"], 1);
         _tenantIdArg = CommandArgumentValue.AddArgument("tid", "tenantId",
             ["Id of tenant (e. g. 'meshtest')"], 1);
         _reportingServicesUriArg = CommandArgumentValue.AddArgument("rsu", "reportingServicesUri",
@@ -83,10 +80,6 @@ internal class ConfigOctoCommand : Command<OctoToolOptions>
 
         Options.Value.AiServiceUrl = CommandArgumentValue.IsArgumentUsed(_aiServicesUriArg)
             ? CommandArgumentValue.GetArgumentScalarValue<string>(_aiServicesUriArg).ToLower()
-            : null;
-
-        Options.Value.AdminPanelUrl = CommandArgumentValue.IsArgumentUsed(_adminPanelUriArg)
-            ? CommandArgumentValue.GetArgumentScalarValue<string>(_adminPanelUriArg).ToLower()
             : null;
 
         if (CommandArgumentValue.IsArgumentUsed(_identityServicesUriArg))

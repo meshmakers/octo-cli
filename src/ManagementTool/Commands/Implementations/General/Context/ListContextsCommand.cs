@@ -116,7 +116,6 @@ internal class ListContextsCommand : Command<OctoToolOptions>
         _consoleService.WriteLine($"  Communication Service:  {o.CommunicationServiceUrl ?? "(not set)"}");
         _consoleService.WriteLine($"  Reporting Service:      {o.ReportingServiceUrl ?? "(not set)"}");
         _consoleService.WriteLine($"  AI Service:             {o.AiServiceUrl ?? "(not set)"}");
-        _consoleService.WriteLine($"  Admin Panel:            {o.AdminPanelUrl ?? "(not set)"}");
         _consoleService.WriteLine($"  Auth:                   {DescribeAuth(entry.Authentication)}");
     }
 
@@ -174,8 +173,7 @@ internal class ListContextsCommand : Command<OctoToolOptions>
                     bot = c.Entry.OctoToolOptions.BotServiceUrl,
                     communication = c.Entry.OctoToolOptions.CommunicationServiceUrl,
                     reporting = c.Entry.OctoToolOptions.ReportingServiceUrl,
-                    ai = c.Entry.OctoToolOptions.AiServiceUrl,
-                    adminPanel = c.Entry.OctoToolOptions.AdminPanelUrl
+                    ai = c.Entry.OctoToolOptions.AiServiceUrl
                 },
                 authStatus,
                 accessTokenExpiresAt = auth.AccessTokenExpiresAt,

@@ -29,7 +29,6 @@ using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Identity.
 using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Identity.Users;
 using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Reporting;
 using Meshmakers.Octo.Frontend.ManagementTool.Services;
-using Meshmakers.Octo.Sdk.ServiceClient.AdminPanel.System;
 using Meshmakers.Octo.Sdk.ServiceClient.AiServices;
 using Meshmakers.Octo.Sdk.ServiceClient.AssetRepositoryServices.System;
 using Meshmakers.Octo.Sdk.ServiceClient.AssetRepositoryServices.Tenants;
@@ -109,7 +108,6 @@ internal static class Program
             options.CommunicationServiceUrl = activeContext.OctoToolOptions.CommunicationServiceUrl;
             options.ReportingServiceUrl = activeContext.OctoToolOptions.ReportingServiceUrl;
             options.AiServiceUrl = activeContext.OctoToolOptions.AiServiceUrl;
-            options.AdminPanelUrl = activeContext.OctoToolOptions.AdminPanelUrl;
             options.TenantId = activeContext.OctoToolOptions.TenantId;
         });
 
@@ -198,10 +196,6 @@ internal static class Program
                 (options, toolOptions) => options.EndpointUri = toolOptions.Value.AssetServiceUrl
             );
 
-        services.AddOptions<AdminPanelClientOptions>()
-            .Configure<IOptions<OctoToolOptions>>(
-                (options, toolOptions) => { options.EndpointUri = toolOptions.Value.AdminPanelUrl; });
-
         services.AddOptions<ReportingServicesClientOptions>()
             .Configure<IOptions<OctoToolOptions>>(
                 (options, toolOptions) =>
@@ -213,7 +207,6 @@ internal static class Program
         services.AddSingleton<IBotServiceClientAccessToken, ServiceClientAccessToken>();
         services.AddSingleton<IIdentityServiceClientAccessToken, ServiceClientAccessToken>();
         services.AddSingleton<IAssetServiceClientAccessToken, ServiceClientAccessToken>();
-        services.AddSingleton<IAdminPanelClientAccessToken, ServiceClientAccessToken>();
         services.AddSingleton<ICommunicationServiceClientAccessToken, ServiceClientAccessToken>();
         services.AddSingleton<IStreamDataServiceClientAccessToken, ServiceClientAccessToken>();
         services.AddSingleton<IReportingServicesClientAccessToken, ServiceClientAccessToken>();
@@ -226,7 +219,6 @@ internal static class Program
         services.AddSingleton<IBotServicesClient, BotServicesClient>();
         services.AddSingleton<IAuthenticatorClient, AuthenticatorClient>();
         services.AddSingleton<IAuthenticationService, AuthenticationService>();
-        services.AddSingleton<IAdminPanelClient, AdminPanelClient>();
         services.AddSingleton<ICommunicationServicesClient, CommunicationServicesClient>();
         services.AddSingleton<IStreamDataServicesClient, StreamDataServicesClient>();
         services.AddSingleton<IReportingServicesClient, ReportingServicesClient>();

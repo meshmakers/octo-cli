@@ -9,6 +9,5 @@ public class OctoToolOptions
     public string? ReportingServiceUrl { get; set; }
     public string? AiServiceUrl { get; set; }
 
-    public string? AdminPanelUrl { get; set; }
     public string? TenantId { get; set; }
 }
