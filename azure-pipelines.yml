@@ -80,6 +80,7 @@ steps:
     clean: true
   - template: templates/steps/set-version.yml@pipelineTemplates
   - task: DotNetCoreCLI@2
+    retryCountOnTaskFailure: 2
     displayName: 'Run tests'
     inputs:
       command: 'test'
