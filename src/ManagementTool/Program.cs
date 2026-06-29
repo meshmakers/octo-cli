@@ -447,6 +447,8 @@ internal static class Program
         services.AddTransient<ICommand, ListRollupsForArchiveCommand>();
         services.AddTransient<ICommand, RecomputeArchiveCommand>();
         services.AddTransient<ICommand, ListRecomputeJobsCommand>();
+        services.AddTransient<ICommand, AddComputedColumnCommand>();
+        services.AddTransient<ICommand, RemoveComputedColumnCommand>();
 
         services.AddTransient<ICommand, EnableReportingCommand>();
         services.AddTransient<ICommand, DisableReportingCommand>();
