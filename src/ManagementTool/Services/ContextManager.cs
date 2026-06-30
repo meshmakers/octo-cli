@@ -21,10 +21,16 @@ public class ContextManager : IContextManager
     private ContextConfiguration _configuration;
 
     public ContextManager()
+        : this(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile))
     {
-        _directoryPath = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
-            $".{Constants.OctoToolUserFolderName}");
+    }
+
+    // baseDirectory is the parent of the ".octo-cli" folder; the parameterless
+    // constructor uses the user profile. The overload exists so tests can point at
+    // a throwaway directory instead of the developer's real ~/.octo-cli.
+    public ContextManager(string baseDirectory)
+    {
+        _directoryPath = Path.Combine(baseDirectory, $".{Constants.OctoToolUserFolderName}");
         _contextsFilePath = Path.Combine(_directoryPath, "contexts.json");
         _settingsFilePath = Path.Combine(_directoryPath, "settings.json");
         _configuration = new ContextConfiguration();
@@ -41,7 +47,24 @@ public class ContextManager : IContextManager
         var json = File.ReadAllText(_contextsFilePath);
         _configuration = JsonSerializer.Deserialize<ContextConfiguration>(json, JsonOptions)
                          ?? new ContextConfiguration();
+        NormalizeContextComparer();
         return _configuration;
+    }
+
+    // Context names are matched case-insensitively (like kubectl). System.Text.Json
+    // always deserializes a Dictionary with the ordinal (case-sensitive) comparer
+    // regardless of the property initializer, so rebuild it with OrdinalIgnoreCase
+    // after every load/migrate. On a case-only collision the last entry wins, which
+    // mirrors how the names are treated as the same context from now on.
+    private void NormalizeContextComparer()
+    {
+        if (_configuration.Contexts.Comparer.Equals(StringComparer.OrdinalIgnoreCase))
+        {
+            return;
+        }
+
+        _configuration.Contexts =
+            new Dictionary<string, ContextEntry>(_configuration.Contexts, StringComparer.OrdinalIgnoreCase);
     }
 
     public void Save(ContextConfiguration configuration)
@@ -96,12 +119,15 @@ public class ContextManager : IContextManager
 
     public void SetActiveContext(string name)
     {
-        if (!_configuration.Contexts.ContainsKey(name))
+        // Contexts is keyed case-insensitively; resolve to the stored key so the
+        // persisted ActiveContext matches an actual context name exactly.
+        if (!_configuration.Contexts.TryGetValue(name, out _))
         {
             throw new ToolException($"Context '{name}' does not exist.");
         }
 
-        _configuration.ActiveContext = name;
+        _configuration.ActiveContext =
+            _configuration.Contexts.Keys.First(k => StringComparer.OrdinalIgnoreCase.Equals(k, name));
         SaveToFile();
     }
 
@@ -149,7 +175,10 @@ public class ContextManager : IContextManager
             _configuration = new ContextConfiguration
             {
                 ActiveContext = "default",
-                Contexts = new Dictionary<string, ContextEntry> { ["default"] = entry }
+                Contexts = new Dictionary<string, ContextEntry>(StringComparer.OrdinalIgnoreCase)
+                {
+                    ["default"] = entry
+                }
             };
 
             SaveToFile();
