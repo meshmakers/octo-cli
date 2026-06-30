@@ -438,6 +438,7 @@ internal static class Program
         services.AddTransient<ICommand, RewindRollupWatermarkCommand>();
         services.AddTransient<ICommand, ListRollupsForArchiveCommand>();
         services.AddTransient<ICommand, RecomputeArchiveCommand>();
+        services.AddTransient<ICommand, BackfillRollupCommand>();
         services.AddTransient<ICommand, ListRecomputeJobsCommand>();
         services.AddTransient<ICommand, AddComputedColumnCommand>();
         services.AddTransient<ICommand, RemoveComputedColumnCommand>();
