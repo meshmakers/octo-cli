@@ -52,11 +52,23 @@ src/
 │   ├── Program.cs            # Entry point
 │   └── Runner.cs             # Command execution orchestrator
 └── GraphQlDtos/              # GraphQL DTOs for service communication
+
+tests/
+├── CommandReferenceGenerator.Tests/  # Tests for the Roslyn doc generator
+└── ManagementTool.Tests/             # Unit tests for the CLI service layer (xUnit)
 ```
+
+Tests run via `dotnet test Octo.Cli.sln`; the CI pipeline (`azure-pipelines.yml`,
+`-c Release`) discovers every test project in the solution automatically, so a new
+test project only needs to be added to the solution — no pipeline change. Locally,
+build/test in `DebugL` (the local NuGet feed has the current 999.0.0 service-client
+packages; `Release` resolves them from the private CI feed). `ContextManager` exposes
+a `ContextManager(string baseDirectory)` constructor so tests use a throwaway
+directory instead of the real `~/.octo-cli`.
 
 ### Key Components
 
-- **ContextManager** (`Services/ContextManager.cs`): Manages named contexts stored in `~/.octo-cli/contexts.json`. Each context holds its own `OctoToolOptions` (service URIs, tenant) and `OctoToolAuthenticationOptions` (tokens). Supports migration from legacy `settings.json`.
+- **ContextManager** (`Services/ContextManager.cs`): Manages named contexts stored in `~/.octo-cli/contexts.json`. Each context holds its own `OctoToolOptions` (service URIs, tenant) and `OctoToolAuthenticationOptions` (tokens). Supports migration from legacy `settings.json`. **Context names are matched case-insensitively** (`StringComparer.OrdinalIgnoreCase`), so `UseContext`/`RemoveContext` accept any casing; the active context is persisted using the stored key's canonical casing. Because System.Text.Json deserializes the `Contexts` dictionary with the ordinal comparer, `Load()` rebuilds it with `OrdinalIgnoreCase` after reading the file.
 
 - **AuthenticationService** (`Services/AuthenticationService.cs`): Handles OAuth token management. Saves tokens to the active context via `IContextManager`. Supports both access tokens and refresh tokens.
 
@@ -90,7 +102,7 @@ The CLI supports multiple authentication methods:
 
 ### Token Storage & Context Management
 
-The CLI uses named contexts (similar to `kubectl config use-context`) stored in `~/.octo-cli/contexts.json`. Each context holds service URIs, tenant ID, and authentication tokens independently:
+The CLI uses named contexts (similar to `kubectl config use-context`) stored in `~/.octo-cli/contexts.json`. Each context holds service URIs, tenant ID, and authentication tokens independently. Context names are matched case-insensitively, so `UseContext -n Local_OctoSystem` resolves to a stored `local_octosystem` context:
 
 ```json
 {
