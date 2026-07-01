@@ -193,14 +193,18 @@ internal static class Program
 
         services.AddOptions<StreamDataServiceClientOptions>()
             .Configure<IOptions<OctoToolOptions>>(
-                (options, toolOptions) => options.EndpointUri = toolOptions.Value.AssetServiceUrl
-            );
+                (options, toolOptions) =>
+                {
+                    options.EndpointUri = toolOptions.Value.AssetServiceUrl;
+                    options.TenantId = toolOptions.Value.TenantId;
+                });
 
         services.AddOptions<ReportingServicesClientOptions>()
             .Configure<IOptions<OctoToolOptions>>(
                 (options, toolOptions) =>
                 {
                     options.EndpointUri = toolOptions.Value.ReportingServiceUrl;
+                    options.TenantId = toolOptions.Value.TenantId;
                 });
 
         services.AddSingleton<ITenantClientAccessToken, ServiceClientAccessToken>();

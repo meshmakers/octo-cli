@@ -153,6 +153,14 @@ Environment variables are prefixed with `OCTO_`.
 | General | login, loginClientCredentials, authStatus, config | Local operations |
 | Context | addContext, removeContext, useContext, listContexts | Local operations |
 
+> **AB#4287 — tenant-scoped service clients.** The StreamData and Reporting service clients
+> are now tenant-scoped (like Communication): `Program.cs` sets `TenantId` (from the active
+> context) on `StreamDataServiceClientOptions` and `ReportingServicesClientOptions`. The SDK
+> routes these to `{tenantId}/v1` and throws `ServiceConfigurationMissingException` if the
+> active context has no `TenantId`, so `EnableStreamData` / archive / rollup / computed-column
+> commands and `EnableReporting` / `DisableReporting` require a context with a tenant set. The
+> former system-scoped enable/disable endpoints were removed server-side.
+
 ## Common Operations
 
 ```bash
