@@ -258,9 +258,11 @@ octo-cli -c RewindRollupWatermark -id <rollupRtId> -t 2026-05-11T10:00:00Z # re-
 octo-cli -c RecomputeArchive -id <rollupRtId> -f 2026-05-11T00:00:00Z -t 2026-05-12T00:00:00Z   # recompute [from, to)
 octo-cli -c RecomputeArchive -id <rollupRtId> -f 2026-05-11T00:00:00Z -t 2026-05-12T00:00:00Z -s <rtId>  # scoped to one entity
 octo-cli -c ListRecomputeJobs -id <rollupRtId>                 # recent recompute jobs (debug failures)
-# Backfill a rollup over the ENTIRE history of its source archive (AB#4269) — no timestamp needed.
-# Resolves the source's earliest timestamp and recomputes [sourceMin, now) over the recompute path.
-octo-cli -c BackfillRollup -id <rollupRtId>                    # populate / reset whole rollup from source
+# Backfill a rollup over the ENTIRE history of its source archive (AB#4269 / AB#4286) — no timestamp needed.
+# Durable background job: enqueues a recompute of [sourceMin, now) and returns the Pending job id
+# immediately (never cancelled by a client HTTP timeout; survives an asset-repo restart).
+octo-cli -c BackfillRollup -id <rollupRtId>                    # queue whole-history backfill, return job id
+octo-cli -c BackfillRollup -id <rollupRtId> -w                # queue, then poll the job until it completes
 
 # Computed columns (AB#4189) — add a formula-derived column to a live archive and backfill it
 octo-cli -c AddComputedColumn -id <archiveRtId> -n powerFactor -f "activePower / apparentPower" -r Double
