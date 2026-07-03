@@ -256,6 +256,7 @@ internal static class Program
         services.AddTransient<ICommand, RefreshCatalogsCommand>();
 
         services.AddTransient<ICommand, ListBlueprints>();
+        services.AddTransient<ICommand, RefreshBlueprintCatalogs>();
         services.AddTransient<ICommand, InstallBlueprint>();
         services.AddTransient<ICommand, GetBlueprintHistory>();
         services.AddTransient<ICommand, PreviewBlueprintUpdate>();

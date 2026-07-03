@@ -144,7 +144,7 @@ Environment variables are prefixed with `OCTO_`.
 | Category | Commands | Service |
 |----------|----------|---------|
 | Identity | users, roles, clients (+ mirror commands: GetClientMirrors, ProvisionClientInExistingTenants, ProvisionClientInTenant, UnprovisionClientFromTenant, SetClientAutoProvision, ApplyClientOverlay, CleanClientOverlays), identityProviders, groups, emailDomainGroupRules, externalTenantUserMappings, adminProvisioning, apiResources, apiScopes | Identity Services |
-| Asset | tenants, models, blueprints (ListBlueprints, InstallBlueprint, GetBlueprintHistory, PreviewBlueprintUpdate, UpdateBlueprint, ListBlueprintBackups, RollbackBlueprint, ListBlueprintInstallations, UninstallBlueprint), timeSeries (EnableStreamData, DisableStreamData, ActivateArchive, DisableArchive, EnableArchive, RetryArchiveActivation, DeleteArchive, FreezeRollupArchive, UnfreezeRollupArchive, RewindRollupWatermark, ListRollupsForArchive, RecomputeArchive, BackfillRollup, ListRecomputeJobs, AddComputedColumn, RemoveComputedColumn, UpdateComputedColumnFormula) | Asset Repository |
+| Asset | tenants, models, blueprints (ListBlueprints, RefreshBlueprintCatalogs, InstallBlueprint, GetBlueprintHistory, PreviewBlueprintUpdate, UpdateBlueprint, ListBlueprintBackups, RollbackBlueprint, ListBlueprintInstallations, UninstallBlueprint), timeSeries (EnableStreamData, DisableStreamData, ActivateArchive, DisableArchive, EnableArchive, RetryArchiveActivation, DeleteArchive, FreezeRollupArchive, UnfreezeRollupArchive, RewindRollupWatermark, ListRollupsForArchive, RecomputeArchive, BackfillRollup, ListRecomputeJobs, AddComputedColumn, RemoveComputedColumn, UpdateComputedColumnFormula) | Asset Repository |
 | Bots | Dump, Restore, ExportArchiveData, ImportArchiveData, RunFixupScripts | Bot Services |
 | Communication | enable/disable, adapters, pipelines (incl. MovePipelines for bulk reassignment to a different adapter), triggers, pools, dataFlows, workloads (GetWorkloadsByChart, UpdateWorkloadChartVersion, DeployWorkload, UndeployWorkload) | Communication Controller |
 | Reporting | enable/disable | Report Services |
@@ -211,6 +211,8 @@ octo-cli tenants create -tid mytenant -db mytenant --no-provision
 
 # Blueprints (asset repository) — initial install path is Phase 1
 octo-cli -c ListBlueprints                                          # list catalog blueprints across all sources
+octo-cli -c RefreshBlueprintCatalogs                                # force-refresh all blueprint catalog caches at the asset repo (AB#4309)
+octo-cli -c RefreshBlueprintCatalogs -cn PrivateGitHubBlueprintCatalog  # force-refresh a single catalog (case-insensitive name)
 octo-cli -c InstallBlueprint -b MyBlueprint-1.0.0                   # apply blueprint to the active tenant
 octo-cli -c InstallBlueprint -b MyBlueprint-1.0.0 -f                # re-apply seed data via upsert (recovery)
 octo-cli -c GetBlueprintHistory                                     # show application history for the active tenant
