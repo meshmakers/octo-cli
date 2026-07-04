@@ -144,7 +144,7 @@ Environment variables are prefixed with `OCTO_`.
 | Category | Commands | Service |
 |----------|----------|---------|
 | Identity | users, roles, clients (+ mirror commands: GetClientMirrors, ProvisionClientInExistingTenants, ProvisionClientInTenant, UnprovisionClientFromTenant, SetClientAutoProvision, ApplyClientOverlay, CleanClientOverlays), identityProviders, groups, emailDomainGroupRules, externalTenantUserMappings, adminProvisioning, apiResources, apiScopes | Identity Services |
-| Asset | tenants, models, blueprints (ListBlueprints, RefreshBlueprintCatalogs, InstallBlueprint, GetBlueprintHistory, PreviewBlueprintUpdate, UpdateBlueprint, ListBlueprintBackups, RollbackBlueprint, ListBlueprintInstallations, UninstallBlueprint), timeSeries (EnableStreamData, DisableStreamData, ActivateArchive, DisableArchive, EnableArchive, RetryArchiveActivation, DeleteArchive, FreezeRollupArchive, UnfreezeRollupArchive, RewindRollupWatermark, ListRollupsForArchive, RecomputeArchive, BackfillRollup, ListRecomputeJobs, AddComputedColumn, RemoveComputedColumn, UpdateComputedColumnFormula) | Asset Repository |
+| Asset | tenants, models, blueprints (ListBlueprints, RefreshBlueprintCatalogs, InstallBlueprint, GetBlueprintHistory, PreviewBlueprintUpdate, UpdateBlueprint, ListBlueprintInstallations, UninstallBlueprint), timeSeries (EnableStreamData, DisableStreamData, ActivateArchive, DisableArchive, EnableArchive, RetryArchiveActivation, DeleteArchive, FreezeRollupArchive, UnfreezeRollupArchive, RewindRollupWatermark, ListRollupsForArchive, RecomputeArchive, BackfillRollup, ListRecomputeJobs, AddComputedColumn, RemoveComputedColumn, UpdateComputedColumnFormula) | Asset Repository |
 | Bots | Dump, Restore, ExportArchiveData, ImportArchiveData, RunFixupScripts | Bot Services |
 | Communication | enable/disable, adapters, pipelines (incl. MovePipelines for bulk reassignment to a different adapter), triggers, pools, dataFlows, workloads (GetWorkloadsByChart, UpdateWorkloadChartVersion, DeployWorkload, UndeployWorkload) | Communication Controller |
 | Reporting | enable/disable | Report Services |
@@ -223,15 +223,12 @@ octo-cli -c UninstallBlueprint -n MyBlueprint                       # uninstall 
 octo-cli -c UninstallBlueprint -n MyBlueprint -c                    # cascade: also remove dependents and orphan deps
 octo-cli -c UninstallBlueprint -n MyBlueprint -y                    # skip the confirmation prompt
 
-# Blueprints — update + rollback (Phase 2a: operations layer; richer diff/merge in Phase 2b)
+# Blueprints — update (Phase 2a: operations layer; richer diff/merge in Phase 2b)
 octo-cli -c PreviewBlueprintUpdate -tv MyBlueprint-2.0.0            # preview changes a target version would apply (Merge mode)
 octo-cli -c PreviewBlueprintUpdate -tv MyBlueprint-2.0.0 -m Safe    # preview in Safe mode
-octo-cli -c UpdateBlueprint -tv MyBlueprint-2.0.0                   # apply update with Merge mode + auto-backup
-octo-cli -c UpdateBlueprint -tv MyBlueprint-2.0.0 -m Full -nb       # apply Full mode without pre-update backup
+octo-cli -c UpdateBlueprint -tv MyBlueprint-2.0.0                   # apply update with Merge mode
+octo-cli -c UpdateBlueprint -tv MyBlueprint-2.0.0 -m Full           # apply Full mode
 octo-cli -c UpdateBlueprint -tv MyBlueprint-2.0.0 -dr               # dry-run (no persistent changes)
-octo-cli -c ListBlueprintBackups                                    # list backups created before updates
-octo-cli -c RollbackBlueprint -bid <backupId>                       # roll the tenant back to a backup
-octo-cli -c RollbackBlueprint -bid <backupId> -y                    # skip the interactive confirmation
 
 # Stream data lifecycle (asset repository)
 octo-cli -c EnableStreamData
@@ -513,7 +510,6 @@ All destructive commands (Delete, Clean, Reset, Remove) require interactive user
 | `DeleteApiSecretApiResource` | `delete API secret for resource '{name}'` |
 | `DeleteApiSecretClient` | `delete API secret for client '{clientId}'` |
 | `DeleteArchive` | `delete archive '{archiveRtId}'? The CrateDB table will be dropped and historical data lost` |
-| `RollbackBlueprint` | `rollback tenant '{tenantId}' to backup '{backupId}'? Current tenant data will be replaced` |
 | `UninstallBlueprint` | `uninstall blueprint '{name}' from tenant '{tenantId}'[ together with any blueprints that depend on it and any orphaned dependencies]? Locked owned entities will be erased` |
 
 ### Usage Examples

@@ -11,7 +11,6 @@ internal class UpdateBlueprint : ServiceClientOctoCommand<IAssetServicesClient>
 {
     private readonly IArgument _targetVersionArg;
     private readonly IArgument _updateModeArg;
-    private readonly IArgument _noBackupArg;
     private readonly IArgument _dryRunArg;
 
     public UpdateBlueprint(
@@ -29,9 +28,6 @@ internal class UpdateBlueprint : ServiceClientOctoCommand<IAssetServicesClient>
         _updateModeArg = CommandArgumentValue.AddArgument("m", "updateMode",
             ["Update mode: Safe, Merge (default), Full, or Migration"], false, 1);
 
-        _noBackupArg = CommandArgumentValue.AddArgument("nb", "no-backup",
-            ["Skip the pre-update tenant backup (not recommended)"], false, 0);
-
         _dryRunArg = CommandArgumentValue.AddArgument("dr", "dry-run",
             ["Simulate the update without persisting changes"], false, 0);
     }
@@ -48,18 +44,16 @@ internal class UpdateBlueprint : ServiceClientOctoCommand<IAssetServicesClient>
         var updateMode = CommandArgumentValue.IsArgumentUsed(_updateModeArg)
             ? CommandArgumentValue.GetArgumentScalarValue<string>(_updateModeArg)
             : "Merge";
-        var createBackup = !CommandArgumentValue.IsArgumentUsed(_noBackupArg);
         var dryRun = CommandArgumentValue.IsArgumentUsed(_dryRunArg);
 
         Logger.LogInformation(
-            "Applying update of tenant '{TenantId}' to '{TargetVersion}' (mode={UpdateMode}, backup={Backup}, dryRun={DryRun})",
-            Options.Value.TenantId, targetVersion, updateMode, createBackup, dryRun);
+            "Applying update of tenant '{TenantId}' to '{TargetVersion}' (mode={UpdateMode}, dryRun={DryRun})",
+            Options.Value.TenantId, targetVersion, updateMode, dryRun);
 
         var request = new BlueprintUpdateRequestDto
         {
             TargetVersion = targetVersion,
             UpdateMode = updateMode,
-            CreateBackup = createBackup,
             DryRun = dryRun
         };
 
