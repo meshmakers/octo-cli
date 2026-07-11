@@ -333,6 +333,8 @@ internal static class Program
         services.AddTransient<ICommand, CleanTenant>();
         services.AddTransient<ICommand, AttachTenant>();
         services.AddTransient<ICommand, DeleteTenant>();
+        services.AddTransient<ICommand, GetTenantLifecycle>();
+        services.AddTransient<ICommand, ReRunTenantSetup>();
         services.AddTransient<ICommand, ClearTenantCache>();
         services.AddTransient<ICommand, UpdateSystemCkModelTenant>();
         services.AddTransient<ICommand, DumpTenant>();

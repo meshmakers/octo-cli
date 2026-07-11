@@ -209,6 +209,11 @@ octo-cli tenants create -tid mytenant -db mytenant
 # Create tenant without admin provisioning
 octo-cli tenants create -tid mytenant -db mytenant --no-provision
 
+# Inspect a tenant's durable provisioning lifecycle (Creating/Active/Deleting/Failed) — AB#4348
+octo-cli -c GetTenantLifecycle -tid mytenant
+# Operator safety valve: re-open a stuck/Failed tenant's setup so the background reconciler finishes it
+octo-cli -c ReRunTenantSetup -tid mytenant
+
 # Blueprints (asset repository) — initial install path is Phase 1
 octo-cli -c ListBlueprints                                          # list catalog blueprints across all sources
 octo-cli -c RefreshBlueprintCatalogs                                # force-refresh all blueprint catalog caches at the asset repo (AB#4309)
