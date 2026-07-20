@@ -68,7 +68,7 @@ internal class UpdateIdentityProvider : ServiceClientOctoCommand<IIdentityServic
 
     public override async Task Execute()
     {
-        var rtId = CommandArgumentValue.GetArgumentScalarValue<OctoObjectId>(_rtId);
+        var rtId = OctoObjectId.Parse(CommandArgumentValue.GetArgumentScalarValue<string>(_rtId));
 
         Logger.LogInformation("Updating identity provider \'{RtId}\' at \'{ServiceClientServiceUri}\'", rtId,
             ServiceClient.ServiceUri);

@@ -40,7 +40,7 @@ internal class UpdateGroup : ServiceClientOctoCommand<IIdentityServicesClient>
 
     public override async Task Execute()
     {
-        var rtId = CommandArgumentValue.GetArgumentScalarValue<OctoObjectId>(_id);
+        var rtId = OctoObjectId.Parse(CommandArgumentValue.GetArgumentScalarValue<string>(_id));
 
         Logger.LogInformation("Updating group '{RtId}' at '{ServiceClientServiceUri}'",
             rtId, ServiceClient.ServiceUri);

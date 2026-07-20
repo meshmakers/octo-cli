@@ -36,7 +36,7 @@ internal class GetExternalTenantUserMapping : ServiceClientOctoCommand<IIdentity
 
     public override async Task Execute()
     {
-        var rtId = CommandArgumentValue.GetArgumentScalarValue<OctoObjectId>(_id);
+        var rtId = OctoObjectId.Parse(CommandArgumentValue.GetArgumentScalarValue<string>(_id));
 
         Logger.LogInformation(
             "Getting external tenant user mapping '{RtId}' from '{ServiceClientServiceUri}'",

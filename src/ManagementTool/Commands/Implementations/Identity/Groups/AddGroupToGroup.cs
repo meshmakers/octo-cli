@@ -36,7 +36,7 @@ internal class AddGroupToGroup : ServiceClientOctoCommand<IIdentityServicesClien
 
     public override async Task Execute()
     {
-        var rtId = CommandArgumentValue.GetArgumentScalarValue<OctoObjectId>(_id);
+        var rtId = OctoObjectId.Parse(CommandArgumentValue.GetArgumentScalarValue<string>(_id));
         var childGroupId = CommandArgumentValue.GetArgumentScalarValue<string>(_childGroupId);
 
         Logger.LogInformation(

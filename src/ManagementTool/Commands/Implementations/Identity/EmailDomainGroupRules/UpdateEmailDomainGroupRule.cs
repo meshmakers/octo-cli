@@ -45,7 +45,7 @@ internal class UpdateEmailDomainGroupRule : ServiceClientOctoCommand<IIdentitySe
 
     public override async Task Execute()
     {
-        var rtId = CommandArgumentValue.GetArgumentScalarValue<OctoObjectId>(_id);
+        var rtId = OctoObjectId.Parse(CommandArgumentValue.GetArgumentScalarValue<string>(_id));
 
         Logger.LogInformation(
             "Updating email domain group rule '{RtId}' at '{ServiceClientServiceUri}'",

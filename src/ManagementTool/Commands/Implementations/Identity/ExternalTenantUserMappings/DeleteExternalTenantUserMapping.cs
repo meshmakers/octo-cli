@@ -31,7 +31,7 @@ internal class DeleteExternalTenantUserMapping : ServiceClientOctoCommand<IIdent
 
     public override async Task Execute()
     {
-        var rtId = CommandArgumentValue.GetArgumentScalarValue<OctoObjectId>(_id);
+        var rtId = OctoObjectId.Parse(CommandArgumentValue.GetArgumentScalarValue<string>(_id));
 
         Logger.LogInformation(
             "Deleting external tenant user mapping '{RtId}' from '{ServiceClientServiceUri}'",

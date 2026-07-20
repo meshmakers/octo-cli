@@ -38,7 +38,7 @@ internal class DeleteIdentityProvider : ServiceClientOctoCommand<IIdentityServic
 
     public override async Task Execute()
     {
-        var rtId = CommandArgumentValue.GetArgumentScalarValue<OctoObjectId>(_id);
+        var rtId = OctoObjectId.Parse(CommandArgumentValue.GetArgumentScalarValue<string>(_id));
 
         if (!CommandArgumentValue.IsArgumentUsed(_yesArg) &&
             !_confirmationService.Confirm($"Are you sure you want to delete identity provider '{rtId}'?"))

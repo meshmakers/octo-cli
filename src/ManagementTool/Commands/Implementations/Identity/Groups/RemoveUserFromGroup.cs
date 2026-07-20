@@ -35,7 +35,7 @@ internal class RemoveUserFromGroup : ServiceClientOctoCommand<IIdentityServicesC
 
     public override async Task Execute()
     {
-        var rtId = CommandArgumentValue.GetArgumentScalarValue<OctoObjectId>(_id);
+        var rtId = OctoObjectId.Parse(CommandArgumentValue.GetArgumentScalarValue<string>(_id));
         var userId = CommandArgumentValue.GetArgumentScalarValue<string>(_userId);
 
         Logger.LogInformation("Removing user '{UserId}' from group '{RtId}' at '{ServiceClientServiceUri}'",

@@ -35,7 +35,7 @@ internal class AddUserToGroup : ServiceClientOctoCommand<IIdentityServicesClient
 
     public override async Task Execute()
     {
-        var rtId = CommandArgumentValue.GetArgumentScalarValue<OctoObjectId>(_id);
+        var rtId = OctoObjectId.Parse(CommandArgumentValue.GetArgumentScalarValue<string>(_id));
         var userId = CommandArgumentValue.GetArgumentScalarValue<string>(_userId);
 
         Logger.LogInformation("Adding user '{UserId}' to group '{RtId}' at '{ServiceClientServiceUri}'",

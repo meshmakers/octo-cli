@@ -36,7 +36,7 @@ internal class UpdateGroupRoles : ServiceClientOctoCommand<IIdentityServicesClie
 
     public override async Task Execute()
     {
-        var rtId = CommandArgumentValue.GetArgumentScalarValue<OctoObjectId>(_id);
+        var rtId = OctoObjectId.Parse(CommandArgumentValue.GetArgumentScalarValue<string>(_id));
         var roleIdsValue = CommandArgumentValue.GetArgumentScalarValue<string>(_roleIds);
         var roleIds = roleIdsValue.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
             .ToList();

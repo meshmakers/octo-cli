@@ -42,16 +42,18 @@ internal class ExportRuntimeModelByQuery : JobOctoCommand
             [
                 new CodeSample(arguments: [
                     new CodeSampleArgument(_fileArg, "./export.zip"),
-                    new CodeSampleArgument(_queryIdArg, "query-id"),
+                    new CodeSampleArgument(_queryIdArg, "68e296bc1f73f259bbb10399"),
                 ],
-                    description: "Basic usage"),
+                    description: "Export the results of a stored query (the RtId of a System/SimpleRtQuery entity)"),
             ]
         );
 
     public override async Task Execute()
     {
         var rtModelFilePath = CommandArgumentValue.GetArgumentScalarValue<string>(_fileArg);
-        var queryId = CommandArgumentValue.GetArgumentScalarValue<OctoObjectId>(_queryIdArg);
+        // OctoObjectId has no TypeConverter, so binding it directly via
+        // GetArgumentScalarValue<OctoObjectId> throws NotSupportedException.
+        var queryId = OctoObjectId.Parse(CommandArgumentValue.GetArgumentScalarValue<string>(_queryIdArg));
 
         var tenantId = Options.Value.TenantId;
         if (string.IsNullOrWhiteSpace(tenantId))

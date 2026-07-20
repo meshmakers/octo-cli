@@ -35,7 +35,7 @@ internal class GetEmailDomainGroupRule : ServiceClientOctoCommand<IIdentityServi
 
     public override async Task Execute()
     {
-        var rtId = CommandArgumentValue.GetArgumentScalarValue<OctoObjectId>(_id);
+        var rtId = OctoObjectId.Parse(CommandArgumentValue.GetArgumentScalarValue<string>(_id));
 
         Logger.LogInformation("Getting email domain group rule '{RtId}' from '{ServiceClientServiceUri}'",
             rtId, ServiceClient.ServiceUri);

@@ -30,7 +30,7 @@ internal class DeleteEmailDomainGroupRule : ServiceClientOctoCommand<IIdentitySe
 
     public override async Task Execute()
     {
-        var rtId = CommandArgumentValue.GetArgumentScalarValue<OctoObjectId>(_id);
+        var rtId = OctoObjectId.Parse(CommandArgumentValue.GetArgumentScalarValue<string>(_id));
 
         Logger.LogInformation(
             "Deleting email domain group rule '{RtId}' from '{ServiceClientServiceUri}'",

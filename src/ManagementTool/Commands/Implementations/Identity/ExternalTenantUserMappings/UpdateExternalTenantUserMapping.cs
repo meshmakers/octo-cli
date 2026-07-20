@@ -39,7 +39,7 @@ internal class UpdateExternalTenantUserMapping : ServiceClientOctoCommand<IIdent
 
     public override async Task Execute()
     {
-        var rtId = CommandArgumentValue.GetArgumentScalarValue<OctoObjectId>(_id);
+        var rtId = OctoObjectId.Parse(CommandArgumentValue.GetArgumentScalarValue<string>(_id));
 
         Logger.LogInformation(
             "Updating external tenant user mapping '{RtId}' at '{ServiceClientServiceUri}'",

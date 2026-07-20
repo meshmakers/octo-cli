@@ -44,7 +44,7 @@ internal class DeleteAdminProvisioningMapping : ServiceClientOctoCommand<IIdenti
     public override async Task Execute()
     {
         var targetTenantId = CommandArgumentValue.GetArgumentScalarValue<string>(_targetTenantId);
-        var mappingRtId = CommandArgumentValue.GetArgumentScalarValue<OctoObjectId>(_mappingId);
+        var mappingRtId = OctoObjectId.Parse(CommandArgumentValue.GetArgumentScalarValue<string>(_mappingId));
 
         Logger.LogInformation(
             "Deleting admin provisioning mapping '{MappingRtId}' from target tenant '{TargetTenantId}' at '{ServiceClientServiceUri}'",
