@@ -445,6 +445,7 @@ All communication commands accept plain runtime object IDs (e.g. `69cfa838092b71
 | Command | Parameters | Description |
 |---------|-----------|-------------|
 | `GetPools` | `--json` (optional) | List all pools for the tenant |
+| `DeployPool` | `-id <poolRtId>` | Trigger pool deploy (operator creates the CommunicationPool CR); workloads deploy separately |
 
 ### Data Flows
 
