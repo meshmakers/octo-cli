@@ -22,6 +22,12 @@ internal class DeployPoolCommand : ServiceClientOctoCommand<ICommunicationServic
 
     public override async Task Execute()
     {
+        if (string.IsNullOrWhiteSpace(Options.Value.TenantId))
+        {
+            Logger.LogError("TenantId is missing");
+            return;
+        }
+
         var poolRtId = CommandArgumentValue.GetArgumentScalarValue<string>(_poolRtId);
 
         Logger.LogInformation(
