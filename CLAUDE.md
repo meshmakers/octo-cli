@@ -180,18 +180,41 @@ The help flag is served by `CommandParser` / `ParserService` in
 `Meshmakers.Common.CommandLineParser` (repo `mm-common`), not by octo-cli itself. It is
 implicit: no command declares it, every command understands it.
 
-```bash
-# Help for a single command — arguments, samples and notes of that command only
-octo-cli -c Create --help
-octo-cli -c Create -?
-octo-cli -c Create -h
+The help has three levels, so nobody has to page through all 176 commands to find one:
 
-# Usage of the whole tool (all commands grouped by category)
-octo-cli --help
-octo-cli            # legacy shortcut: the mandatory -c is missing, so the usage is printed
+```bash
+# 1. Which groups are there? (~19 lines)
+octo-cli -h
+
+# 2. Which commands are in a group? Verb + description, no arguments (~94 lines for the largest group)
+octo-cli -h "Identity Services"
+octo-cli -h identity          # prefix match, case-insensitive
+octo-cli -h Identity Services # quoting is optional, the words are joined
+octo-cli -h General
+
+# 3. What does one command take? Arguments, samples and notes (~15 lines)
+octo-cli -c Create --help
+octo-cli -h Create            # a topic that names a command goes straight to its help
+
+# Everything at once, as before (~1210 lines)
+octo-cli -h all
+octo-cli                      # same dump on the error path: the mandatory -c is missing
 ```
 
-Accepted terms are `--help`, `-help`, `/help`, `-?`, `/?` and `-h` (case-insensitive).
+| Eingabe | Ausgabe | Exit |
+|---|---|---|
+| `-h` | group overview | 0 |
+| `-h <group>` | commands of that group | 0 |
+| `-h <command>` / `-c <command> -h` | help of that command | 0 |
+| `-h all` | full usage listing | 0 |
+| `-h <unknown>` | error naming the known groups | -1 |
+| *(no arguments)* | full usage listing after the missing-argument error | -1 |
+
+Accepted terms are `--help`, `-help`, `/help`, `-?`, `/?` and `-h` (case-insensitive). A
+topic is resolved in this order: reserved `all` → exact group name → exact command name →
+unique group prefix → unique group substring. Ambiguous shortenings resolve to nothing and
+are reported, so `-h e` fails rather than guessing. Fuzzy matching applies to groups only —
+`-h Crea` is an error, not `Create`.
 
 **`-h` is claimed by the command first.** Declared arguments are matched before the help
 flag, so a command owning `-h` keeps it — `octo-cli -c AddAdIdentityProvider -h myhost`
@@ -209,6 +232,17 @@ Behaviour worth knowing:
   exit code `-1` followed by the full usage.
 - The `NOTES` section comes from `GetDocumentation()`'s `Notes`; `SAMPLES` is filtered to
   the samples of that one command.
+
+**Groups come from the `base(...)` call**, not from a registry: the first argument of the
+`Command<T>` constructor, in practice one of the `Constants.*Group` values
+(`Constants.cs:13-21`). A command using the constructor overload without a group lands in
+`General`. A new group therefore exists as soon as one command names it — nothing else to
+register, and it shows up in `-h` automatically.
+
+Two names are worth avoiding for a new group: `all` is reserved for the full listing and
+would make the group unreachable, and a group named exactly like a command loses nothing
+but renders an extra pointer line (the group wins the name because a command is still
+reachable via `-c <name> --help`, whereas a group has no second way in).
 
 ## Common Operations
 
