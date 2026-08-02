@@ -174,6 +174,42 @@ Environment variables are prefixed with `OCTO_`.
 > commands and `EnableReporting` / `DisableReporting` require a context with a tenant set. The
 > former system-scoped enable/disable endpoints were removed server-side.
 
+## Help Options
+
+The help flag is served by `CommandParser` / `ParserService` in
+`Meshmakers.Common.CommandLineParser` (repo `mm-common`), not by octo-cli itself. It is
+implicit: no command declares it, every command understands it.
+
+```bash
+# Help for a single command — arguments, samples and notes of that command only
+octo-cli -c Create --help
+octo-cli -c Create -?
+octo-cli -c Create -h
+
+# Usage of the whole tool (all commands grouped by category)
+octo-cli --help
+octo-cli            # legacy shortcut: the mandatory -c is missing, so the usage is printed
+```
+
+Accepted terms are `--help`, `-help`, `/help`, `-?`, `/?` and `-h` (case-insensitive).
+
+**`-h` is claimed by the command first.** Declared arguments are matched before the help
+flag, so a command owning `-h` keeps it — `octo-cli -c AddAdIdentityProvider -h myhost`
+still binds `--host`. Use `--help` or `-?` for those commands. Give a new `AddArgument`
+the short term `h` only when the command genuinely needs it; it costs the command its
+`-h` shortcut for help.
+
+Behaviour worth knowing:
+
+- A help request suppresses validation of mandatory arguments and argument values, so
+  `-c Create --help` prints help instead of complaining about the missing `-tid`.
+- Help exits with code `0` and executes nothing — safe in scripts.
+- Position does not matter: `--help -c Create` behaves like `-c Create --help`.
+- Without help, everything is unchanged: missing mandatory arguments still fail with
+  exit code `-1` followed by the full usage.
+- The `NOTES` section comes from `GetDocumentation()`'s `Notes`; `SAMPLES` is filtered to
+  the samples of that one command.
+
 ## Common Operations
 
 ```bash
@@ -632,7 +668,7 @@ internal class FooCommand : ServiceClientOctoCommand<IFooClient>
 - Use **explicit type names** (`new CodeSample(...)`, `new CodeSampleArgument(...)`) and **named arguments** (`arguments:`, `description:`, `expectedOutput:`) inside the documentation tree. The top-level `new(Samples: …, Notes: …)` keeps the target-typed `new(` because the method return type makes it unambiguous; everything nested below should be explicit so the reader doesn't have to mentally type-check.
 - `CodeSample(IEnumerable<CodeSampleArgument> arguments, string description, string? expectedOutput = null)` — arguments are typed bindings, not free-form strings. The renderer composes `octo-cli -c <verb> -<short> "value"...` at format time from the live `IArgument.ShortTerm`. Samples with three or more bindings render multi-line with PowerShell-7 backtick continuation; shorter invocations stay on a single line.
 - `CodeSampleArgument(IArgument, string)` for arguments with values; `CodeSampleArgument(IArgument)` for flags. Constructor enforces the right shape against the argument's `MandatoryValuesCount`.
-- `ExpectedOutput` is documentation-only — `--help` does not render it (consistent with `kubectl`-style CLIs).
+- `ExpectedOutput` is documentation-only — `--help` does not render it (consistent with `kubectl`-style CLIs). `Samples` and `Notes`, in contrast, are rendered by `octo-cli -c <verb> --help` (see [Help Options](#help-options)), so keep both terse enough to read in a terminal.
 - Cross-references to non-command pages (concept docs, related sections) belong on handwritten `index.md` landing pages per command-reference section in `octo-documentation`, not on individual command pages — keeps generator output focused on the command itself.
 - Skip the override entirely when the auto-canonical example suffices and there are no notes to add — keeps the class clean.
 
