@@ -66,6 +66,19 @@ packages; `Release` resolves them from the private CI feed). `ContextManager` ex
 a `ContextManager(string baseDirectory)` constructor so tests use a throwaway
 directory instead of the real `~/.octo-cli`.
 
+**A new project must opt into `DebugL` explicitly**, in two places, or the local build
+breaks in a confusing way:
+
+1. `<Configurations>Debug;Release;DebugL</Configurations>` in its `.csproj` — the SDK
+   default is `Debug;Release`.
+2. `DebugL|<platform>.ActiveCfg` / `.Build.0` = `DebugL|Any CPU` in `Octo.Cli.sln`
+   (`dotnet sln add` writes `Debug|Any CPU` there).
+
+Miss either one and the project restores as `Debug`, whose `RestoreSources` do not
+include the local `../nuget` feed, while the projects it references still demand the
+999.0.0 packages — the result is a `NU1102` that only appears once the package is no
+longer in the global NuGet cache.
+
 ### Key Components
 
 - **ContextManager** (`Services/ContextManager.cs`): Manages named contexts stored in `~/.octo-cli/contexts.json`. Each context holds its own `OctoToolOptions` (service URIs, tenant) and `OctoToolAuthenticationOptions` (tokens). Supports migration from legacy `settings.json`. **Context names are matched case-insensitively** (`StringComparer.OrdinalIgnoreCase`), so `UseContext`/`RemoveContext` accept any casing; the active context is persisted using the stored key's canonical casing. Because System.Text.Json deserializes the `Contexts` dictionary with the ordinal comparer, `Load()` rebuilds it with `OrdinalIgnoreCase` after reading the file.

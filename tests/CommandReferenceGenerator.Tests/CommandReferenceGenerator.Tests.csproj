@@ -5,6 +5,8 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <IsPackable>false</IsPackable>
+    <!-- DebugL resolves the Meshmakers/Octo packages from the local ../nuget feed, see Directory.Build.props -->
+    <Configurations>Debug;Release;DebugL</Configurations>
   </PropertyGroup>
 
   <ItemGroup>
