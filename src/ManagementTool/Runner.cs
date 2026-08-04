@@ -28,7 +28,7 @@ internal class Runner
             _logger.LogInformation("{Copyright}", GetCopyright());
             _logger.LogInformation("Executable directory: {BinDirectory}", GetBinDirectory());
 
-            await _parser.ParseAndValidateAsync();
+            await _parser.ParseAndValidateAsync(Constants.OctoExeName);
 
             return 0;
         }

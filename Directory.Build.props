@@ -38,7 +38,7 @@
              communication-sdk). Same rule as OctoCoreLibVersion: set by the pipeline
              (train override on r-tag); $(OctoVersion) fallback only for local/standalone. -->
         <OctoCommVersion Condition="'$(OctoCommVersion)'==''">$(OctoVersion)</OctoCommVersion>
-        <MeshmakerVersion>4.1.38</MeshmakerVersion>
+        <MeshmakerVersion>4.1.41</MeshmakerVersion>
         <MeshmakerVersion Condition="'$(Configuration)'=='DebugL'">999.0.0</MeshmakerVersion>
         <Version Condition="'$(Configuration)'=='DebugL'">999.0.0</Version>
         <PackageVersion Condition="'$(Configuration)'=='DebugL'">999.0.0</PackageVersion>

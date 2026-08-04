@@ -5,6 +5,10 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <IsPackable>false</IsPackable>
+    <!-- DebugL resolves the Meshmakers/Octo packages from the local ../nuget feed, see Directory.Build.props.
+         Without it the solution falls back to Debug for this project, whose restore sources do not contain
+         the local feed, while the referenced ManagementTool still demands the 999.0.0 packages. -->
+    <Configurations>Debug;Release;DebugL</Configurations>
   </PropertyGroup>
 
   <ItemGroup>

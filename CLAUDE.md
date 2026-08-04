@@ -66,6 +66,19 @@ packages; `Release` resolves them from the private CI feed). `ContextManager` ex
 a `ContextManager(string baseDirectory)` constructor so tests use a throwaway
 directory instead of the real `~/.octo-cli`.
 
+**A new project must opt into `DebugL` explicitly**, in two places, or the local build
+breaks in a confusing way:
+
+1. `<Configurations>Debug;Release;DebugL</Configurations>` in its `.csproj` — the SDK
+   default is `Debug;Release`.
+2. `DebugL|<platform>.ActiveCfg` / `.Build.0` = `DebugL|Any CPU` in `Octo.Cli.sln`
+   (`dotnet sln add` writes `Debug|Any CPU` there).
+
+Miss either one and the project restores as `Debug`, whose `RestoreSources` do not
+include the local `../nuget` feed, while the projects it references still demand the
+999.0.0 packages — the result is a `NU1102` that only appears once the package is no
+longer in the global NuGet cache.
+
 ### Key Components
 
 - **ContextManager** (`Services/ContextManager.cs`): Manages named contexts stored in `~/.octo-cli/contexts.json`. Each context holds its own `OctoToolOptions` (service URIs, tenant) and `OctoToolAuthenticationOptions` (tokens). Supports migration from legacy `settings.json`. **Context names are matched case-insensitively** (`StringComparer.OrdinalIgnoreCase`), so `UseContext`/`RemoveContext` accept any casing; the active context is persisted using the stored key's canonical casing. Because System.Text.Json deserializes the `Contexts` dictionary with the ordinal comparer, `Load()` rebuilds it with `OrdinalIgnoreCase` after reading the file.
@@ -160,6 +173,76 @@ Environment variables are prefixed with `OCTO_`.
 > active context has no `TenantId`, so `EnableStreamData` / archive / rollup / computed-column
 > commands and `EnableReporting` / `DisableReporting` require a context with a tenant set. The
 > former system-scoped enable/disable endpoints were removed server-side.
+
+## Help Options
+
+The help flag is served by `CommandParser` / `ParserService` in
+`Meshmakers.Common.CommandLineParser` (repo `mm-common`), not by octo-cli itself. It is
+implicit: no command declares it, every command understands it.
+
+The help has three levels, so nobody has to page through all 176 commands to find one:
+
+```bash
+# 1. Which groups are there? (~19 lines)
+octo-cli -h
+
+# 2. Which commands are in a group? Verb + description, no arguments (~94 lines for the largest group)
+octo-cli -h "Identity Services"
+octo-cli -h identity          # prefix match, case-insensitive
+octo-cli -h Identity Services # quoting is optional, the words are joined
+octo-cli -h General
+
+# 3. What does one command take? Arguments, samples and notes (~15 lines)
+octo-cli -c Create --help
+octo-cli -h Create            # a topic that names a command goes straight to its help
+
+# Everything at once, as before (~1210 lines)
+octo-cli -h all
+octo-cli                      # same dump on the error path: the mandatory -c is missing
+```
+
+| Input | Output | Exit |
+|---|---|---|
+| `-h` | group overview | 0 |
+| `-h <group>` | commands of that group | 0 |
+| `-h <command>` / `-c <command> -h` | help of that command | 0 |
+| `-h all` | full usage listing | 0 |
+| `-h <unknown>` | error naming the known groups | -1 |
+| *(no arguments)* | full usage listing after the missing-argument error | -1 |
+
+Accepted terms are `--help`, `-help`, `/help`, `-?`, `/?` and `-h` (case-insensitive). A
+topic is resolved in this order: reserved `all` → exact group name → exact command name →
+unique group prefix → unique group substring. Ambiguous shortenings resolve to nothing and
+are reported, so `-h e` fails rather than guessing. Fuzzy matching applies to groups only —
+`-h Crea` is an error, not `Create`.
+
+**`-h` is claimed by the command first.** Declared arguments are matched before the help
+flag, so a command owning `-h` keeps it — `octo-cli -c AddAdIdentityProvider -h myhost`
+still binds `--host`. Use `--help` or `-?` for those commands. Give a new `AddArgument`
+the short term `h` only when the command genuinely needs it; it costs the command its
+`-h` shortcut for help.
+
+Behaviour worth knowing:
+
+- A help request suppresses validation of mandatory arguments and argument values, so
+  `-c Create --help` prints help instead of complaining about the missing `-tid`.
+- Help exits with code `0` and executes nothing — safe in scripts.
+- Position does not matter: `--help -c Create` behaves like `-c Create --help`.
+- Without help, everything is unchanged: missing mandatory arguments still fail with
+  exit code `-1` followed by the full usage.
+- The `NOTES` section comes from `GetDocumentation()`'s `Notes`; `SAMPLES` is filtered to
+  the samples of that one command.
+
+**Groups come from the `base(...)` call**, not from a registry: the first argument of the
+`Command<T>` constructor, in practice one of the `Constants.*Group` values
+(`Constants.cs:13-21`). A command using the constructor overload without a group lands in
+`General`. A new group therefore exists as soon as one command names it — nothing else to
+register, and it shows up in `-h` automatically.
+
+Two names are worth avoiding for a new group: `all` is reserved for the full listing and
+would make the group unreachable, and a group named exactly like a command loses nothing
+but renders an extra pointer line (the group wins the name because a command is still
+reachable via `-c <name> --help`, whereas a group has no second way in).
 
 ## Common Operations
 
@@ -619,7 +702,7 @@ internal class FooCommand : ServiceClientOctoCommand<IFooClient>
 - Use **explicit type names** (`new CodeSample(...)`, `new CodeSampleArgument(...)`) and **named arguments** (`arguments:`, `description:`, `expectedOutput:`) inside the documentation tree. The top-level `new(Samples: …, Notes: …)` keeps the target-typed `new(` because the method return type makes it unambiguous; everything nested below should be explicit so the reader doesn't have to mentally type-check.
 - `CodeSample(IEnumerable<CodeSampleArgument> arguments, string description, string? expectedOutput = null)` — arguments are typed bindings, not free-form strings. The renderer composes `octo-cli -c <verb> -<short> "value"...` at format time from the live `IArgument.ShortTerm`. Samples with three or more bindings render multi-line with PowerShell-7 backtick continuation; shorter invocations stay on a single line.
 - `CodeSampleArgument(IArgument, string)` for arguments with values; `CodeSampleArgument(IArgument)` for flags. Constructor enforces the right shape against the argument's `MandatoryValuesCount`.
-- `ExpectedOutput` is documentation-only — `--help` does not render it (consistent with `kubectl`-style CLIs).
+- `ExpectedOutput` is documentation-only — `--help` does not render it (consistent with `kubectl`-style CLIs). `Samples` and `Notes`, in contrast, are rendered by `octo-cli -c <verb> --help` (see [Help Options](#help-options)), so keep both terse enough to read in a terminal.
 - Cross-references to non-command pages (concept docs, related sections) belong on handwritten `index.md` landing pages per command-reference section in `octo-documentation`, not on individual command pages — keeps generator output focused on the command itself.
 - Skip the override entirely when the auto-canonical example suffices and there are no notes to add — keeps the class clean.
 
