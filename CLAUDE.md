@@ -201,7 +201,7 @@ octo-cli -h all
 octo-cli                      # same dump on the error path: the mandatory -c is missing
 ```
 
-| Eingabe | Ausgabe | Exit |
+| Input | Output | Exit |
 |---|---|---|
 | `-h` | group overview | 0 |
 | `-h <group>` | commands of that group | 0 |
