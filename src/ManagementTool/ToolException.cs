@@ -19,6 +19,22 @@ public class ToolException : Exception
         return new ToolException("No tenant id has been saved in configuration. Use --config to set a value");
     }
 
+    public static Exception UnknownContext(string name, IEnumerable<string> knownContexts)
+    {
+        var known = string.Join(", ", knownContexts.OrderBy(x => x, StringComparer.OrdinalIgnoreCase));
+
+        return new ToolException(string.IsNullOrEmpty(known)
+            ? $"Context '{name}' does not exist. No contexts are configured yet — use the 'AddContext' command."
+            : $"Context '{name}' does not exist. Known contexts: {known}.");
+    }
+
+    public static Exception ContextOverrideNotSupported(string commandValue)
+    {
+        return new ToolException(
+            $"'{commandValue}' changes a stored context and therefore cannot be combined with --context. " +
+            "Configure the active context without --context, or use 'AddContext -n <name>' to write a named one.");
+    }
+
     public static Exception FilePathDoesNotExist(string filePath)
     {
         return new ToolException(

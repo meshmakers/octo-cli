@@ -59,6 +59,15 @@ internal class UseContextCommand : Command<OctoToolOptions>
 
         var contextName = CommandArgumentValue.GetArgumentScalarValue<string>(_nameArg);
 
+        // Switching the active context is this command's whole purpose, so --context cannot apply
+        // to it. Say so rather than leaving the caller to wonder which of the two won.
+        if (_contextManager.IsContextOverridden)
+        {
+            Logger.LogWarning(
+                "--{ContextArgument} does not apply to UseContext; the active context is set to '{ContextName}'",
+                Constants.ContextArgumentTerm, contextName);
+        }
+
         _contextManager.SetActiveContext(contextName);
 
         Logger.LogInformation("Switched to context '{ContextName}'", contextName);

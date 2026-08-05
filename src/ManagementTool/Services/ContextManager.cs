@@ -14,40 +14,65 @@ public class ContextManager : IContextManager
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
     };
 
+    // Every write re-reads, merges and atomically replaces the file while holding a
+    // cross-process lock, so parallel octo-cli invocations (each with its own --context)
+    // do not lose each other's changes. The retries cover the window in which another
+    // process holds the lock or has the file open for reading.
+    private const int FileAccessRetryCount = 50;
+    private const int FileAccessRetryDelayMilliseconds = 100;
+
     private readonly string _directoryPath;
     private readonly string _contextsFilePath;
     private readonly string _settingsFilePath;
+    private readonly string _lockFilePath;
 
     private ContextConfiguration _configuration;
 
+    // Name of the context chosen for this invocation only (--context / OCTO_CLI_CONTEXT).
+    // Null means "use the persisted active context". Selecting a context never writes.
+    private string? _selectedContextName;
+
     public ContextManager()
-        : this(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile))
+        : this(ResolveBaseDirectory())
     {
     }
 
     // baseDirectory is the parent of the ".octo-cli" folder; the parameterless
-    // constructor uses the user profile. The overload exists so tests can point at
-    // a throwaway directory instead of the developer's real ~/.octo-cli.
+    // constructor uses OCTO_CLI_HOME or the user profile. The overload exists so tests can
+    // point at a throwaway directory instead of the developer's real ~/.octo-cli.
     public ContextManager(string baseDirectory)
     {
         _directoryPath = Path.Combine(baseDirectory, $".{Constants.OctoToolUserFolderName}");
         _contextsFilePath = Path.Combine(_directoryPath, "contexts.json");
         _settingsFilePath = Path.Combine(_directoryPath, "settings.json");
+        _lockFilePath = Path.Combine(_directoryPath, "contexts.lock");
         _configuration = new ContextConfiguration();
+    }
+
+    /// <summary>
+    ///     Path of the file the contexts are read from and written to. Surfaced so commands can
+    ///     name it in their output — with OCTO_CLI_HOME in play, guessing ~/.octo-cli is wrong.
+    /// </summary>
+    public string ConfigurationFilePath => _contextsFilePath;
+
+    /// <inheritdoc />
+    public bool IsContextOverridden => _selectedContextName != null;
+
+    // OCTO_CLI_HOME points at the parent of the ".octo-cli" folder, matching the
+    // baseDirectory parameter above. Giving each parallel job its own value is the
+    // strongest form of isolation: separate files instead of a shared one.
+    private static string ResolveBaseDirectory()
+    {
+        var home = Environment.GetEnvironmentVariable(Constants.EnvVarHome);
+
+        return string.IsNullOrWhiteSpace(home)
+            ? Environment.GetFolderPath(Environment.SpecialFolder.UserProfile)
+            : home;
     }
 
     public ContextConfiguration Load()
     {
-        if (!File.Exists(_contextsFilePath))
-        {
-            _configuration = new ContextConfiguration();
-            return _configuration;
-        }
-
-        var json = File.ReadAllText(_contextsFilePath);
-        _configuration = JsonSerializer.Deserialize<ContextConfiguration>(json, JsonOptions)
-                         ?? new ContextConfiguration();
-        NormalizeContextComparer();
+        _configuration = ReadFromFile();
         return _configuration;
     }
 
@@ -56,31 +81,25 @@ public class ContextManager : IContextManager
     // regardless of the property initializer, so rebuild it with OrdinalIgnoreCase
     // after every load/migrate. On a case-only collision the last entry wins, which
     // mirrors how the names are treated as the same context from now on.
-    private void NormalizeContextComparer()
+    private static void NormalizeContextComparer(ContextConfiguration configuration)
     {
-        if (_configuration.Contexts.Comparer.Equals(StringComparer.OrdinalIgnoreCase))
+        if (configuration.Contexts.Comparer.Equals(StringComparer.OrdinalIgnoreCase))
         {
             return;
         }
 
-        _configuration.Contexts =
-            new Dictionary<string, ContextEntry>(_configuration.Contexts, StringComparer.OrdinalIgnoreCase);
+        configuration.Contexts =
+            new Dictionary<string, ContextEntry>(configuration.Contexts, StringComparer.OrdinalIgnoreCase);
     }
 
     public void Save(ContextConfiguration configuration)
     {
-        _configuration = configuration;
-        SaveToFile();
+        Mutate(_ => configuration);
     }
 
     public ContextEntry? GetActiveContext()
     {
-        if (string.IsNullOrEmpty(_configuration.ActiveContext))
-        {
-            return null;
-        }
-
-        return _configuration.Contexts.GetValueOrDefault(_configuration.ActiveContext);
+        return GetContext(_configuration.ActiveContext);
     }
 
     public string? GetActiveContextName()
@@ -88,47 +107,90 @@ public class ContextManager : IContextManager
         return _configuration.ActiveContext;
     }
 
-    public void AddOrUpdateContext(string name, ContextEntry entry)
+    /// <inheritdoc />
+    public ContextEntry? GetEffectiveContext()
     {
-        _configuration.Contexts[name] = entry;
+        return GetContext(GetEffectiveContextName());
+    }
 
-        // Auto-activate if this is the first context or no active context
-        if (string.IsNullOrEmpty(_configuration.ActiveContext) || _configuration.Contexts.Count == 1)
+    /// <inheritdoc />
+    public string? GetEffectiveContextName()
+    {
+        return _selectedContextName ?? _configuration.ActiveContext;
+    }
+
+    /// <inheritdoc />
+    public void SelectContext(string name)
+    {
+        var storedName = ResolveContextName(name);
+        if (storedName == null)
         {
-            _configuration.ActiveContext = name;
+            throw ToolException.UnknownContext(name, _configuration.Contexts.Keys);
         }
 
-        SaveToFile();
+        _selectedContextName = storedName;
+    }
+
+    private ContextEntry? GetContext(string? name)
+    {
+        return string.IsNullOrEmpty(name) ? null : _configuration.Contexts.GetValueOrDefault(name);
+    }
+
+    // Contexts is keyed case-insensitively; resolving to the stored key keeps the persisted
+    // ActiveContext and the selected name matching an actual context name exactly.
+    private string? ResolveContextName(string name)
+    {
+        return _configuration.Contexts.Keys.FirstOrDefault(k => StringComparer.OrdinalIgnoreCase.Equals(k, name));
+    }
+
+    public void AddOrUpdateContext(string name, ContextEntry entry)
+    {
+        Mutate(configuration =>
+        {
+            configuration.Contexts[name] = entry;
+
+            // Auto-activate if this is the first context or no active context
+            if (string.IsNullOrEmpty(configuration.ActiveContext) || configuration.Contexts.Count == 1)
+            {
+                configuration.ActiveContext = name;
+            }
+
+            return configuration;
+        });
     }
 
     public void RemoveContext(string name)
     {
-        if (!_configuration.Contexts.Remove(name))
+        Mutate(configuration =>
         {
-            return;
-        }
+            if (!configuration.Contexts.Remove(name))
+            {
+                return configuration;
+            }
 
-        // If the removed context was active, switch to another or clear
-        if (_configuration.ActiveContext == name)
-        {
-            _configuration.ActiveContext = _configuration.Contexts.Keys.FirstOrDefault();
-        }
+            // If the removed context was active, switch to another or clear
+            if (StringComparer.OrdinalIgnoreCase.Equals(configuration.ActiveContext, name))
+            {
+                configuration.ActiveContext = configuration.Contexts.Keys.FirstOrDefault();
+            }
 
-        SaveToFile();
+            return configuration;
+        });
     }
 
     public void SetActiveContext(string name)
     {
-        // Contexts is keyed case-insensitively; resolve to the stored key so the
-        // persisted ActiveContext matches an actual context name exactly.
-        if (!_configuration.Contexts.TryGetValue(name, out _))
+        var storedName = ResolveContextName(name);
+        if (storedName == null)
         {
-            throw new ToolException($"Context '{name}' does not exist.");
+            throw ToolException.UnknownContext(name, _configuration.Contexts.Keys);
         }
 
-        _configuration.ActiveContext =
-            _configuration.Contexts.Keys.First(k => StringComparer.OrdinalIgnoreCase.Equals(k, name));
-        SaveToFile();
+        Mutate(configuration =>
+        {
+            configuration.ActiveContext = storedName;
+            return configuration;
+        });
     }
 
     public IReadOnlyDictionary<string, ContextEntry> ListContexts()
@@ -181,7 +243,7 @@ public class ContextManager : IContextManager
                 }
             };
 
-            SaveToFile();
+            WriteWithLock(_configuration);
             Logger.Info("Migration complete. Settings imported as 'default' context.");
         }
         catch (Exception ex)
@@ -191,19 +253,117 @@ public class ContextManager : IContextManager
         }
     }
 
-    public void SaveActiveContext()
+    /// <inheritdoc />
+    public void SaveEffectiveContext()
     {
-        SaveToFile();
+        var name = GetEffectiveContextName();
+        var entry = GetContext(name);
+
+        if (string.IsNullOrEmpty(name) || entry == null)
+        {
+            // Nothing to merge onto — persist what we have.
+            Mutate(configuration => configuration);
+            return;
+        }
+
+        // Write only this context's entry onto whatever is currently on disk, so a token
+        // refreshed by a parallel invocation for a different context is not clobbered.
+        Mutate(configuration =>
+        {
+            configuration.Contexts[name] = entry;
+            return configuration;
+        });
     }
 
-    private void SaveToFile()
+    /// <summary>
+    ///     Applies a mutation under a cross-process lock: the file is re-read first so changes
+    ///     made by another octo-cli process since our own load are not lost, and the result is
+    ///     written atomically.
+    /// </summary>
+    private void Mutate(Func<ContextConfiguration, ContextConfiguration> mutation)
+    {
+        EnsureDirectory();
+
+        using var fileLock = AcquireLock();
+
+        var configuration = mutation(ReadFromFile());
+        NormalizeContextComparer(configuration);
+
+        WriteAtomic(configuration);
+        _configuration = configuration;
+    }
+
+    private void WriteWithLock(ContextConfiguration configuration)
+    {
+        EnsureDirectory();
+
+        using var fileLock = AcquireLock();
+
+        WriteAtomic(configuration);
+    }
+
+    private ContextConfiguration ReadFromFile()
+    {
+        if (!File.Exists(_contextsFilePath))
+        {
+            return new ContextConfiguration();
+        }
+
+        var json = Retry(() => File.ReadAllText(_contextsFilePath));
+        var configuration = JsonSerializer.Deserialize<ContextConfiguration>(json, JsonOptions)
+                            ?? new ContextConfiguration();
+        NormalizeContextComparer(configuration);
+
+        return configuration;
+    }
+
+    // Writing to a temporary file and renaming it over the target means a concurrent reader
+    // sees either the previous or the new file in full, never a half-written one.
+    private void WriteAtomic(ContextConfiguration configuration)
+    {
+        var json = JsonSerializer.Serialize(configuration, JsonOptions);
+        var temporaryFilePath = _contextsFilePath + ".tmp";
+
+        File.WriteAllText(temporaryFilePath, json);
+        Retry(() =>
+        {
+            File.Move(temporaryFilePath, _contextsFilePath, true);
+            return true;
+        });
+    }
+
+    // A lock file held with FileShare.None is the cross-platform equivalent of a named mutex
+    // here: it works the same on Windows and Linux and is released when the process dies.
+    private FileStream AcquireLock()
+    {
+        return Retry(() => new FileStream(_lockFilePath, FileMode.OpenOrCreate, FileAccess.ReadWrite,
+            FileShare.None));
+    }
+
+    private static T Retry<T>(Func<T> action)
+    {
+        for (var attempt = 1; ; attempt++)
+        {
+            try
+            {
+                return action();
+            }
+            catch (IOException) when (attempt < FileAccessRetryCount)
+            {
+                Thread.Sleep(FileAccessRetryDelayMilliseconds);
+            }
+            catch (UnauthorizedAccessException) when (attempt < FileAccessRetryCount)
+            {
+                Thread.Sleep(FileAccessRetryDelayMilliseconds);
+            }
+        }
+    }
+
+    private void EnsureDirectory()
     {
         if (!Directory.Exists(_directoryPath))
         {
             Directory.CreateDirectory(_directoryPath);
         }
-
-        var json = JsonSerializer.Serialize(_configuration, JsonOptions);
-        File.WriteAllText(_contextsFilePath, json);
     }
 }

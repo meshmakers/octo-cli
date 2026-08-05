@@ -38,7 +38,8 @@ internal class DeleteTenant : ServiceClientOctoCommand<IAssetServicesClient>
         var tenantId = CommandArgumentValue.GetArgumentScalarValue<string>(_tenantIdArg).ToLower();
 
         if (!CommandArgumentValue.IsArgumentUsed(_yesArg) &&
-            !_confirmationService.Confirm($"Are you sure you want to delete tenant '{tenantId}'?"))
+            !_confirmationService.Confirm(
+                $"Are you sure you want to delete tenant '{tenantId}' of {ParentScopeDescription}?"))
         {
             throw ToolException.OperationCancelledByUser();
         }

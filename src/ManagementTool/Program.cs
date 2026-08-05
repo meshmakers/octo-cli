@@ -62,6 +62,13 @@ internal static class Program
                 return await runner.DoActionAsync();
             }
         }
+        catch (ToolException ex)
+        {
+            // Raised while the container is built, before Runner's handler exists — an unknown
+            // --context is the case that matters. Same exit code as ToolException in Runner.
+            logger.Error("{Message}", ex.Message);
+            return -5;
+        }
         catch (Exception ex)
         {
             logger.Error(ex, "Stopped program because of exception");
@@ -86,7 +93,17 @@ internal static class Program
         contextManager.MigrateIfNeeded();
         contextManager.Load();
 
-        var activeContext = contextManager.GetActiveContext();
+        // The context has to be selected here, before the options below are configured from it:
+        // the service clients are singletons that read their options while the command list is
+        // enumerated, which happens before the command line is parsed.
+        var contextSelection = ContextSelection.Resolve(Environment.GetCommandLineArgs(),
+            Environment.GetEnvironmentVariable);
+        if (contextSelection.Name != null)
+        {
+            contextManager.SelectContext(contextSelection.Name);
+        }
+
+        var effectiveContext = contextManager.GetEffectiveContext();
 
         var config = new ConfigurationBuilder()
             .SetBasePath(Directory.GetCurrentDirectory())
@@ -94,33 +111,34 @@ internal static class Program
             .Build();
 
         services.AddSingleton<IContextManager>(contextManager);
+        services.AddSingleton(contextSelection);
 
         services.Configure<OctoToolOptions>(options =>
         {
-            if (activeContext == null)
+            if (effectiveContext == null)
             {
                 return;
             }
 
-            options.IdentityServiceUrl = activeContext.OctoToolOptions.IdentityServiceUrl;
-            options.AssetServiceUrl = activeContext.OctoToolOptions.AssetServiceUrl;
-            options.BotServiceUrl = activeContext.OctoToolOptions.BotServiceUrl;
-            options.CommunicationServiceUrl = activeContext.OctoToolOptions.CommunicationServiceUrl;
-            options.ReportingServiceUrl = activeContext.OctoToolOptions.ReportingServiceUrl;
-            options.AiServiceUrl = activeContext.OctoToolOptions.AiServiceUrl;
-            options.TenantId = activeContext.OctoToolOptions.TenantId;
+            options.IdentityServiceUrl = effectiveContext.OctoToolOptions.IdentityServiceUrl;
+            options.AssetServiceUrl = effectiveContext.OctoToolOptions.AssetServiceUrl;
+            options.BotServiceUrl = effectiveContext.OctoToolOptions.BotServiceUrl;
+            options.CommunicationServiceUrl = effectiveContext.OctoToolOptions.CommunicationServiceUrl;
+            options.ReportingServiceUrl = effectiveContext.OctoToolOptions.ReportingServiceUrl;
+            options.AiServiceUrl = effectiveContext.OctoToolOptions.AiServiceUrl;
+            options.TenantId = effectiveContext.OctoToolOptions.TenantId;
         });
 
         services.Configure<OctoToolAuthenticationOptions>(options =>
         {
-            if (activeContext == null)
+            if (effectiveContext == null)
             {
                 return;
             }
 
-            options.AccessToken = activeContext.Authentication.AccessToken;
-            options.RefreshToken = activeContext.Authentication.RefreshToken;
-            options.AccessTokenExpiresAt = activeContext.Authentication.AccessTokenExpiresAt;
+            options.AccessToken = effectiveContext.Authentication.AccessToken;
+            options.RefreshToken = effectiveContext.Authentication.RefreshToken;
+            options.AccessTokenExpiresAt = effectiveContext.Authentication.AccessTokenExpiresAt;
         });
 
         // configure Logging with NLog
@@ -135,7 +153,7 @@ internal static class Program
         services.AddSingleton<IConsoleService, ConsoleService>();
         services.AddSingleton<IEnvironmentService, EnvironmentService>();
         services.AddSingleton<IParserService, ParserService>();
-        services.AddSingleton<ICommandParser, CommandParser>();
+        services.AddSingleton<ICommandParser, OctoCommandParser>();
 
         services.AddOptions<AuthenticatorOptions>()
             .Configure<IOptions<OctoToolOptions>>(

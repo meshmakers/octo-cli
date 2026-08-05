@@ -97,13 +97,17 @@ public class AuthenticationService : IAuthenticationService
         _authenticationOptions.Value.RefreshToken = authenticationData.RefreshToken;
         _authenticationOptions.Value.AccessTokenExpiresAt = authenticationData.ExpiresAt;
 
-        var activeContext = _contextManager.GetActiveContext();
-        if (activeContext != null)
+        // The effective context, not the active one: with --context in play the token belongs to
+        // the context the command actually talked to.
+        var context = _contextManager.GetEffectiveContext();
+        if (context != null)
         {
-            activeContext.Authentication.AccessToken = authenticationData.AccessToken;
-            activeContext.Authentication.RefreshToken = authenticationData.RefreshToken;
-            activeContext.Authentication.AccessTokenExpiresAt = authenticationData.ExpiresAt;
-            _contextManager.SaveActiveContext();
+            context.Authentication.AccessToken = authenticationData.AccessToken;
+            context.Authentication.RefreshToken = authenticationData.RefreshToken;
+            context.Authentication.AccessTokenExpiresAt = authenticationData.ExpiresAt;
+            _contextManager.SaveEffectiveContext();
+
+            Logger.Info("Credential data stored in context '{0}'.", _contextManager.GetEffectiveContextName());
         }
     }
 }

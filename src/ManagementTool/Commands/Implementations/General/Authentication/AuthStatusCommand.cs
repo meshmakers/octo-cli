@@ -15,17 +15,19 @@ internal class AuthStatusCommand : Command<OctoToolOptions>
     private readonly IAuthenticationService _authenticationService;
     private readonly IAuthenticatorClient _authenticatorClient;
     private readonly IConsoleService _consoleService;
+    private readonly IContextManager _contextManager;
 
     public AuthStatusCommand(ILogger<AuthStatusCommand> logger, IConsoleService consoleService,
         IOptions<OctoToolOptions> options,
         IOptions<OctoToolAuthenticationOptions> authenticationOptions, IAuthenticatorClient authenticatorClient,
-        IAuthenticationService authenticationService)
+        IAuthenticationService authenticationService, IContextManager contextManager)
         : base(logger, "AuthStatus", "Gets authentication status to the configured identity services.", options)
     {
         _consoleService = consoleService;
         _authenticationOptions = authenticationOptions;
         _authenticatorClient = authenticatorClient;
         _authenticationService = authenticationService;
+        _contextManager = contextManager;
     }
 
     public override CommandDocumentation? GetDocumentation() =>
@@ -38,6 +40,13 @@ internal class AuthStatusCommand : Command<OctoToolOptions>
 
     public override async Task Execute()
     {
+        // Which context the reported token belongs to is the first thing to know here — more so
+        // once --context can point the command at a context that is not the active one.
+        Logger.LogInformation("Authentication status of context '{ContextName}'{OverrideHint}, file '{ContextFile}'",
+            _contextManager.GetEffectiveContextName() ?? "<none>",
+            _contextManager.IsContextOverridden ? $" (via --{Constants.ContextArgumentTerm})" : string.Empty,
+            _contextManager.ConfigurationFilePath);
+
         Logger.LogInformation("Check of authentication status at \'{ValueIdentityServiceUrl}\' in progress...",
             Options.Value.IdentityServiceUrl);
 

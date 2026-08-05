@@ -40,7 +40,8 @@ internal class CleanTenant : ServiceClientOctoCommand<IAssetServicesClient>
 
         if (!CommandArgumentValue.IsArgumentUsed(_yesArg) &&
             !_confirmationService.Confirm(
-                $"Are you sure you want to clean tenant '{tenantId}'? This will reset it to factory defaults"))
+                $"Are you sure you want to clean tenant '{tenantId}' of {ParentScopeDescription}? " +
+                "This will reset it to factory defaults"))
         {
             throw ToolException.OperationCancelledByUser();
         }

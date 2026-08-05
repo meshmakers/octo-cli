@@ -32,6 +32,7 @@ internal class ListContextsCommand : Command<OctoToolOptions>
     {
         var contexts = _contextManager.ListContexts();
         var activeName = _contextManager.GetActiveContextName();
+        var effectiveName = _contextManager.GetEffectiveContextName();
         var isJson = CommandArgumentValue.IsArgumentUsed(_jsonArg);
 
         if (CommandArgumentValue.IsArgumentUsed(_nameArg))
@@ -45,11 +46,11 @@ internal class ListContextsCommand : Command<OctoToolOptions>
 
             if (isJson)
             {
-                _consoleService.WriteLine(BuildJson(new[] { (name, entry) }, activeName));
+                _consoleService.WriteLine(BuildJson(new[] { (name, entry) }, activeName, effectiveName));
             }
             else
             {
-                WriteDetail(name, entry, activeName == name);
+                WriteDetail(name, entry, IsSame(name, activeName), IsSame(name, effectiveName));
             }
 
             return Task.CompletedTask;
@@ -71,17 +72,19 @@ internal class ListContextsCommand : Command<OctoToolOptions>
 
         if (isJson)
         {
-            _consoleService.WriteLine(BuildJson(contexts.Select(kv => (kv.Key, kv.Value)), activeName));
+            _consoleService.WriteLine(BuildJson(contexts.Select(kv => (kv.Key, kv.Value)), activeName,
+                effectiveName));
         }
         else
         {
-            WriteTable(contexts, activeName);
+            WriteTable(contexts, activeName, effectiveName);
         }
 
         return Task.CompletedTask;
     }
 
-    private void WriteTable(IReadOnlyDictionary<string, ContextEntry> contexts, string? activeName)
+    private void WriteTable(IReadOnlyDictionary<string, ContextEntry> contexts, string? activeName,
+        string? effectiveName)
     {
         _consoleService.WriteLine("");
         _consoleService.WriteLine("Available contexts:");
@@ -89,7 +92,12 @@ internal class ListContextsCommand : Command<OctoToolOptions>
 
         foreach (var (name, entry) in contexts)
         {
-            var marker = name == activeName ? " *" : "";
+            var marker = IsSame(name, activeName) ? " *" : "";
+            if (_contextManager.IsContextOverridden && IsSame(name, effectiveName))
+            {
+                marker += " >";
+            }
+
             var tenant = entry.OctoToolOptions.TenantId ?? "(not set)";
             var identity = entry.OctoToolOptions.IdentityServiceUrl ?? "(not set)";
             var auth = DescribeAuth(entry.Authentication);
@@ -101,13 +109,32 @@ internal class ListContextsCommand : Command<OctoToolOptions>
 
         _consoleService.WriteLine("");
         _consoleService.WriteLine("* = active context");
+        if (_contextManager.IsContextOverridden)
+        {
+            _consoleService.WriteLine($"> = context used by this invocation (--{Constants.ContextArgumentTerm})");
+        }
+
+        _consoleService.WriteLine($"Context file: {_contextManager.ConfigurationFilePath}");
     }
 
-    private void WriteDetail(string name, ContextEntry entry, bool isActive)
+    private void WriteDetail(string name, ContextEntry entry, bool isActive, bool isEffective)
     {
         var o = entry.OctoToolOptions;
+        var markers = new List<string>();
+        if (isActive)
+        {
+            markers.Add("active");
+        }
+
+        if (_contextManager.IsContextOverridden && isEffective)
+        {
+            markers.Add("in use");
+        }
+
+        var suffix = markers.Count == 0 ? "" : $" ({string.Join(", ", markers)})";
+
         _consoleService.WriteLine("");
-        _consoleService.WriteLine($"Context: {name}{(isActive ? " (active)" : "")}");
+        _consoleService.WriteLine($"Context: {name}{suffix}");
         _consoleService.WriteLine("==========================================");
         _consoleService.WriteLine($"  Tenant:                 {o.TenantId ?? "(not set)"}");
         _consoleService.WriteLine($"  Identity Service:       {o.IdentityServiceUrl ?? "(not set)"}");
@@ -138,7 +165,14 @@ internal class ListContextsCommand : Command<OctoToolOptions>
         return $"{status} (expires {expiresAtUtc:O}{refresh})";
     }
 
-    private static string BuildJson(IEnumerable<(string Name, ContextEntry Entry)> contexts, string? activeName)
+    // Names come from a dictionary keyed with OrdinalIgnoreCase, so compare them the same way.
+    private static bool IsSame(string name, string? other)
+    {
+        return other != null && StringComparer.OrdinalIgnoreCase.Equals(name, other);
+    }
+
+    private static string BuildJson(IEnumerable<(string Name, ContextEntry Entry)> contexts, string? activeName,
+        string? effectiveName)
     {
         var list = contexts.Select(c =>
         {
@@ -164,7 +198,8 @@ internal class ListContextsCommand : Command<OctoToolOptions>
             return new
             {
                 name = c.Name,
-                isActive = c.Name == activeName,
+                isActive = IsSame(c.Name, activeName),
+                isEffective = IsSame(c.Name, effectiveName),
                 tenant = c.Entry.OctoToolOptions.TenantId,
                 services = new
                 {

@@ -81,9 +81,9 @@ longer in the global NuGet cache.
 
 ### Key Components
 
-- **ContextManager** (`Services/ContextManager.cs`): Manages named contexts stored in `~/.octo-cli/contexts.json`. Each context holds its own `OctoToolOptions` (service URIs, tenant) and `OctoToolAuthenticationOptions` (tokens). Supports migration from legacy `settings.json`. **Context names are matched case-insensitively** (`StringComparer.OrdinalIgnoreCase`), so `UseContext`/`RemoveContext` accept any casing; the active context is persisted using the stored key's canonical casing. Because System.Text.Json deserializes the `Contexts` dictionary with the ordinal comparer, `Load()` rebuilds it with `OrdinalIgnoreCase` after reading the file.
+- **ContextManager** (`Services/ContextManager.cs`): Manages named contexts stored in `~/.octo-cli/contexts.json`. Each context holds its own `OctoToolOptions` (service URIs, tenant) and `OctoToolAuthenticationOptions` (tokens). Supports migration from legacy `settings.json`. **Context names are matched case-insensitively** (`StringComparer.OrdinalIgnoreCase`), so `UseContext`/`RemoveContext` accept any casing; the active context is persisted using the stored key's canonical casing. Because System.Text.Json deserializes the `Contexts` dictionary with the ordinal comparer, `Load()` rebuilds it with `OrdinalIgnoreCase` after reading the file. Distinguishes the **active** context (persisted) from the **effective** one (`SelectContext` / `GetEffectiveContext`, chosen per invocation by `--context`), and serialises every write behind a cross-process lock — see [Per-invocation context override](#per-invocation-context-override---context).
 
-- **AuthenticationService** (`Services/AuthenticationService.cs`): Handles OAuth token management. Saves tokens to the active context via `IContextManager`. Supports both access tokens and refresh tokens.
+- **AuthenticationService** (`Services/AuthenticationService.cs`): Handles OAuth token management. Saves tokens to the *effective* context via `IContextManager` (`SaveEffectiveContext`), so `--context` sends the token to the context the command actually used. Supports both access tokens and refresh tokens.
 
 - **ServiceClientOctoCommand**: Base class for commands that call Octo services. Automatically handles authentication via `IAuthenticationService`.
 
@@ -98,7 +98,8 @@ The CLI supports multiple authentication methods:
    - CLI displays device code and verification URL
    - User authenticates in browser
    - CLI receives access token plus a refresh token (device flow requests `offline_access`)
-   - Token stored in the active context's `Authentication` block in `~/.octo-cli/contexts.json`
+   - Token stored in the effective context's `Authentication` block in `~/.octo-cli/contexts.json`
+     (the active context, or the one named by `--context`)
    - **`--if-needed` (`-in`)**: non-disruptive variant. Before starting the device
      flow, the command checks whether the stored access token is still valid; if not,
      it tries a silent refresh-token exchange. The device flow is only started when
@@ -109,9 +110,9 @@ The CLI supports multiple authentication methods:
 2. **Client Credentials Flow** (non-interactive — pipelines, cron jobs, headless servers, container entrypoints, batch scripts, bots, etc.):
    - Operator creates a per-tenant client once: `octo-cli -c AddClientCredentialsClient -id <id> -n "<name>" -s <secret>`
    - Caller exports `OCTO_CLI_CLIENT_ID` and `OCTO_CLI_CLIENT_SECRET` (or passes `-id`/`-s`), then runs `octo-cli -c LogInClientCredentials`
-   - Tenant comes from the active context (no `-tid` arg on the login command). Switch contexts with `UseContext` to target a different tenant.
+   - Tenant comes from the effective context (no `-tid` arg on the login command). Switch contexts with `UseContext`, or target another tenant for one invocation with `--context <name>`.
    - No refresh token is issued. While the env vars remain set, `EnsureAuthenticated` automatically re-acquires the token when it expires; otherwise re-run `LogInClientCredentials`.
-   - Token stored in the active context's `Authentication` block, same path as device flow.
+   - Token stored in the effective context's `Authentication` block, same path as device flow.
 
 ### Token Storage & Context Management
 
@@ -140,17 +141,89 @@ The CLI uses named contexts (similar to `kubectl config use-context`) stored in 
 
 **Migration**: On first run, if `contexts.json` does not exist but `settings.json` does, the CLI automatically imports the legacy settings as a `"default"` context. The original `settings.json` is kept intact.
 
+### Per-invocation context override (`--context`)
+
+`UseContext` switches the active context persistently, which makes it useless for running two
+commands against different environments at the same time. **`--context <name>` selects a stored
+context for a single invocation and never touches `ActiveContext`**, so parallel invocations can
+each target their own tenant/environment:
+
+```bash
+octo-cli --context prod_acme -c GetUsers      # runs against prod_acme
+octo-cli -c GetAdapters --context prod_acme   # position does not matter
+OCTO_CLI_CONTEXT=prod_acme octo-cli -c GetPools
+```
+
+Precedence: `--context` > `OCTO_CLI_CONTEXT` > `ActiveContext`. An unknown name aborts with exit
+code `-5` and lists the known contexts — there is no silent fallback to the active context.
+
+The natural way to create the contexts is `Register-OctoCliContext -NoSwitch` in `octo-tools`
+(`modules/Register-OctoCliContext.psm1`): it registers a context without switching to it, which is
+exactly what `--context` then addresses.
+
+Behaviour worth knowing:
+
+- **It is a top-level argument, not a command argument.** It is declared by `OctoCommandParser`
+  (`src/ManagementTool/OctoCommandParser.cs`) on the parser's top layer, so it works before or
+  after `-c <command>` and applies to *every* command. Accepted spellings are `--context`,
+  `-context` and `/context`; **no short form** exists, deliberately, so the term cannot collide
+  with an argument a future command declares. `CommandReferenceGenerator` only reads command
+  classes, so this argument does not appear on any generated command-reference page — it is
+  visible in `octo-cli -h all`.
+- **It resolves before the DI container is built.** `Program.BuildDi` fills `OctoToolOptions` and
+  every service-client options object from the context, and the service clients are constructed
+  while the command list is enumerated — all of that happens *before* the command line is parsed.
+  `ContextSelection.Resolve` therefore pre-scans the raw arguments; the parser declaration exists
+  for validation, help and a consistency check. When changing either side, keep
+  `ContextOverrideResolver.IsContextTerm` in step with `Argument.Compare` in `mm-common`.
+- **Tokens are written to the effective context.** `AuthenticationService.SaveAuthenticationData`
+  uses `GetEffectiveContext()`, so `--context prod -c LogIn` logs into `prod` without activating
+  it, and a refreshed token never lands in the wrong context.
+- **`Config` refuses to run with `--context`** (exit `-5`): the override picks the context a
+  command *acts on*, and rewriting a stored context definition through it is never the intent. Use
+  `AddContext -n <name>` to write a named context. `UseContext` still switches the active context
+  and logs a warning that `--context` does not apply to it.
+- **`ListContexts` marks both**: `*` is the active context, `>` the one this invocation uses. The
+  JSON output carries `isActive` and `isEffective`.
+
+**`IContextManager` has two notions of "current"**: `GetActiveContext()` is the persisted
+selection — use it only where that selection is itself the subject (`ListContexts`, `UseContext`).
+Everything acting on "the context in use" wants `GetEffectiveContext()` / `SaveEffectiveContext()`.
+
+### Parallel invocations and `contexts.json`
+
+Because several processes can now write `contexts.json` concurrently (token refresh, `AddContext`),
+every write in `ContextManager` **takes a cross-process lock (`contexts.lock`, `FileShare.None`
+with retries), re-reads the file, applies only its own change, and replaces the file atomically**
+(temp file + `File.Move(overwrite: true)`). A reader therefore never sees a half-written file, and
+two processes refreshing tokens for different contexts do not overwrite each other. A plain
+"serialise my whole in-memory state" write — what the code did before — loses one of them.
+
+For complete isolation (CI matrix jobs, throwaway environments), point each job at its own
+configuration directory with **`OCTO_CLI_HOME`**: it names the *parent* of the `.octo-cli` folder,
+so there is no shared file to contend for at all. Unset, the user profile is used as before. The
+path in effect is logged on every run and shown by `ListContexts`.
+
 **Note**: Device flow requests `offline_access` scope and receives a refresh token. The `AuthenticationService` handles both cases: if a refresh token is present, it refreshes expired access tokens automatically; if not, it uses the existing access token directly.
 
 ## Configuration
 
 The CLI uses:
-- **User folder**: `~/.octo-cli/` (defined in `Constants.OctoToolUserFolderName`)
+- **User folder**: `~/.octo-cli/` (defined in `Constants.OctoToolUserFolderName`), or
+  `$OCTO_CLI_HOME/.octo-cli/` when that variable is set
 - **Context file**: `contexts.json` for multi-context configuration and authentication data
+- **Lock file**: `contexts.lock`, held while `contexts.json` is rewritten so parallel invocations
+  cannot lose each other's changes
 - **Legacy file**: `settings.json` (auto-migrated to `contexts.json` on first run)
 - **Context manager**: `IContextManager` for loading/saving context configuration
 
-Environment variables are prefixed with `OCTO_`.
+Environment variables are prefixed with `OCTO_`:
+
+| Variable | Purpose |
+|---|---|
+| `OCTO_CLI_CONTEXT` | Context used for this invocation, like `--context` but for a whole subshell. The argument wins when both are set. |
+| `OCTO_CLI_HOME` | Parent directory of the `.octo-cli` folder. Give parallel jobs different values to get fully separate `contexts.json` files. |
+| `OCTO_CLI_CLIENT_ID` / `OCTO_CLI_CLIENT_SECRET` | Credentials for `LogInClientCredentials` and for automatic token renewal. |
 
 ## Command Categories
 
@@ -170,7 +243,7 @@ Environment variables are prefixed with `OCTO_`.
 > are now tenant-scoped (like Communication): `Program.cs` sets `TenantId` (from the active
 > context) on `StreamDataServiceClientOptions` and `ReportingServicesClientOptions`. The SDK
 > routes these to `{tenantId}/v1` and throws `ServiceConfigurationMissingException` if the
-> active context has no `TenantId`, so `EnableStreamData` / archive / rollup / computed-column
+> effective context has no `TenantId`, so `EnableStreamData` / archive / rollup / computed-column
 > commands and `EnableReporting` / `DisableReporting` require a context with a tenant set. The
 > former system-scoped enable/disable endpoints were removed server-side.
 
@@ -179,6 +252,13 @@ Environment variables are prefixed with `OCTO_`.
 The help flag is served by `CommandParser` / `ParserService` in
 `Meshmakers.Common.CommandLineParser` (repo `mm-common`), not by octo-cli itself. It is
 implicit: no command declares it, every command understands it.
+
+> **Top-level arguments.** Besides `-c`/`--command` and the help flag, octo-cli declares one
+> argument on the parser's top layer: `--context` (see
+> [Per-invocation context override](#per-invocation-context-override---context)). It is understood
+> by every command, in any position, and is listed in the full usage output. Commands themselves
+> keep declaring their arguments via `CommandArgumentValue.AddArgument`; a top-level argument is
+> added in `OctoCommandParser`, and only for something that genuinely applies to all commands.
 
 The help has three levels, so nobody has to page through all 176 commands to find one:
 
@@ -257,8 +337,19 @@ octo-cli -c ListContexts            # Tabular list of all contexts with auth sta
 octo-cli -c ListContexts -n dev     # Detail view of one context (all service URIs)
 octo-cli -c ListContexts -j         # JSON output for scripting (tokens never included)
 
-# Login via device code flow (tokens saved to active context)
+# Run a single command against another context without switching the active one.
+# Works with every command and in any position.
+octo-cli --context prod -c GetUsers
+octo-cli -c GetAdapters --context prod
+export OCTO_CLI_CONTEXT=prod        # same, for a whole subshell
+# Parallel jobs against different environments (this is what the override is for):
+foreach ($c in 'test_a','test_b') { Start-Job { octo-cli --context $using:c -c DeployTriggers } }
+# Fully isolated configuration per job — no shared contexts.json at all:
+OCTO_CLI_HOME=/tmp/job-$JOB_ID octo-cli -c AddContext -n ci -isu … -tid …
+
+# Login via device code flow (tokens saved to the context in use)
 octo-cli -c LogIn
+octo-cli --context prod -c LogIn    # log into prod without making it active
 
 # Non-disruptive login: reuse the valid token or refresh it silently, and only
 # open a browser if neither works (great for re-runnable setup scripts).
@@ -274,7 +365,7 @@ octo-cli -c LogInClientCredentials
 # Check authentication status
 octo-cli -c AuthStatus
 
-# Configure the active context
+# Configure the active context (rejected when combined with --context)
 octo-cli -c Config -isu https://localhost:5003/ -asu https://localhost:5001/ -tid meshtest
 
 # List identity providers
@@ -584,9 +675,9 @@ All destructive commands (Delete, Clean, Reset, Remove) require interactive user
 
 | Command | Confirmation Message |
 |---------|---------------------|
-| `DeleteTenant` | `delete tenant '{tenantId}'` |
-| `CleanTenant` | `clean tenant '{tenantId}'? This will reset it to factory defaults` |
-| `ClearTenantCache` | `clear the cache for tenant '{tenantId}'` |
+| `DeleteTenant` | `delete tenant '{tenantId}' of {parent scope}` |
+| `CleanTenant` | `clean tenant '{tenantId}' of {parent scope}? This will reset it to factory defaults` |
+| `ClearTenantCache` | `clear the cache for tenant '{tenantId}' of {parent scope}` |
 | `DeleteUser` | `delete user '{name}'` |
 | `ResetPassword` | `reset the password for user '{name}'` |
 | `RemoveUserFromRole` | `remove user '{name}' from role '{roleName}'` |
@@ -600,6 +691,19 @@ All destructive commands (Delete, Clean, Reset, Remove) require interactive user
 | `DeleteApiSecretClient` | `delete API secret for client '{clientId}'` |
 | `DeleteArchive` | `delete archive '{archiveRtId}'? The CrateDB table will be dropped and historical data lost` |
 | `UninstallBlueprint` | `uninstall blueprint '{name}' from tenant '{tenantId}'[ together with any blueprints that depend on it and any orphaned dependencies]? Locked owned entities will be erased` |
+| `UnprovisionClientFromTenant` | `remove client '{clientId}' from child tenant '{childTenantId}' of {parent scope}? …` |
+
+**`{parent scope}`** expands to `parent tenant '<tenant>' at '<scheme://host:port>'` via
+`ServiceClientOctoCommand.ParentScopeDescription`. Commands that act on a **child** tenant name it,
+because the child alone does not identify the operation: the parent scope comes from the effective
+context, which `--context` can change per invocation, and two contexts may carry the same tenant id
+against different environments — hence the host, not just the tenant. Commands whose target *is* the
+context tenant (`DeleteUser`, `DeleteArchive`, …) do not use it; there is no parent/child split to
+disambiguate there.
+
+The prompt text is only visible on a real terminal — `ConfirmationService` writes it with
+`Console.Write` and suppresses it entirely when input is redirected. `ParentScopeDescriptionTests`
+pins the scope string for that reason.
 
 ### Usage Examples
 
