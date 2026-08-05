@@ -12,6 +12,10 @@ namespace ManagementTool.Tests;
 /// </summary>
 public sealed class ContextManagerTests : IDisposable
 {
+    // Constants is internal to the tool assembly, so the name is repeated here on purpose;
+    // a mismatch shows up as a failing test rather than a silently skipped one.
+    private const string EnvVarHome = "OCTO_CLI_HOME";
+
     private readonly string _baseDirectory;
 
     public ContextManagerTests()
@@ -29,6 +33,50 @@ public sealed class ContextManagerTests : IDisposable
     }
 
     private ContextManager NewManager() => new(_baseDirectory);
+
+    [Theory]
+    [InlineData("")]
+    [InlineData(" ")]
+    [InlineData("  ")]
+    public void OctoCliHome_IsTrimmed(string padding)
+    {
+        // Stray whitespace does not fail: it resolves to a *different* directory, where the tool
+        // reports "No contexts configured" with exit code 0 and starts a second configuration tree.
+        // `set OCTO_CLI_HOME=C:\foo ` in cmd.exe keeps that trailing space.
+        var previous = Environment.GetEnvironmentVariable(EnvVarHome);
+        try
+        {
+            Environment.SetEnvironmentVariable(EnvVarHome, _baseDirectory);
+            var expected = new ContextManager().ConfigurationFilePath;
+
+            Environment.SetEnvironmentVariable(EnvVarHome, $"{padding}{_baseDirectory}{padding}");
+
+            Assert.Equal(expected, new ContextManager().ConfigurationFilePath);
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable(EnvVarHome, previous);
+        }
+    }
+
+    [Fact]
+    public void OctoCliHome_BlankFallsBackToTheUserProfile()
+    {
+        var previous = Environment.GetEnvironmentVariable(EnvVarHome);
+        try
+        {
+            Environment.SetEnvironmentVariable(EnvVarHome, "   ");
+
+            var expected = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+                ".octo-cli", "contexts.json");
+
+            Assert.Equal(expected, new ContextManager().ConfigurationFilePath);
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable(EnvVarHome, previous);
+        }
+    }
 
     private static ContextEntry SampleEntry(string tenant) =>
         new() { OctoToolOptions = new OctoToolOptions { TenantId = tenant } };

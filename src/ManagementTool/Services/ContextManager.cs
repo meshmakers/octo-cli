@@ -14,10 +14,12 @@ public class ContextManager : IContextManager
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
     };
 
-    // Every write re-reads, merges and atomically replaces the file while holding a
-    // cross-process lock, so parallel octo-cli invocations (each with its own --context)
-    // do not lose each other's changes. The retries cover the window in which another
-    // process holds the lock or has the file open for reading.
+    // Writes go through Mutate: re-read the file, apply only this process's change, replace it
+    // atomically, all while holding a cross-process lock. That way parallel octo-cli invocations
+    // (each with its own --context) do not lose each other's changes. The one exception is
+    // MigrateIfNeeded, which writes a whole configuration without re-reading — correct there,
+    // because it only runs when contexts.json does not exist yet.
+    // The retries cover the window in which another process holds the lock or has the file open.
     private const int FileAccessRetryCount = 50;
     private const int FileAccessRetryDelayMilliseconds = 100;
 
@@ -61,13 +63,18 @@ public class ContextManager : IContextManager
     // OCTO_CLI_HOME points at the parent of the ".octo-cli" folder, matching the
     // baseDirectory parameter above. Giving each parallel job its own value is the
     // strongest form of isolation: separate files instead of a shared one.
+    //
+    // Trimmed because stray whitespace does not fail — it silently resolves to a *different*
+    // directory, where the tool then reports "No contexts configured" with exit code 0 and writes
+    // a second configuration tree. `set OCTO_CLI_HOME=C:\foo ` in cmd.exe keeps that trailing
+    // space, and pipeline variables pick them up just as easily.
     private static string ResolveBaseDirectory()
     {
         var home = Environment.GetEnvironmentVariable(Constants.EnvVarHome);
 
         return string.IsNullOrWhiteSpace(home)
             ? Environment.GetFolderPath(Environment.SpecialFolder.UserProfile)
-            : home;
+            : home.Trim();
     }
 
     public ContextConfiguration Load()
@@ -90,11 +97,6 @@ public class ContextManager : IContextManager
 
         configuration.Contexts =
             new Dictionary<string, ContextEntry>(configuration.Contexts, StringComparer.OrdinalIgnoreCase);
-    }
-
-    public void Save(ContextConfiguration configuration)
-    {
-        Mutate(_ => configuration);
     }
 
     public ContextEntry? GetActiveContext()
@@ -154,8 +156,6 @@ public class ContextManager : IContextManager
             {
                 configuration.ActiveContext = name;
             }
-
-            return configuration;
         });
     }
 
@@ -165,7 +165,7 @@ public class ContextManager : IContextManager
         {
             if (!configuration.Contexts.Remove(name))
             {
-                return configuration;
+                return;
             }
 
             // If the removed context was active, switch to another or clear
@@ -173,8 +173,6 @@ public class ContextManager : IContextManager
             {
                 configuration.ActiveContext = configuration.Contexts.Keys.FirstOrDefault();
             }
-
-            return configuration;
         });
     }
 
@@ -186,11 +184,7 @@ public class ContextManager : IContextManager
             throw ToolException.UnknownContext(name, _configuration.Contexts.Keys);
         }
 
-        Mutate(configuration =>
-        {
-            configuration.ActiveContext = storedName;
-            return configuration;
-        });
+        Mutate(configuration => configuration.ActiveContext = storedName);
     }
 
     public IReadOnlyDictionary<string, ContextEntry> ListContexts()
@@ -261,18 +255,14 @@ public class ContextManager : IContextManager
 
         if (string.IsNullOrEmpty(name) || entry == null)
         {
-            // Nothing to merge onto — persist what we have.
-            Mutate(configuration => configuration);
+            // No context to save into. Writing anything here would only rewrite the file with
+            // what it already holds.
             return;
         }
 
         // Write only this context's entry onto whatever is currently on disk, so a token
         // refreshed by a parallel invocation for a different context is not clobbered.
-        Mutate(configuration =>
-        {
-            configuration.Contexts[name] = entry;
-            return configuration;
-        });
+        Mutate(configuration => configuration.Contexts[name] = entry);
     }
 
     /// <summary>
@@ -280,13 +270,19 @@ public class ContextManager : IContextManager
     ///     made by another octo-cli process since our own load are not lost, and the result is
     ///     written atomically.
     /// </summary>
-    private void Mutate(Func<ContextConfiguration, ContextConfiguration> mutation)
+    /// <remarks>
+    ///     Deliberately an <see cref="Action{T}" />: a mutation can only adjust the configuration it
+    ///     is handed, never hand back a different one. Returning a wholesale replacement is exactly
+    ///     how a caller would discard a parallel invocation's changes without noticing.
+    /// </remarks>
+    private void Mutate(Action<ContextConfiguration> mutation)
     {
         EnsureDirectory();
 
         using var fileLock = AcquireLock();
 
-        var configuration = mutation(ReadFromFile());
+        var configuration = ReadFromFile();
+        mutation(configuration);
         NormalizeContextComparer(configuration);
 
         WriteAtomic(configuration);

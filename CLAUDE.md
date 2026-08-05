@@ -193,11 +193,18 @@ Everything acting on "the context in use" wants `GetEffectiveContext()` / `SaveE
 ### Parallel invocations and `contexts.json`
 
 Because several processes can now write `contexts.json` concurrently (token refresh, `AddContext`),
-every write in `ContextManager` **takes a cross-process lock (`contexts.lock`, `FileShare.None`
-with retries), re-reads the file, applies only its own change, and replaces the file atomically**
-(temp file + `File.Move(overwrite: true)`). A reader therefore never sees a half-written file, and
-two processes refreshing tokens for different contexts do not overwrite each other. A plain
-"serialise my whole in-memory state" write — what the code did before — loses one of them.
+every write in `ContextManager` goes through `Mutate`, which **takes a cross-process lock
+(`contexts.lock`, `FileShare.None` with retries), re-reads the file, applies only its own change,
+and replaces the file atomically** (temp file + `File.Move(overwrite: true)`). A reader therefore
+never sees a half-written file, and two processes refreshing tokens for different contexts do not
+overwrite each other. A plain "serialise my whole in-memory state" write — what the code did
+before — loses one of them.
+
+`Mutate` takes an `Action<ContextConfiguration>`, not a function returning one: a mutation can
+adjust the configuration it is handed but cannot hand back a different instance, because returning
+a wholesale replacement is precisely how a caller would discard a parallel invocation's changes
+unnoticed. The single exception to the re-read is `MigrateIfNeeded`, which writes a whole
+configuration — correct there, since it only runs when `contexts.json` does not exist yet.
 
 For complete isolation (CI matrix jobs, throwaway environments), point each job at its own
 configuration directory with **`OCTO_CLI_HOME`**: it names the *parent* of the `.octo-cli` folder,
@@ -222,7 +229,7 @@ Environment variables are prefixed with `OCTO_`:
 | Variable | Purpose |
 |---|---|
 | `OCTO_CLI_CONTEXT` | Context used for this invocation, like `--context` but for a whole subshell. The argument wins when both are set. |
-| `OCTO_CLI_HOME` | Parent directory of the `.octo-cli` folder. Give parallel jobs different values to get fully separate `contexts.json` files. |
+| `OCTO_CLI_HOME` | Parent directory of the `.octo-cli` folder. Give parallel jobs different values to get fully separate `contexts.json` files. Trimmed before use — untrimmed whitespace would silently resolve to a different directory rather than fail. |
 | `OCTO_CLI_CLIENT_ID` / `OCTO_CLI_CLIENT_SECRET` | Credentials for `LogInClientCredentials` and for automatic token renewal. |
 
 ## Command Categories

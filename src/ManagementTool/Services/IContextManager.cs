@@ -15,8 +15,6 @@ public interface IContextManager
 
     ContextConfiguration Load();
 
-    void Save(ContextConfiguration configuration);
-
     /// <summary>
     ///     The context persisted as active. Use this only where the persisted selection itself is
     ///     the subject (listing contexts, switching them); everything acting on "the context in
