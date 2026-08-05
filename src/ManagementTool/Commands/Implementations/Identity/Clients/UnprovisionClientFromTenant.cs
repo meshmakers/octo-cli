@@ -37,7 +37,8 @@ internal class UnprovisionClientFromTenant : ServiceClientOctoCommand<IIdentityS
 
         if (!CommandArgumentValue.IsArgumentUsed(_yesArg) &&
             !_confirmationService.Confirm(
-                $"Remove client '{clientId}' from child tenant '{childTenantId}'? The mirror client will be erased from the child tenant's identity DB."))
+                $"Remove client '{clientId}' from child tenant '{childTenantId}' of {ParentScopeDescription}? " +
+                "The mirror client will be erased from the child tenant's identity DB."))
         {
             throw ToolException.OperationCancelledByUser();
         }

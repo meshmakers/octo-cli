@@ -1,6 +1,7 @@
 ﻿using System.Reflection;
 using Meshmakers.Common.CommandLineParser;
 using Meshmakers.Common.CommandLineParser.Commands;
+using Meshmakers.Octo.Frontend.ManagementTool.Services;
 using Meshmakers.Octo.Sdk.ServiceClient;
 using Meshmakers.Octo.Sdk.ServiceClient.Authentication;
 using Meshmakers.Octo.Sdk.ServiceClient.Authorization;
@@ -12,11 +13,16 @@ internal class Runner
 {
     private readonly ILogger<Runner> _logger;
     private readonly ICommandParser _parser;
+    private readonly IContextManager _contextManager;
+    private readonly ContextSelection _contextSelection;
 
-    public Runner(ILogger<Runner> logger, ICommandParser parser)
+    public Runner(ILogger<Runner> logger, ICommandParser parser, IContextManager contextManager,
+        ContextSelection contextSelection)
     {
         _logger = logger;
         _parser = parser;
+        _contextManager = contextManager;
+        _contextSelection = contextSelection;
     }
 
     public async Task<int> DoActionAsync()
@@ -27,6 +33,8 @@ internal class Runner
                 GetProductVersion());
             _logger.LogInformation("{Copyright}", GetCopyright());
             _logger.LogInformation("Executable directory: {BinDirectory}", GetBinDirectory());
+
+            LogContextInUse();
 
             await _parser.ParseAndValidateAsync(Constants.OctoExeName);
 
@@ -92,6 +100,28 @@ internal class Runner
 
             return -99;
         }
+    }
+
+    /// <summary>
+    ///     Names the context this run works with. Logged for every command, because with parallel
+    ///     invocations against different contexts the output is otherwise impossible to attribute.
+    /// </summary>
+    private void LogContextInUse()
+    {
+        var name = _contextManager.GetEffectiveContextName();
+
+        if (_contextSelection.IsOverridden)
+        {
+            _logger.LogInformation(
+                "Using context '{ContextName}' from {ContextSource} (active context '{ActiveContextName}' unchanged)",
+                name, _contextSelection.Source, _contextManager.GetActiveContextName() ?? "<none>");
+        }
+        else
+        {
+            _logger.LogInformation("Using active context '{ContextName}'", name ?? "<none>");
+        }
+
+        _logger.LogInformation("Context file: {ConfigurationFilePath}", _contextManager.ConfigurationFilePath);
     }
 
     private static string GetProductVersion()

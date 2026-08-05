@@ -38,7 +38,8 @@ internal class ClearTenantCache : ServiceClientOctoCommand<IAssetServicesClient>
         var tenantId = CommandArgumentValue.GetArgumentScalarValue<string>(_tenantIdArg).ToLower();
 
         if (!CommandArgumentValue.IsArgumentUsed(_yesArg) &&
-            !_confirmationService.Confirm($"Are you sure you want to clear the cache for tenant '{tenantId}'?"))
+            !_confirmationService.Confirm(
+                $"Are you sure you want to clear the cache for tenant '{tenantId}' of {ParentScopeDescription}?"))
         {
             throw ToolException.OperationCancelledByUser();
         }

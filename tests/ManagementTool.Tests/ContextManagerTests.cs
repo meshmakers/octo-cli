@@ -12,6 +12,10 @@ namespace ManagementTool.Tests;
 /// </summary>
 public sealed class ContextManagerTests : IDisposable
 {
+    // Constants is internal to the tool assembly, so the name is repeated here on purpose;
+    // a mismatch shows up as a failing test rather than a silently skipped one.
+    private const string EnvVarHome = "OCTO_CLI_HOME";
+
     private readonly string _baseDirectory;
 
     public ContextManagerTests()
@@ -29,6 +33,50 @@ public sealed class ContextManagerTests : IDisposable
     }
 
     private ContextManager NewManager() => new(_baseDirectory);
+
+    [Theory]
+    [InlineData("")]
+    [InlineData(" ")]
+    [InlineData("  ")]
+    public void OctoCliHome_IsTrimmed(string padding)
+    {
+        // Stray whitespace does not fail: it resolves to a *different* directory, where the tool
+        // reports "No contexts configured" with exit code 0 and starts a second configuration tree.
+        // `set OCTO_CLI_HOME=C:\foo ` in cmd.exe keeps that trailing space.
+        var previous = Environment.GetEnvironmentVariable(EnvVarHome);
+        try
+        {
+            Environment.SetEnvironmentVariable(EnvVarHome, _baseDirectory);
+            var expected = new ContextManager().ConfigurationFilePath;
+
+            Environment.SetEnvironmentVariable(EnvVarHome, $"{padding}{_baseDirectory}{padding}");
+
+            Assert.Equal(expected, new ContextManager().ConfigurationFilePath);
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable(EnvVarHome, previous);
+        }
+    }
+
+    [Fact]
+    public void OctoCliHome_BlankFallsBackToTheUserProfile()
+    {
+        var previous = Environment.GetEnvironmentVariable(EnvVarHome);
+        try
+        {
+            Environment.SetEnvironmentVariable(EnvVarHome, "   ");
+
+            var expected = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+                ".octo-cli", "contexts.json");
+
+            Assert.Equal(expected, new ContextManager().ConfigurationFilePath);
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable(EnvVarHome, previous);
+        }
+    }
 
     private static ContextEntry SampleEntry(string tenant) =>
         new() { OctoToolOptions = new OctoToolOptions { TenantId = tenant } };
@@ -110,5 +158,169 @@ public sealed class ContextManagerTests : IDisposable
         sut.AddOrUpdateContext("local_octosystem", SampleEntry("octosystem"));
 
         Assert.Throws<ToolException>(() => sut.SetActiveContext("does_not_exist"));
+    }
+
+    [Fact]
+    public void SelectContext_ChangesEffectiveContextButNotTheActiveOne()
+    {
+        var sut = NewManager();
+        sut.AddOrUpdateContext("dev", SampleEntry("devtenant"));
+        sut.AddOrUpdateContext("prod", SampleEntry("prodtenant"));
+
+        sut.SelectContext("prod");
+
+        // The whole point of the override: the active context is untouched, so a parallel
+        // invocation using the active context is unaffected.
+        Assert.Equal("dev", sut.GetActiveContextName());
+        Assert.Equal("devtenant", sut.GetActiveContext()!.OctoToolOptions.TenantId);
+        Assert.Equal("prod", sut.GetEffectiveContextName());
+        Assert.Equal("prodtenant", sut.GetEffectiveContext()!.OctoToolOptions.TenantId);
+        Assert.True(sut.IsContextOverridden);
+    }
+
+    [Fact]
+    public void SelectContext_DoesNotWriteToDisk()
+    {
+        var writer = NewManager();
+        writer.AddOrUpdateContext("dev", SampleEntry("devtenant"));
+        writer.AddOrUpdateContext("prod", SampleEntry("prodtenant"));
+
+        writer.SelectContext("prod");
+
+        var reader = NewManager();
+        reader.Load();
+        Assert.Equal("dev", reader.GetActiveContextName());
+    }
+
+    [Fact]
+    public void SelectContext_IsCaseInsensitiveAndCanonicalisesTheName()
+    {
+        var sut = NewManager();
+        sut.AddOrUpdateContext("local_octosystem", SampleEntry("octosystem"));
+
+        sut.SelectContext("LOCAL_OctoSystem");
+
+        Assert.Equal("local_octosystem", sut.GetEffectiveContextName());
+    }
+
+    [Fact]
+    public void SelectContext_UnknownContext_ThrowsAndNamesTheKnownOnes()
+    {
+        var sut = NewManager();
+        sut.AddOrUpdateContext("dev", SampleEntry("devtenant"));
+        sut.AddOrUpdateContext("prod", SampleEntry("prodtenant"));
+
+        var exception = Assert.Throws<ToolException>(() => sut.SelectContext("stage"));
+
+        Assert.Contains("stage", exception.Message);
+        Assert.Contains("dev", exception.Message);
+        Assert.Contains("prod", exception.Message);
+    }
+
+    [Fact]
+    public void WithoutSelection_EffectiveContextIsTheActiveOne()
+    {
+        var sut = NewManager();
+        sut.AddOrUpdateContext("dev", SampleEntry("devtenant"));
+
+        Assert.False(sut.IsContextOverridden);
+        Assert.Equal(sut.GetActiveContextName(), sut.GetEffectiveContextName());
+        Assert.Same(sut.GetActiveContext(), sut.GetEffectiveContext());
+    }
+
+    [Fact]
+    public void SaveEffectiveContext_WritesTheSelectedContext()
+    {
+        var writer = NewManager();
+        writer.AddOrUpdateContext("dev", SampleEntry("devtenant"));
+        writer.AddOrUpdateContext("prod", SampleEntry("prodtenant"));
+        writer.SelectContext("prod");
+
+        writer.GetEffectiveContext()!.Authentication.AccessToken = "prod-token";
+        writer.SaveEffectiveContext();
+
+        var reader = NewManager();
+        reader.Load();
+        Assert.Equal("prod-token", reader.ListContexts()["prod"].Authentication.AccessToken);
+        Assert.Null(reader.ListContexts()["dev"].Authentication.AccessToken);
+        Assert.Equal("dev", reader.GetActiveContextName());
+    }
+
+    [Fact]
+    public void SaveEffectiveContext_KeepsChangesMadeByAnotherInstanceMeanwhile()
+    {
+        // Two parallel octo-cli processes, each with its own --context, both refreshing their
+        // token. The write path re-reads and merges, so neither loses the other's token — a plain
+        // "serialise my whole in-memory state" write would drop one of them.
+        var setup = NewManager();
+        setup.AddOrUpdateContext("dev", SampleEntry("devtenant"));
+        setup.AddOrUpdateContext("prod", SampleEntry("prodtenant"));
+
+        var devProcess = NewManager();
+        devProcess.Load();
+        devProcess.SelectContext("dev");
+
+        var prodProcess = NewManager();
+        prodProcess.Load();
+        prodProcess.SelectContext("prod");
+
+        devProcess.GetEffectiveContext()!.Authentication.AccessToken = "dev-token";
+        devProcess.SaveEffectiveContext();
+
+        prodProcess.GetEffectiveContext()!.Authentication.AccessToken = "prod-token";
+        prodProcess.SaveEffectiveContext();
+
+        var reader = NewManager();
+        reader.Load();
+        Assert.Equal("dev-token", reader.ListContexts()["dev"].Authentication.AccessToken);
+        Assert.Equal("prod-token", reader.ListContexts()["prod"].Authentication.AccessToken);
+    }
+
+    [Fact]
+    public void AddOrUpdateContext_KeepsContextsAddedByAnotherInstanceMeanwhile()
+    {
+        var first = NewManager();
+        first.AddOrUpdateContext("dev", SampleEntry("devtenant"));
+
+        // A second instance that loaded before "dev" existed must not wipe it out.
+        var second = NewManager();
+        second.Load();
+        second.AddOrUpdateContext("prod", SampleEntry("prodtenant"));
+
+        var reader = NewManager();
+        reader.Load();
+        Assert.Equal(2, reader.ListContexts().Count);
+        Assert.Contains("dev", reader.ListContexts().Keys);
+        Assert.Contains("prod", reader.ListContexts().Keys);
+    }
+
+    [Fact]
+    public void ConcurrentSaves_LeaveTheFileValidAndCompletelyWritten()
+    {
+        var setup = NewManager();
+        var names = Enumerable.Range(0, 8).Select(i => $"ctx{i}").ToList();
+        foreach (var name in names)
+        {
+            setup.AddOrUpdateContext(name, SampleEntry($"tenant{name}"));
+        }
+
+        Parallel.ForEach(names, name =>
+        {
+            var manager = NewManager();
+            manager.Load();
+            manager.SelectContext(name);
+            manager.GetEffectiveContext()!.Authentication.AccessToken = $"token-{name}";
+            manager.SaveEffectiveContext();
+        });
+
+        var reader = NewManager();
+        reader.Load();
+
+        // No torn file, and every writer's token survived.
+        Assert.Equal(names.Count, reader.ListContexts().Count);
+        foreach (var name in names)
+        {
+            Assert.Equal($"token-{name}", reader.ListContexts()[name].Authentication.AccessToken);
+        }
     }
 }

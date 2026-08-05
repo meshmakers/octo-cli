@@ -56,6 +56,13 @@ internal class ConfigOctoCommand : Command<OctoToolOptions>
 
     public override Task Execute()
     {
+        // Refused rather than redirected: --context selects the context a command runs against,
+        // and rewriting a stored context definition through it is never what the caller meant.
+        if (_contextManager.IsContextOverridden)
+        {
+            throw ToolException.ContextOverrideNotSupported(CommandArgumentValue.Value);
+        }
+
         Logger.LogInformation("Configuring the tool");
 
         Options.Value.TenantId = CommandArgumentValue.IsArgumentUsed(_tenantIdArg)
@@ -93,7 +100,7 @@ internal class ConfigOctoCommand : Command<OctoToolOptions>
         if (activeContext != null)
         {
             activeContext.OctoToolOptions = Options.Value;
-            _contextManager.SaveActiveContext();
+            _contextManager.SaveEffectiveContext();
         }
         else
         {
