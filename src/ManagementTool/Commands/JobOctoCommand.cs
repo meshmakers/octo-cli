@@ -47,6 +47,14 @@ internal abstract class JobOctoCommand(
         JobDto? lastJobDto = null;
         while (true)
         {
+            // A long-running job can outlive the access token, and PreValidate only authenticates
+            // once. Re-run EnsureAuthenticated before each poll so a multi-hour -w wait refreshes the
+            // token before it expires instead of 401-ing near the end (AB#4755). This is cheap: the
+            // refresh is expiry-gated (AB#4754), so it is a timestamp check unless the token is within
+            // its refresh margin, and the ServiceClientAccessToken setter updates the auth header only
+            // when the token actually changed.
+            await authenticationService.EnsureAuthenticated(ServiceClient.AccessToken);
+
             var jobDto = await ServiceClient.GetImportJobStatus(id);
             if (jobDto.Status == "Succeeded")
             {
