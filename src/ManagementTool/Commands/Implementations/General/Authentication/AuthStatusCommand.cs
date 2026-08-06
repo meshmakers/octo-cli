@@ -53,21 +53,50 @@ internal class AuthStatusCommand : Command<OctoToolOptions>
         var result = await TestAuthenticationStatus();
         if (!result)
         {
-            Logger.LogInformation("Refreshing token");
-
             if (_authenticationOptions.Value.RefreshToken != null)
             {
-                var authenticationData =
-                    await _authenticatorClient.RefreshTokenAsync(_authenticationOptions.Value.RefreshToken);
+                Logger.LogInformation("Refreshing token");
 
-                _authenticationService.SaveAuthenticationData(authenticationData);
+                try
+                {
+                    var authenticationData =
+                        await _authenticatorClient.RefreshTokenAsync(_authenticationOptions.Value.RefreshToken);
 
-                Logger.LogInformation("Refresh successful. Token expires at \'{AuthenticationDataExpiresAt}\'",
-                    authenticationData.ExpiresAt);
+                    _authenticationService.SaveAuthenticationData(authenticationData);
+
+                    Logger.LogInformation("Refresh successful. Token expires at \'{AuthenticationDataExpiresAt}\'",
+                        authenticationData.ExpiresAt);
+
+                    await TestAuthenticationStatus();
+                }
+                catch (AuthenticationFailedException ex)
+                {
+                    // Refresh token gone/expired/revoked — the common outcome for a context that has
+                    // not been used in a while (AB#4754). Report it actionably instead of letting the
+                    // raw OIDC error bubble up.
+                    Logger.LogWarning(
+                        "The refresh token for context '{ContextName}' is no longer valid ({Reason}). " +
+                        "Re-authenticate with: {LoginHint}",
+                        _contextManager.GetEffectiveContextName() ?? "<none>", ex.Message, BuildLoginHint());
+                }
             }
-
-            await TestAuthenticationStatus();
+            else
+            {
+                // client_credentials session (no refresh token) with an expired access token.
+                Logger.LogInformation(
+                    "No refresh token available (client_credentials session). Re-run 'LogInClientCredentials' " +
+                    "or set {EnvClientId} / {EnvClientSecret} so the token is re-acquired automatically.",
+                    Constants.EnvVarClientId, Constants.EnvVarClientSecret);
+            }
         }
+    }
+
+    private string BuildLoginHint()
+    {
+        var contextName = _contextManager.GetEffectiveContextName();
+        return contextName != null
+            ? $"octo-cli --{Constants.ContextArgumentTerm} {contextName} -c LogIn"
+            : "octo-cli -c LogIn";
     }
 
     private async Task<bool> TestAuthenticationStatus()

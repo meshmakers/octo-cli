@@ -213,6 +213,8 @@ path in effect is logged on every run and shown by `ListContexts`.
 
 **Note**: Device flow requests `offline_access` scope and receives a refresh token. The `AuthenticationService` handles both cases: if a refresh token is present, it refreshes expired access tokens automatically; if not, it uses the existing access token directly.
 
+**Refresh decision & failure handling (AB#4754).** `EnsureAuthenticated` decides whether to refresh a device/interactive token from the stored `AccessTokenExpiresAt` (with a 30s margin), **not** from a live `/connect/userinfo` probe. A token that is not expiring soon is used as-is — no per-command round-trip to the identity service, and a transient identity-service hiccup no longer forces an unnecessary refresh. Server-side revocation of a not-yet-expired token still surfaces as the target service's own 401. When the refresh itself fails because the **refresh token is expired/revoked** — the typical outcome for a context that has not been used in a while, so it bites hardest when switching between contexts — the tool does one of two things: if `OCTO_CLI_CLIENT_ID` / `OCTO_CLI_CLIENT_SECRET` are set it re-acquires non-interactively via client_credentials; otherwise it fails with an actionable `ToolException` (exit `-5`) naming the effective context and the exact `octo-cli --context <name> -c LogIn` to run, instead of the raw OIDC `invalid_grant`. `AuthStatus` reports the same dead-refresh-token case as an actionable warning rather than letting it bubble up.
+
 ## Configuration
 
 The CLI uses:

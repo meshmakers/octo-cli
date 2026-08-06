@@ -30,30 +30,58 @@ public class AuthenticationService : IAuthenticationService
             return;
         }
 
-        // If we have a refresh token, try to refresh the access token if needed
+        // Device/interactive session: a refresh token is present (device flow requests offline_access).
         if (!string.IsNullOrEmpty(_authenticationOptions.Value.RefreshToken))
         {
-            var ensureAuthenticationData = await
-                _authenticatorClient.EnsureAuthenticatedAsync(_authenticationOptions.Value.RefreshToken,
-                    _authenticationOptions.Value.AccessToken);
-
-            if (ensureAuthenticationData.IsRefreshDone)
+            // Decide whether to refresh from our own expiry clock, NOT from a live /connect/userinfo
+            // probe (AB#4754). The former probe added a network round-trip before every command and,
+            // worse, treated ANY identity-service hiccup (5xx, timeout, DNS, TLS) as "token invalid"
+            // and forced a refresh of a still-valid token. A token that is not expiring soon is used
+            // as-is; only an expiring/expired one is refreshed. Server-side revocation of a token that
+            // has not yet expired is surfaced by the target service's own 401, as before.
+            if (!IsTokenExpiringSoon())
             {
-                SaveAuthenticationData(ensureAuthenticationData.RefreshedAuthenticationData);
-                serviceClientAccessToken.AccessToken = ensureAuthenticationData.RefreshedAuthenticationData.AccessToken;
-                Logger.Info("Credential data has been refreshed.");
+                serviceClientAccessToken.AccessToken = _authenticationOptions.Value.AccessToken;
                 return;
             }
+
+            try
+            {
+                var refreshed = await _authenticatorClient.RefreshTokenAsync(_authenticationOptions.Value.RefreshToken);
+                SaveAuthenticationData(refreshed);
+                serviceClientAccessToken.AccessToken = refreshed.AccessToken;
+                Logger.Info("Access token has been refreshed via the refresh token.");
+                return;
+            }
+            catch (AuthenticationFailedException ex)
+            {
+                // The refresh token itself is gone / expired / revoked — the failure mode that hits
+                // the least-frequently-used context first when switching contexts. If client_credentials
+                // env vars are set, re-acquire non-interactively (headless/CI); otherwise surface an
+                // actionable re-login hint instead of the raw OIDC 'invalid_grant' (AB#4754).
+                if (TryReadClientCredentialsEnv(out var fallbackClientId, out var fallbackClientSecret))
+                {
+                    var reacquired = await _authenticatorClient.RequestClientCredentialsTokenAsync(
+                        ApiScopes.OctoApiFullAccess,
+                        DefaultScopes.None,
+                        customScopes: null,
+                        clientId: fallbackClientId,
+                        clientSecret: fallbackClientSecret);
+                    SaveAuthenticationData(reacquired);
+                    serviceClientAccessToken.AccessToken = reacquired.AccessToken;
+                    Logger.Info("Refresh token was rejected; re-acquired via client_credentials env vars.");
+                    return;
+                }
+
+                throw SessionExpired(ex);
+            }
         }
-        // No refresh token, but client_credentials env vars are set →
-        // silently re-acquire token if expired/near-expiry. Device flow always
-        // provides a refresh token (offline_access), so this branch only fires
-        // for client_credentials sessions.
-        // Note: when a device-code session's refresh token IS present (the `if` branch above),
-        // we never fall back into this client_credentials branch, even if env vars are set —
-        // device-code and client_credentials sessions are kept separate by design.
-        else if (IsTokenExpiringSoon() &&
-                 TryReadClientCredentialsEnv(out var clientId, out var clientSecret))
+
+        // No refresh token: client_credentials session. While the env vars remain set, silently
+        // re-acquire the token when it is expired/near-expiry. Device-code and client_credentials
+        // sessions are kept separate; a context carrying a refresh token takes the branch above.
+        if (IsTokenExpiringSoon() &&
+            TryReadClientCredentialsEnv(out var clientId, out var clientSecret))
         {
             var newAuthData = await _authenticatorClient.RequestClientCredentialsTokenAsync(
                 ApiScopes.OctoApiFullAccess,
@@ -69,6 +97,23 @@ public class AuthenticationService : IAuthenticationService
 
         // Use the existing access token (even without refresh token)
         serviceClientAccessToken.AccessToken = _authenticationOptions.Value.AccessToken;
+    }
+
+    // Turns a failed refresh-token exchange into an actionable error: name the context to re-login
+    // and point at the non-interactive alternative. Runner renders ToolException as a clean message
+    // (exit -5) instead of the raw AuthenticationFailedException OIDC error (exit -4).
+    private Exception SessionExpired(Exception inner)
+    {
+        var contextName = _contextManager.GetEffectiveContextName();
+        var loginHint = contextName != null
+            ? $"octo-cli --{Constants.ContextArgumentTerm} {contextName} -c LogIn"
+            : "octo-cli -c LogIn";
+
+        return new ToolException(
+            $"The session for context '{contextName ?? "<none>"}' has expired and could not be refreshed " +
+            $"(its refresh token is no longer valid). Re-authenticate with: {loginHint}. For non-interactive " +
+            $"use, set {Constants.EnvVarClientId} / {Constants.EnvVarClientSecret} and re-run.",
+            inner);
     }
 
     private bool IsTokenExpiringSoon()
