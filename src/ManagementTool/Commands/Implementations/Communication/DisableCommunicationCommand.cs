@@ -1,4 +1,5 @@
-﻿using Meshmakers.Octo.Frontend.ManagementTool.Services;
+﻿using Meshmakers.Common.CommandLineParser;
+using Meshmakers.Octo.Frontend.ManagementTool.Services;
 using Meshmakers.Octo.Sdk.ServiceClient.CommunicationControllerServices;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -14,6 +15,25 @@ internal class DisableCommunicationCommand : ServiceClientOctoCommand<ICommunica
             communicationServicesClient, authenticationService)
     {
     }
+
+    public override CommandDocumentation? GetDocumentation() =>
+        new(
+            Samples:
+            [
+                new CodeSample(arguments: [], description: "Basic usage"),
+            ],
+            Notes:
+            [
+                "Refused with HTTP 409 while pools or workloads (Adapters and Applications) of the tenant are still " +
+                "deployed; the error names them with their deployment state. Undeploy them first with UndeployWorkload " +
+                "and UndeployPool - like this command they act on the tenant of the active context (UseContext or " +
+                "--context <name>).",
+                "Disabling Communication is a precondition for Delete and Detach of the tenant (AB#4255); the disable " +
+                "itself removes the trigger schedules and unloads the tenant from the controller, it does not undeploy " +
+                "anything.",
+                "Reversible with EnableCommunication.",
+            ]
+        );
 
     public override async Task Execute()
     {

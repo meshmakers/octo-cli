@@ -438,6 +438,7 @@ internal static class Program
         // Communication - Pools
         services.AddTransient<ICommand, GetPoolsCommand>();
         services.AddTransient<ICommand, DeployPoolCommand>();
+        services.AddTransient<ICommand, UndeployPoolCommand>();
 
         // Communication - Data Flows
         services.AddTransient<ICommand, DeployDataFlowCommand>();
