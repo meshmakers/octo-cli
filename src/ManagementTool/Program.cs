@@ -350,6 +350,7 @@ internal static class Program
         services.AddTransient<ICommand, CreateTenant>();
         services.AddTransient<ICommand, CleanTenant>();
         services.AddTransient<ICommand, AttachTenant>();
+        services.AddTransient<ICommand, DetachTenant>();
         services.AddTransient<ICommand, DeleteTenant>();
         services.AddTransient<ICommand, GetTenantLifecycle>();
         services.AddTransient<ICommand, ReRunTenantSetup>();
