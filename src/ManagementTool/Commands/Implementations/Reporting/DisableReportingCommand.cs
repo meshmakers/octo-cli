@@ -1,4 +1,5 @@
-﻿using Meshmakers.Octo.Frontend.ManagementTool.Services;
+﻿using Meshmakers.Common.CommandLineParser;
+using Meshmakers.Octo.Frontend.ManagementTool.Services;
 using Meshmakers.Octo.Sdk.ServiceClient.ReportingServices;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -14,6 +15,24 @@ internal class DisableReportingCommand : ServiceClientOctoCommand<IReportingServ
             reportingServicesClient, authenticationService)
     {
     }
+
+    public override CommandDocumentation? GetDocumentation() =>
+        new(
+            Samples:
+            [
+                new CodeSample(arguments: [], description: "Basic usage"),
+            ],
+            Notes:
+            [
+                "Disabling only removes the enabled flag: report definitions, resources and stored reports stay in " +
+                "the tenant and are accessible again after EnableReporting. Until then the reporting API, the report " +
+                "designer and the viewer answer HTTP 403 for this tenant.",
+                "Disabling Reporting is a precondition for Delete and Detach of the tenant (AB#4255). It has no " +
+                "precondition of its own - Reporting owns no deployed resources. Like the other disable commands it " +
+                "acts on the tenant of the active context (UseContext or --context <name>).",
+                "Reversible with EnableReporting.",
+            ]
+        );
 
     public override async Task Execute()
     {
