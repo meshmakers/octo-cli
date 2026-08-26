@@ -31,8 +31,8 @@ public class DisableStreamDataCommand : ServiceClientOctoCommand<IStreamDataServ
                 "(UseContext or --context <name>).",
                 "Disabling only switches the tenant flag off: the System.StreamData CK model, the archive definitions " +
                 "and the stored stream data stay and are usable again after EnableStreamData. Disabling Stream Data " +
-                "is a precondition for Delete and Detach of the tenant (AB#4255); Delete then drops the tenant's " +
-                "CrateDB schema, Detach keeps it.",
+                "is a precondition for Delete and Detach of the tenant (AB#4255); Delete then drops the CrateDB " +
+                "tables of the tenant's archives, Detach keeps them.",
                 "Reversible with EnableStreamData.",
             ]
         );
