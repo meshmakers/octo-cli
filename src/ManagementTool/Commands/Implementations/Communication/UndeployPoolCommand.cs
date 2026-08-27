@@ -16,7 +16,7 @@ internal class UndeployPoolCommand : ServiceClientOctoCommand<ICommunicationServ
         ICommunicationServicesClient communicationServicesClient, IAuthenticationService authenticationService,
         IConfirmationService confirmationService)
         : base(logger, Constants.CommunicationServicesGroup, "UndeployPool",
-            "Undeploys a pool through the Communication Operator. Undeploy its workloads first (UndeployWorkload); Cloud pools release their operator resources.",
+            "Undeploys a pool through the Communication Operator. Undeploy the pool's workloads first (UndeployWorkload); Cloud pools release their operator resources.",
             options, communicationServicesClient, authenticationService)
     {
         _confirmationService = confirmationService;
