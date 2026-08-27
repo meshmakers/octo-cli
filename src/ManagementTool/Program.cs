@@ -350,6 +350,7 @@ internal static class Program
         services.AddTransient<ICommand, CreateTenant>();
         services.AddTransient<ICommand, CleanTenant>();
         services.AddTransient<ICommand, AttachTenant>();
+        services.AddTransient<ICommand, DetachTenant>();
         services.AddTransient<ICommand, DeleteTenant>();
         services.AddTransient<ICommand, GetTenantLifecycle>();
         services.AddTransient<ICommand, ReRunTenantSetup>();
@@ -437,6 +438,7 @@ internal static class Program
         // Communication - Pools
         services.AddTransient<ICommand, GetPoolsCommand>();
         services.AddTransient<ICommand, DeployPoolCommand>();
+        services.AddTransient<ICommand, UndeployPoolCommand>();
 
         // Communication - Data Flows
         services.AddTransient<ICommand, DeployDataFlowCommand>();

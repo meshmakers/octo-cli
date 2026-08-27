@@ -1,4 +1,5 @@
-﻿using Meshmakers.Octo.Frontend.ManagementTool.Services;
+﻿using Meshmakers.Common.CommandLineParser;
+using Meshmakers.Octo.Frontend.ManagementTool.Services;
 using Meshmakers.Octo.Sdk.ServiceClient.AssetRepositoryServices.StreamData;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -15,6 +16,26 @@ public class DisableStreamDataCommand : ServiceClientOctoCommand<IStreamDataServ
         serviceClient, authenticationService)
     {
     }
+
+    public override CommandDocumentation? GetDocumentation() =>
+        new(
+            Samples:
+            [
+                new CodeSample(arguments: [], description: "Basic usage"),
+            ],
+            Notes:
+            [
+                "Refused with HTTP 409 while archives of the tenant are still activated; the error names them. " +
+                "Disable them first with DisableArchive (data is kept) or remove them with DeleteArchive (rollups " +
+                "before their source archive) - like this command they act on the tenant of the active context " +
+                "(UseContext or --context <name>).",
+                "Disabling only switches the tenant flag off: the System.StreamData CK model, the archive definitions " +
+                "and the stored stream data stay and are usable again after EnableStreamData. Disabling Stream Data " +
+                "is a precondition for Delete and Detach of the tenant (AB#4255); Delete then drops the CrateDB " +
+                "tables of the tenant's archives, Detach keeps them.",
+                "Reversible with EnableStreamData.",
+            ]
+        );
 
     public override async Task Execute()
     {

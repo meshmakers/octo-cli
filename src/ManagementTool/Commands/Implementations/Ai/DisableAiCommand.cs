@@ -1,3 +1,4 @@
+using Meshmakers.Common.CommandLineParser;
 using Meshmakers.Octo.Frontend.ManagementTool.Services;
 using Meshmakers.Octo.Sdk.ServiceClient.AiServices;
 using Microsoft.Extensions.Logging;
@@ -14,6 +15,25 @@ internal class DisableAiCommand : ServiceClientOctoCommand<IAiServicesClient>
             options, aiServicesClient, authenticationService)
     {
     }
+
+    public override CommandDocumentation? GetDocumentation() =>
+        new(
+            Samples:
+            [
+                new CodeSample(arguments: [], description: "Basic usage"),
+            ],
+            Notes:
+            [
+                "Disabling only removes the enabled flag: the System.Ai CK model, the seeded AgentConfig / QuotaLimit " +
+                "and all session, lease and audit data stay in the tenant. New AI sessions are refused until EnableAi " +
+                "(which requires Communication to be enabled on the tenant); running sessions are not interrupted and " +
+                "completed sessions can still be continued.",
+                "Disabling AI Services is a precondition for Delete and Detach of the tenant (AB#4255). It has no " +
+                "precondition of its own - the AI service owns no deployed resources. Like the other disable commands " +
+                "it acts on the tenant of the active context (UseContext or --context <name>).",
+                "Reversible with EnableAi.",
+            ]
+        );
 
     public override async Task Execute()
     {

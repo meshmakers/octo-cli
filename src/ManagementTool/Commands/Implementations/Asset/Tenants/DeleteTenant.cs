@@ -30,6 +30,23 @@ internal class DeleteTenant : ServiceClientOctoCommand<IAssetServicesClient>
             Samples:
             [
                 new CodeSample(arguments: [new CodeSampleArgument(_tenantIdArg, "newtenant")], description: "Basic usage"),
+                new CodeSample(arguments: [
+                    new CodeSampleArgument(_tenantIdArg, "newtenant"),
+                    new CodeSampleArgument(_yesArg),
+                ],
+                    description: "Non-interactive"),
+            ],
+            Notes:
+            [
+                "Refused with HTTP 409 while Stream Data, Communication, Reporting or AI Services is still enabled for the tenant; " +
+                "the error names the enabled capabilities. Disable them first with DisableStreamData / DisableCommunication / " +
+                "DisableReporting / DisableAi. Those commands act on the tenant of the active context, so switch to the tenant " +
+                "being deleted with UseContext or pass --context <name>.",
+                "If the tenant's data is still needed, take a backup with Dump before disabling the capabilities and deleting; " +
+                "Dump works regardless of capability state.",
+                "Answers 404 when the tenant is not a child of the current tenant.",
+                "A 409 is also answered while the tenant is still being created; that message names the lifecycle state, " +
+                "not capabilities - retry once the tenant is active or failed.",
             ]
         );
 
