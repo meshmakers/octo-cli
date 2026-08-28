@@ -406,6 +406,8 @@ internal static class Program
 
         services.AddTransient<ICommand, EnableCommunicationCommand>();
         services.AddTransient<ICommand, DisableCommunicationCommand>();
+        services.AddTransient<ICommand, GetCommunicationLifecycleCommand>();
+        services.AddTransient<ICommand, SetCommunicationLifecycleCommand>();
 
         services.AddTransient<ICommand, EnableAiCommand>();
         services.AddTransient<ICommand, DisableAiCommand>();
