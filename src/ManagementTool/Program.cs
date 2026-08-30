@@ -25,6 +25,7 @@ using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Identity.
 using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Identity.ExternalTenantUserMappings;
 using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Identity.Groups;
 using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Identity.IdentityProviders;
+using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Identity.DataPermissions;
 using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Identity.Roles;
 using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Identity.Users;
 using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Reporting;
@@ -373,6 +374,14 @@ internal static class Program
         services.AddTransient<ICommand, CreateRole>();
         services.AddTransient<ICommand, UpdateRole>();
         services.AddTransient<ICommand, DeleteRole>();
+
+        services.AddTransient<ICommand, GetDataPermissions>();
+        services.AddTransient<ICommand, CreateDataPermission>();
+        services.AddTransient<ICommand, DeleteDataPermission>();
+        services.AddTransient<ICommand, CreateDataPolicy>();
+        services.AddTransient<ICommand, SetDataPolicyEnforcementMode>();
+        services.AddTransient<ICommand, GrantDataPermission>();
+        services.AddTransient<ICommand, RevokeDataPermission>();
 
         services.AddTransient<ICommand, GetApiScopes>();
         services.AddTransient<ICommand, CreateApiScope>();
