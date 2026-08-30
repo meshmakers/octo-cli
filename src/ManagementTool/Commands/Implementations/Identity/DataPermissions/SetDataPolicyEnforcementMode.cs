@@ -30,5 +30,6 @@ internal class SetDataPolicyEnforcementMode : ServiceClientOctoCommand<IIdentity
 
         await ServiceClient.SetDataPolicyEnforcementMode(policyRtId, mode);
         Logger.LogInformation("Data policy '{PolicyRtId}' switched to '{Mode}'", policyRtId, mode);
+        Logger.LogInformation("Note: the change takes effect within 60 seconds (asset repository policy cache)");
     }
 }
