@@ -28,6 +28,8 @@ internal class DisableCommunicationCommand : ServiceClientOctoCommand<ICommunica
                 "deployed; the error names them with their deployment state. Undeploy them first with UndeployWorkload " +
                 "and UndeployPool - like this command they act on the tenant of the active context (UseContext or " +
                 "--context <name>).",
+                "Also refused with HTTP 409 while AI Services is still enabled for the tenant (AB#4884) - the AI " +
+                "service depends on Communication. Disable it first with DisableAi.",
                 "Disabling Communication is a precondition for Delete and Detach of the tenant (AB#4255); the disable " +
                 "itself removes the trigger schedules and unloads the tenant from the controller, it does not undeploy " +
                 "anything.",
