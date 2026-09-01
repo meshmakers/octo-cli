@@ -61,4 +61,11 @@
     <ItemGroup>
       <ProjectReference Include="..\GraphQlDtos\GraphQlDtos.csproj" />
     </ItemGroup>
+
+    <ItemGroup>
+      <!-- Commands are internal; the unit tests drive them through their public ICommand surface
+           (CommandArgumentValue.ParseLayer + Execute) rather than forcing a class public just to be
+           reachable from a test. Same arrangement as octo-sdk's Sdk.ServiceClient. -->
+      <InternalsVisibleTo Include="ManagementTool.Tests" />
+    </ItemGroup>
 </Project>

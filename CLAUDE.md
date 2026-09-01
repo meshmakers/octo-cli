@@ -241,7 +241,7 @@ Environment variables are prefixed with `OCTO_`:
 | Identity | users, roles, clients (+ mirror commands: GetClientMirrors, ProvisionClientInExistingTenants, ProvisionClientInTenant, UnprovisionClientFromTenant, SetClientAutoProvision, ApplyClientOverlay, CleanClientOverlays), identityProviders, groups, emailDomainGroupRules, externalTenantUserMappings, adminProvisioning, apiResources, apiScopes | Identity Services |
 | Asset | tenants, models, blueprints (ListBlueprints, RefreshBlueprintCatalogs, InstallBlueprint, GetBlueprintHistory, PreviewBlueprintUpdate, UpdateBlueprint, ListBlueprintInstallations, UninstallBlueprint), timeSeries (EnableStreamData, DisableStreamData, ActivateArchive, DisableArchive, EnableArchive, RetryArchiveActivation, DeleteArchive, FreezeRollupArchive, UnfreezeRollupArchive, RewindRollupWatermark, ListRollupsForArchive, RecomputeArchive, BackfillRollup, ListRecomputeJobs, AddComputedColumn, RemoveComputedColumn, UpdateComputedColumnFormula) | Asset Repository |
 | Bots | Dump, Restore, ExportArchiveData, ImportArchiveData, RunFixupScripts | Bot Services |
-| Communication | enable/disable, adapters, pipelines (incl. MovePipelines for bulk reassignment to a different adapter), triggers, pools, dataFlows, workloads (GetWorkloadsByChart, UpdateWorkloadChartVersion, DeployWorkload, UndeployWorkload) | Communication Controller |
+| Communication | enable/disable, adapters (incl. RotateAdapterServiceAccountSecret), pipelines (incl. MovePipelines for bulk reassignment to a different adapter), triggers, pools, dataFlows, workloads (GetWorkloadsByChart, UpdateWorkloadChartVersion, DeployWorkload, UndeployWorkload) | Communication Controller |
 | Reporting | enable/disable | Report Services |
 | AI Services | EnableAi, DisableAi, RedeemAiTicket (anonymous — bastion-side), GetAiCredentialsStatus, RevokeAiCredentials | AI Services |
 | DevOps | certificates | Local operations |
@@ -525,6 +525,14 @@ octo-cli -c MovePipelines -ids p1,p2 -aid <newAdapterRtId> -rd
 # -y skips the interactive confirmation prompt.
 octo-cli -c MovePipelines -ids p1 -aid <newAdapterRtId> -y
 
+# Rotate the secret of an adapter's pipeline service account (AB#5032 / AB#5048).
+# Destructive: the old secret stops working the moment the controller answers.
+# A blueprint cannot do this — the secret attribute is runtime state — so this is the path.
+octo-cli -c RotateAdapterServiceAccountSecret -id <adapterRtId>
+octo-cli -c RotateAdapterServiceAccountSecret -id <adapterRtId> -y   # skip confirmation
+# ...then redeploy, or the pipelines keep presenting the withdrawn secret:
+octo-cli -c DeployDataFlow -id <dataFlowRtId>
+
 # Multi-tenant ClientCredentials mirroring (Epic 3054, #4047)
 # Create a flagged client in octosystem — gets auto-provisioned into every new sub-tenant.
 octo-cli -c AddClientCredentialsClient -id ci-deploy -n "CI Deploy" -s <secret> -apic
@@ -602,6 +610,27 @@ All communication commands accept plain runtime object IDs (e.g. `69cfa838092b71
 | `GetAdapter` | `--identifier <rtId>`, `--json` (optional) | Get adapter configuration |
 | `GetAdapterNodes` | | List available pipeline nodes from connected adapters |
 | `GetPipelineSchema` | `--adapterId <rtId>`, `--outputFile` (optional) | Get pipeline JSON schema for an adapter |
+| `RotateAdapterServiceAccountSecret` | `--identifier <rtId>`, `--yes` (optional) | Rotate the secret of the adapter's pipeline service account (destructive — prompts) |
+
+#### `RotateAdapterServiceAccountSecret` (AB#5032 / AB#5048)
+
+Backs `POST {tenantId}/v1/adapter/{adapterRtId}/serviceAccount/rotateSecret` via
+`ICommunicationServicesClient.RotateServiceAccountSecretAsync`. Three properties of it are
+deliberate and easy to undo by accident:
+
+- **It is the only supported rotation path.** The secret attribute is runtime state, so a blueprint
+  can no longer change a live secret — an attempt fails confusingly. The controller owns both halves
+  of the credential (identity client + the tenant's `ServiceAccountConfiguration`), which is why
+  neither the CLI nor Studio may reproduce the rotation themselves.
+- **The redeploy hint is printed, not swallowed** — as a `Warning`, and the controller's own message
+  is relayed verbatim so CLI output and the tenant's audit event cannot drift apart. The adapter
+  freezes the credentials into the pipeline's `GlobalConfiguration` at *pipeline registration* and
+  never refreshes them, so until `DeployDataFlow` / `DeployPipeline` runs, every pipeline still
+  presents the withdrawn secret. Skipping it is what produces "rotation done, still broken".
+  When the adapter had no service account at all (`WasCreated`), nothing was invalidated and no
+  warning is emitted — a redeploy demand nobody needs is how the real one gets ignored later.
+- **No secret is printed**, because the response carries none. Both the controller and
+  `Communication.Contracts.Tests` pin that.
 
 ### Pipelines
 
@@ -671,7 +700,10 @@ octo-cli -c GetPipelineDebug --identifier cc0000000000000000000003 --json
 
 ## Confirmation Dialogs for Destructive Commands
 
-All destructive commands (Delete, Clean, Reset, Remove) require interactive user confirmation before executing. This prevents accidental data loss from typos or wrong IDs.
+All destructive commands (Delete, Clean, Reset, Remove, and credential-invalidating verbs such as
+Revoke and Rotate) require interactive user confirmation before executing. This prevents accidental
+data loss — and accidental lockouts — from typos or wrong IDs. "Destructive" here is not only about
+deleting rows: a verb that makes an existing credential stop working belongs in this list too.
 
 ### How It Works
 
@@ -701,6 +733,8 @@ All destructive commands (Delete, Clean, Reset, Remove) require interactive user
 | `DeleteArchive` | `delete archive '{archiveRtId}'? The CrateDB table will be dropped and historical data lost` |
 | `UninstallBlueprint` | `uninstall blueprint '{name}' from tenant '{tenantId}'[ together with any blueprints that depend on it and any orphaned dependencies]? Locked owned entities will be erased` |
 | `UnprovisionClientFromTenant` | `remove client '{clientId}' from child tenant '{childTenantId}' of {parent scope}? …` |
+| `RotateAdapterServiceAccountSecret` | `rotate the pipeline service account secret of adapter '{adapterRtId}' in tenant '{tenantId}'? The current secret stops working immediately, and the adapter's pipelines / data flows must be redeployed afterwards` |
+| `RevokeAiCredentials` | `revoke AI credential lease for tenant '{tenantId}'? New sessions will fail until a fresh subscription is registered` |
 
 **`{parent scope}`** expands to `parent tenant '<tenant>' at '<scheme://host:port>'` via
 `ServiceClientOctoCommand.ParentScopeDescription`. Commands that act on a **child** tenant name it,
