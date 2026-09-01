@@ -397,6 +397,11 @@ octo-cli -c GetTenantLifecycle -tid mytenant
 # Operator safety valve: re-open a stuck/Failed tenant's setup so the background reconciler finishes it
 octo-cli -c ReRunTenantSetup -tid mytenant
 
+# Show the enabled-state of the active tenant's capabilities (Stream Data, Communication,
+# Reporting, AI Services) — the same flags the tenant delete/detach guard evaluates (AB#4255/AB#4884).
+# The Stream Data line also notes when stream data is switched off at the instance level.
+octo-cli -c GetTenantFeatures
+
 # Blueprints (asset repository) — initial install path is Phase 1
 octo-cli -c ListBlueprints                                          # list catalog blueprints across all sources
 octo-cli -c RefreshBlueprintCatalogs                                # force-refresh all blueprint catalog caches at the asset repo (AB#4309)
