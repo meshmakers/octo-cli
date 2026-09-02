@@ -161,7 +161,6 @@ internal static class Program
                 {
                     options.IssuerUri = toolOptions.Value.IdentityServiceUrl ?? string.Empty;
                     options.ClientId = CommonConstants.OctoToolClientId;
-                    options.ClientSecret = CommonConstants.OctoToolClientSecret;
                     options.TenantId = toolOptions.Value.TenantId;
                 });
 
