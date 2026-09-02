@@ -162,7 +162,6 @@ internal static class Program
                 {
                     options.IssuerUri = toolOptions.Value.IdentityServiceUrl ?? string.Empty;
                     options.ClientId = CommonConstants.OctoToolClientId;
-                    options.ClientSecret = CommonConstants.OctoToolClientSecret;
                     options.TenantId = toolOptions.Value.TenantId;
                 });
 
@@ -354,6 +353,7 @@ internal static class Program
         services.AddTransient<ICommand, DetachTenant>();
         services.AddTransient<ICommand, DeleteTenant>();
         services.AddTransient<ICommand, GetTenantLifecycle>();
+        services.AddTransient<ICommand, GetTenantFeatures>();
         services.AddTransient<ICommand, ReRunTenantSetup>();
         services.AddTransient<ICommand, ClearTenantCache>();
         services.AddTransient<ICommand, UpdateSystemCkModelTenant>();
