@@ -35,6 +35,8 @@ internal class RedeemAiTicketCommand : ServiceClientOctoCommand<IAiServicesClien
     private readonly IArgument _accessExpiresAtArg;
     private readonly IArgument _refreshExpiresAtArg;
 
+    private readonly string? _aiServiceUrl;
+
     public RedeemAiTicketCommand(ILogger<RedeemAiTicketCommand> logger, IOptions<OctoToolOptions> options,
         IAiServicesClient aiServicesClient, IAuthenticationService authenticationService)
         : base(logger, Constants.AiServicesGroup, "RedeemAiTicket",
@@ -55,6 +57,8 @@ internal class RedeemAiTicketCommand : ServiceClientOctoCommand<IAiServicesClien
             ["UTC expiry of the access token (ISO-8601). Optional — defaults to 2099 for dev."], false, 1);
         _refreshExpiresAtArg = CommandArgumentValue.AddArgument("rex", "refreshExpiresAt",
             ["UTC expiry of the refresh token (ISO-8601). Optional — defaults to 2099 for dev."], false, 1);
+
+        _aiServiceUrl = options.Value.AiServiceUrl;
     }
 
     /// <inheritdoc />
@@ -63,10 +67,18 @@ internal class RedeemAiTicketCommand : ServiceClientOctoCommand<IAiServicesClien
     ///     <c>[AllowAnonymous]</c> — sending a stale or wrong token here would only
     ///     confuse the operator on the bastion (who almost certainly has no OctoMesh
     ///     session at all).
+    ///     <para>
+    ///         🔴 <b>Do not log <c>ServiceClient.ServiceUri</c> here.</b> It is the tenant-scoped
+    ///         base URI, and since stage 3 of AB#5060 building it <i>throws</i> when the CLI context
+    ///         carries no tenant — which is the normal state for this command's operator, who has no
+    ///         OctoMesh session and passes the tenant as <c>-tid</c>. It was also the wrong address
+    ///         to print: the redeem call deliberately builds its own client against the service root
+    ///         (<c>/v1/credentials/tickets/redeem</c>) and never goes through the tenant URI.
+    ///     </para>
     /// </remarks>
     public override Task PreValidate()
     {
-        Logger.LogInformation("Service URI: {ServiceClientServiceUri}", ServiceClient.ServiceUri);
+        Logger.LogInformation("AI services URI: {AiServiceUrl}", _aiServiceUrl);
         return Task.CompletedTask;
     }
 
