@@ -29,6 +29,9 @@
     </PropertyGroup>
 
     <ItemGroup>
+        <!-- Direct reference: OidcConstants is used by the AddXxxClient commands. The legacy IdentityModel
+             package is deprecated; Sdk.ServiceClient moved to Duende.IdentityModel (same API, new namespace). -->
+        <PackageReference Include="Duende.IdentityModel" Version="8.1.0" />
         <PackageReference Include="Meshmakers.Common.CommandLineParser" Version="$(MeshmakerVersion)" />
         <PackageReference Include="Meshmakers.Common.Configuration" Version="$(MeshmakerVersion)" />
         <PackageReference Include="Meshmakers.Octo.Sdk.ServiceClient" Version="$(OctoCoreLibVersion)" />

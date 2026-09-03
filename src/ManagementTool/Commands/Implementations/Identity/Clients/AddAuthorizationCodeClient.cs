@@ -1,4 +1,4 @@
-using IdentityModel;
+using Duende.IdentityModel;
 using Meshmakers.Common.CommandLineParser;
 using Meshmakers.Common.Shared;
 using Meshmakers.Octo.Communication.Contracts;
