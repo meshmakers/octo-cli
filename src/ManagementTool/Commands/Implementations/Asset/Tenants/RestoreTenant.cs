@@ -25,7 +25,7 @@ internal class RestoreTenant : JobWithWaitOctoCommand
             true, 1);
         _databaseArg = CommandArgumentValue.AddArgument("db", "database", ["Name of database"], true,
             1);
-        _fileArg = CommandArgumentValue.AddArgument("f", "file", ["File of backup (*.tar.gz)"], true, 1);
+        _fileArg = CommandArgumentValue.AddArgument("f", "file", ["File of backup (*.tar.gz or *.octobak.zip)"], true, 1);
         _oldDatabaseNameArg = CommandArgumentValue.AddArgument("oldDb", "oldDatabaseName", ["Name of the old database (if different to new database name)"], false, 1);
         _restoreArchiveDataArg = CommandArgumentValue.AddArgument("rad", "restore-archive-data",
             ["Restore CrateDB archive data contained in an '*.octobak.zip' backup (no-op on a plain '*.tar.gz')"],
