@@ -12,6 +12,7 @@ internal class GetTenants : ServiceClientOctoCommand<IAssetServicesClient>
 {
     private readonly IConsoleService _consoleService;
     private readonly IArgument _allArg;
+    private readonly IArgument _recursiveArg;
 
     public GetTenants(ILogger<GetTenants> logger,
         IConsoleService consoleService,
@@ -27,6 +28,13 @@ internal class GetTenants : ServiceClientOctoCommand<IAssetServicesClient>
             "Return every tenant registered on the installation, including sub-tenants of nested parents " +
             "and re-parented tenants. Only answered on the system tenant."
         ], false, 0);
+        _recursiveArg = CommandArgumentValue.AddArgument("r", "recursive",
+            [
+                "Also list every deeper descendant (grandchildren and below), each entry carrying its",
+                "parentTenantId. Without it, only DIRECT child tenants are returned — sub-tenant",
+                "hierarchies stay invisible (AB#5151). Requires a service exposing tenants/descendants;",
+                "an older service fails the call instead of silently returning only the children."
+            ], false);
     }
 
     public override CommandDocumentation? GetDocumentation() =>
@@ -63,7 +71,9 @@ internal class GetTenants : ServiceClientOctoCommand<IAssetServicesClient>
 
         var result = all
             ? await ServiceClient.GetAllTenantsAsync()
-            : await ServiceClient.GetTenantsAsync();
+            : CommandArgumentValue.IsArgumentUsed(_recursiveArg)
+                ? await ServiceClient.GetTenantDescendantsAsync()
+                : await ServiceClient.GetTenantsAsync();
 
         var tenants = result.ToArray();
         if (!tenants.Any())

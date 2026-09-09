@@ -5,6 +5,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <IsPackable>false</IsPackable>
+    <OutputType>Exe</OutputType>
     <!-- DebugL resolves the Meshmakers/Octo packages from the local ../nuget feed, see Directory.Build.props.
          Without it the solution falls back to Debug for this project, whose restore sources do not contain
          the local feed, while the referenced ManagementTool still demands the 999.0.0 packages. -->
@@ -18,7 +19,7 @@
     </PackageReference>
     <PackageReference Include="FakeItEasy" Version="9.0.1" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.9.0" />
-    <PackageReference Include="xunit" Version="2.9.3" />
+    <PackageReference Include="xunit.v3.mtp-off" Version="4.0.0" />
     <PackageReference Include="xunit.runner.visualstudio" Version="4.0.0">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>

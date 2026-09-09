@@ -21,7 +21,7 @@ internal class DumpTenant : JobOctoCommand
     {
         _tenantIdArg = CommandArgumentValue.AddArgument("tid", "tenantId", ["Id of tenant"],
             true, 1);
-        _fileArg = CommandArgumentValue.AddArgument("f", "file", ["File of backup (*.tar.gz)"], true, 1);
+        _fileArg = CommandArgumentValue.AddArgument("f", "file", ["File of backup (*.tar.gz, or *.octobak.zip with --include-archive-data)"], true, 1);
         _includeArchiveDataArg = CommandArgumentValue.AddArgument("iad", "include-archive-data",
             ["Include CrateDB archive data in the dump. The produced backup is a larger '*.octobak.zip' artifact"],
             false, 0);
