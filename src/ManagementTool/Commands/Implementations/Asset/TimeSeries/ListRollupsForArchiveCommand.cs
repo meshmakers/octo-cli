@@ -66,11 +66,12 @@ public class ListRollupsForArchiveCommand : ServiceClientOctoCommand<IStreamData
                 r.LastRecomputeSuccessAt?.ToString("O") ?? "<never>",
                 r.LastRecomputeFailureAt?.ToString("O") ?? "<none>",
                 string.IsNullOrEmpty(r.LastRecomputeFailureReason) ? "" : $" ({r.LastRecomputeFailureReason})");
-            // Multi-source rollups (AB#5157) — only interesting when there is more than one source or
-            // a source is span-limited. A single unbounded source is already covered by sourceArchiveRtId
-            // on the first line, so the common case stays byte-identical to the pre-1.8.0 output.
-            if (r.Sources is { Count: > 0 } sources &&
-                (sources.Count > 1 || sources.Any(s => s.ValidFrom.HasValue || s.ValidTo.HasValue)))
+            // Multi-source rollups (AB#5157). Printed for every rollup that declares sources, not
+            // only for the multi-source or span-limited ones: the line was the only place the
+            // listing states what a rollup actually reads from, so suppressing it in the single
+            // unbounded case left a rollup whose deprecated scalar disagrees with its Sources
+            // showing no source at all (AB#5157 validation finding 4).
+            if (r.Sources is { Count: > 0 } sources)
             {
                 // Half-open spans [from, to): 'from' inclusive, 'to' exclusive, unbounded ends as -inf/+inf.
                 var spans = string.Join(", ", sources.Select(s =>
