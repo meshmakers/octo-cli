@@ -84,11 +84,13 @@ public class BackfillRollupCommand : ServiceClientOctoCommand<IStreamDataService
         {
             case BackfillPollResult.Terminal:
                 Logger.LogInformation(
-                    "Backfill job {RtId}: state={State}, rows={Rows}, windows={Windows}, duration={Duration}ms, error={Error}",
+                    "Backfill job {RtId}: state={State}, rows={Rows}, windows={Windows}, duration={Duration}ms, " +
+                    "lastProgress={LastProgress}, error={Error}",
                     job!.RtId, job.State,
                     job.RowsProcessed?.ToString() ?? "n/a",
                     job.WindowsProcessed?.ToString() ?? "n/a",
                     job.DurationMs?.ToString() ?? "n/a",
+                    job.LastProgressAt?.ToString("O") ?? "n/a",
                     job.ErrorReason ?? "none");
                 break;
             case BackfillPollResult.Vanished:

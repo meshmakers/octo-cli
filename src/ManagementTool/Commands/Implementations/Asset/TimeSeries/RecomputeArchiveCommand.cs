@@ -67,11 +67,13 @@ public class RecomputeArchiveCommand : ServiceClientOctoCommand<IStreamDataServi
         var job = await ServiceClient.RecomputeArchiveAsync(Options.Value.TenantId, rollupRtId, from, to, rtIdScope);
 
         Logger.LogInformation(
-            "Recompute job {RtId}: state={State}, rows={Rows}, windows={Windows}, duration={Duration}ms, error={Error}",
+            "Recompute job {RtId}: state={State}, rows={Rows}, windows={Windows}, duration={Duration}ms, " +
+            "lastProgress={LastProgress}, error={Error}",
             job.RtId, job.State,
             job.RowsProcessed?.ToString() ?? "n/a",
             job.WindowsProcessed?.ToString() ?? "n/a",
             job.DurationMs?.ToString() ?? "n/a",
+            job.LastProgressAt?.ToString("O") ?? "n/a",
             job.ErrorReason ?? "none");
     }
 }
