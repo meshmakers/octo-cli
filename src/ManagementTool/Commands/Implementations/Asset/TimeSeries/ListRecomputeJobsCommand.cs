@@ -46,12 +46,14 @@ public class ListRecomputeJobsCommand : ServiceClientOctoCommand<IStreamDataServ
         foreach (var j in jobs)
         {
             Logger.LogInformation(
-                "  {RtId} — {State}, rows={Rows}, windows={Windows}, started={Started}, finished={Finished}, duration={Duration}ms, error={Error}",
+                "  {RtId} — {State}, rows={Rows}, windows={Windows}, started={Started}, lastProgress={LastProgress}, " +
+                "finished={Finished}, duration={Duration}ms, error={Error}",
                 j.RtId,
                 j.State,
                 j.RowsProcessed?.ToString() ?? "pending",
                 j.WindowsProcessed?.ToString() ?? "pending",
                 j.StartedAt?.ToString("O") ?? "<not started>",
+                j.LastProgressAt?.ToString("O") ?? "<none>",
                 j.FinishedAt?.ToString("O") ?? "<running>",
                 j.DurationMs?.ToString() ?? "n/a",
                 j.ErrorReason ?? "<none>");

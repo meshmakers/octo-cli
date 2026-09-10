@@ -82,14 +82,21 @@ public class BackfillRollupCommand : ServiceClientOctoCommand<IStreamDataService
 
         switch (result)
         {
-            case BackfillPollResult.Terminal:
+            case BackfillPollResult.Terminal when job is not null:
                 Logger.LogInformation(
-                    "Backfill job {RtId}: state={State}, rows={Rows}, windows={Windows}, duration={Duration}ms, error={Error}",
-                    job!.RtId, job.State,
+                    "Backfill job {RtId}: state={State}, rows={Rows}, windows={Windows}, duration={Duration}ms, " +
+                    "lastProgress={LastProgress}, error={Error}",
+                    job.RtId, job.State,
                     job.RowsProcessed?.ToString() ?? "n/a",
                     job.WindowsProcessed?.ToString() ?? "n/a",
                     job.DurationMs?.ToString() ?? "n/a",
+                    job.LastProgressAt?.ToString("O") ?? "n/a",
                     job.ErrorReason ?? "none");
+                break;
+            case BackfillPollResult.Terminal:
+                // PollUntilTerminalAsync pairs Terminal with the job it observed; guard the contract
+                // anyway rather than dereferencing a null snapshot.
+                Logger.LogWarning("Backfill job {RtId} reached a terminal state, but no job snapshot was returned.", jobRtId);
                 break;
             case BackfillPollResult.Vanished:
                 Logger.LogWarning("Backfill job {RtId} no longer listed for rollup '{RollupRtId}'; stopping wait.",
