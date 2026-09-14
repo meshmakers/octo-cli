@@ -401,12 +401,6 @@ internal static class Program
 
         services.AddTransient<ICommand, CreateFixupScript>();
         services.AddTransient<ICommand, RunFixupScripts>();
-/*
-        services.AddTransient<ICommand, GetNotificationMessages>();
-        services.AddTransient<ICommand, CreateNotification>();
-        services.AddTransient<ICommand, CompletePendingNotifications>();
-        services.AddTransient<ICommand, ResetNotificationsInError>();
-*/
 
         services.AddTransient<ICommand, GetApiResources>();
         services.AddTransient<ICommand, CreateApiResource>();
