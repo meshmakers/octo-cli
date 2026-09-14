@@ -190,6 +190,38 @@ Behaviour worth knowing:
 selection — use it only where that selection is itself the subject (`ListContexts`, `UseContext`).
 Everything acting on "the context in use" wants `GetEffectiveContext()` / `SaveEffectiveContext()`.
 
+### Adapter pool queue (AB#4924 §10)
+
+`GetAdapterPoolQueue -id <adapterPoolRtId>` and `CancelQueuedExecution -id <adapterPoolRtId> -eid
+<executionId>` are the CLI third of the queue surface concept §5 asks for — the same view Refinery
+Studio and the MCP server show, all three off one endpoint
+(`GET`/`DELETE {tenantId}/v1/adapterPool/{id}/queue[/{executionId}]`). Three things about them are
+deliberate and must survive future edits:
+
+- **There is no global queue position and printing one would be wrong.** The pool serves borrowing
+  tenants round-robin, so the truthful answer is the pair *position inside its own tenant* +
+  *tenants ahead in the rotation*: item 1 of the tenant whose turn is next runs before item 2 of the
+  tenant being served now. `AdapterPoolQueueCommandTests` pins that the pair is printed and that the
+  word "rank" appears nowhere.
+- **`CancelQueuedExecution` cancels a QUEUE entry, never a running pipeline.** An execution that
+  already holds a lease comes back as `AdapterPoolQueueCancellationOutcome.AlreadyLeased` (HTTP 409)
+  and is reported as its own case — *nothing was cancelled, interrupting it is a different
+  operation* — not as a generic failure and never as a success. Collapsing the two verbs would leave
+  the operator unsure which one they just performed.
+- **An empty queue is an idle pool, not an error**, and the route tenant is the **lending** tenant:
+  the pool is its entity, while every entry belongs to a borrowing tenant.
+
+Manual (non-pooled) adapters have no queue at all and therefore no equivalent command — that
+asymmetry is intended.
+
+🔴 **`CommandReferenceGenerator.Tests` cannot run from a scratch `-p:BaseOutputPath`.**
+`RoslynExtractorTests.InheritedArgsByBaseClass_does_not_drift_from_JobWithWaitOctoCommand_source`
+walks up from `AppContext.BaseDirectory` looking for `Octo.Cli.sln` and asserts it found it, so an
+assembly built outside the repo fails with `Assert.NotNull() Failure: Value is null` — a red test
+that says nothing about the code. Build *that* project into the repo's own `bin/` (or run
+`dotnet test`) and keep the scratch output path for `ManagementTool.Tests`, which has no such
+dependency.
+
 ### Parallel invocations and `contexts.json`
 
 Because several processes can now write `contexts.json` concurrently (token refresh, `AddContext`),
@@ -241,7 +273,7 @@ Environment variables are prefixed with `OCTO_`:
 | Identity | users, roles, clients (+ mirror commands: GetClientMirrors, ProvisionClientInExistingTenants, ProvisionClientInTenant, UnprovisionClientFromTenant, SetClientAutoProvision, ApplyClientOverlay, CleanClientOverlays), identityProviders, groups, emailDomainGroupRules, externalTenantUserMappings, adminProvisioning, apiResources, apiScopes | Identity Services |
 | Asset | tenants, models, blueprints (ListBlueprints, RefreshBlueprintCatalogs, InstallBlueprint, GetBlueprintHistory, PreviewBlueprintUpdate, UpdateBlueprint, ListBlueprintInstallations, UninstallBlueprint), timeSeries (EnableStreamData, DisableStreamData, ActivateArchive, DisableArchive, EnableArchive, RetryArchiveActivation, DeleteArchive, FreezeRollupArchive, UnfreezeRollupArchive, RewindRollupWatermark, ListRollupsForArchive, RecomputeArchive, BackfillRollup, ListRecomputeJobs, AddComputedColumn, RemoveComputedColumn, UpdateComputedColumnFormula) | Asset Repository |
 | Bots | Dump, Restore, ExportArchiveData, ImportArchiveData, RunFixupScripts | Bot Services |
-| Communication | enable/disable, adapters (incl. RotateAdapterServiceAccountSecret), pipelines (incl. MovePipelines for bulk reassignment to a different adapter), triggers, pools, dataFlows, workloads (GetWorkloadsByChart, UpdateWorkloadChartVersion, DeployWorkload, UndeployWorkload) | Communication Controller |
+| Communication | enable/disable, adapters (incl. RotateAdapterServiceAccountSecret), pipelines (incl. MovePipelines for bulk reassignment to a different adapter), triggers, pools, adapter pool queue (GetAdapterPoolQueue, CancelQueuedExecution), dataFlows, workloads (GetWorkloadsByChart, UpdateWorkloadChartVersion, DeployWorkload, UndeployWorkload) | Communication Controller |
 | Reporting | enable/disable | Report Services |
 | AI Services | EnableAi, DisableAi, RedeemAiTicket (anonymous — bastion-side), GetAiCredentialsStatus, RevokeAiCredentials | AI Services |
 | DevOps | certificates | Local operations |

@@ -235,6 +235,12 @@ public sealed class RotateAdapterServiceAccountSecretCommandTests
         public Task<IReadOnlyList<PoolSummaryDto>> GetPoolsAsync() => throw new NotSupportedException();
         public Task DeployPoolAsync(string poolRtId) => throw new NotSupportedException();
         public Task UndeployPoolAsync(string poolRtId) => throw new NotSupportedException();
+        public Task<IReadOnlyList<AdapterPoolQueueEntryDto>> GetAdapterPoolQueueAsync(string adapterPoolRtId) =>
+            throw new NotSupportedException();
+
+        public Task<AdapterPoolQueueCancellationResultDto> CancelQueuedExecutionAsync(string adapterPoolRtId,
+            string executionId) => throw new NotSupportedException();
+
         public Task DeployDataFlowAsync(string dataFlowRtId) => throw new NotSupportedException();
         public Task UndeployDataFlowAsync(string dataFlowRtId) => throw new NotSupportedException();
 
