@@ -11,7 +11,8 @@ internal class GetCommunicationLifecycleCommand : ServiceClientOctoCommand<IComm
         IOptions<OctoToolOptions> options,
         ICommunicationServicesClient communicationServicesClient, IAuthenticationService authenticationService)
         : base(logger, Constants.CommunicationServicesGroup, "GetCommunicationLifecycle",
-            "Gets the tenant's on-demand lifecycle configuration (scale-to-zero, AB#4914).", options,
+            "Gets the tenant's communication lifecycle configuration: scale-to-zero (AB#4914) and " +
+            "adapter pool leasing (AB#4924).", options,
             communicationServicesClient, authenticationService)
     {
     }
@@ -27,7 +28,8 @@ internal class GetCommunicationLifecycleCommand : ServiceClientOctoCommand<IComm
         var lifecycle = await ServiceClient.GetLifecycleAsync();
 
         Logger.LogInformation(
-            "Communication lifecycle for tenant '{TenantId}': ScaleToZeroEnabled={ScaleToZeroEnabled}",
-            Options.Value.TenantId, lifecycle.ScaleToZeroEnabled);
+            "Communication lifecycle for tenant '{TenantId}': ScaleToZeroEnabled={ScaleToZeroEnabled}, " +
+            "LeasingEnabled={LeasingEnabled}",
+            Options.Value.TenantId, lifecycle.ScaleToZeroEnabled, lifecycle.LeasingEnabled);
     }
 }
