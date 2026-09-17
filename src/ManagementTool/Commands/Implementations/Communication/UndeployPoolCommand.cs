@@ -42,7 +42,7 @@ internal class UndeployPoolCommand : ServiceClientOctoCommand<ICommunicationServ
             Notes:
             [
                 "Undeploy the pool's workloads (Adapters and Applications) with UndeployWorkload before the pool itself; " +
-                "the operator removes the pool resources (CommunicationPool resource and broker secret for Cloud pools) " +
+                "the operator removes the pool resources (DeploymentSite resource and broker secret for Cloud pools) " +
                 "once nothing runs in it.",
                 "Required before DisableCommunication, which is refused with HTTP 409 while any pool or workload of the " +
                 "tenant is still deployed (AB#4255).",
