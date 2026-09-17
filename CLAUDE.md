@@ -151,7 +151,7 @@ each target their own tenant/environment:
 ```bash
 octo-cli --context prod_acme -c GetUsers      # runs against prod_acme
 octo-cli -c GetAdapters --context prod_acme   # position does not matter
-OCTO_CLI_CONTEXT=prod_acme octo-cli -c GetPools
+OCTO_CLI_CONTEXT=prod_acme octo-cli -c GetDeploymentSites
 ```
 
 Precedence: `--context` > `OCTO_CLI_CONTEXT` > `ActiveContext`. An unknown name aborts with exit
@@ -693,8 +693,8 @@ deliberate and easy to undo by accident:
 
 | Command | Parameters | Description |
 |---------|-----------|-------------|
-| `GetPools` | `--json` (optional) | List all pools for the tenant |
-| `DeployPool` | `-id <poolRtId>` | Trigger pool deploy (operator creates the DeploymentSite CR); workloads deploy separately |
+| `GetDeploymentSites` | `--json` (optional) | List all deployment sites for the tenant |
+| `DeployDeploymentSite` | `-id <deploymentSiteRtId>` | Trigger deployment-site deploy (operator creates the DeploymentSite CR); workloads deploy separately |
 
 ### Data Flows
 

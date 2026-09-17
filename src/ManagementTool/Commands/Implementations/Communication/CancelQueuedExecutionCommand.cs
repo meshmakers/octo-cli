@@ -65,7 +65,7 @@ internal class CancelQueuedExecutionCommand : ServiceClientOctoCommand<ICommunic
                 "(HTTP 409) — interrupting it is a different operation with different consequences.",
                 "The cancelled execution becomes Cancelled and is never leased; it stays visible in the execution " +
                 "history as a cancelled attempt.",
-                "The tenant of the active context is the LENDING tenant that owns the pool, not the borrowing tenant " +
+                "The tenant of the active context is the LENDING tenant that owns the adapter pool, not the borrowing tenant " +
                 "whose work is cancelled. Find execution ids with GetAdapterPoolQueue.",
                 "Acts on the tenant of the active context; switch with UseContext or pass --context <name>."
             ]

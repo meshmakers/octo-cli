@@ -9,7 +9,7 @@ using Newtonsoft.Json.Converters;
 
 namespace Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Communication;
 
-internal class GetPoolsCommand : ServiceClientOctoCommand<ICommunicationServicesClient>
+internal class GetDeploymentSitesCommand : ServiceClientOctoCommand<ICommunicationServicesClient>
 {
     private static readonly JsonSerializerSettings JsonSettings = new()
     {
@@ -19,11 +19,11 @@ internal class GetPoolsCommand : ServiceClientOctoCommand<ICommunicationServices
     private readonly IConsoleService _consoleService;
     private readonly IArgument _jsonArg;
 
-    public GetPoolsCommand(ILogger<GetPoolsCommand> logger, IOptions<OctoToolOptions> options,
+    public GetDeploymentSitesCommand(ILogger<GetDeploymentSitesCommand> logger, IOptions<OctoToolOptions> options,
         IConsoleService consoleService,
         ICommunicationServicesClient communicationServicesClient, IAuthenticationService authenticationService)
-        : base(logger, Constants.CommunicationServicesGroup, "GetPools",
-            "Gets all pools for the current tenant.", options,
+        : base(logger, Constants.CommunicationServicesGroup, "GetDeploymentSites",
+            "Gets all deployment sites for the current tenant.", options,
             communicationServicesClient, authenticationService)
     {
         _consoleService = consoleService;
@@ -40,7 +40,7 @@ internal class GetPoolsCommand : ServiceClientOctoCommand<ICommunicationServices
 
     public override async Task Execute()
     {
-        Logger.LogInformation("Getting pools for tenant '{TenantId}' at '{ServiceClientServiceUri}'",
+        Logger.LogInformation("Getting deployment sites for tenant '{TenantId}' at '{ServiceClientServiceUri}'",
             Options.Value.TenantId,
             ServiceClient.ServiceUri);
 
@@ -50,7 +50,7 @@ internal class GetPoolsCommand : ServiceClientOctoCommand<ICommunicationServices
             return;
         }
 
-        var result = await ServiceClient.GetPoolsAsync();
+        var result = await ServiceClient.GetDeploymentSitesAsync();
 
         if (CommandArgumentValue.IsArgumentUsed(_jsonArg))
         {

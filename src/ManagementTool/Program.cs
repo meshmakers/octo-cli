@@ -448,9 +448,9 @@ internal static class Program
         services.AddTransient<ICommand, UndeployTriggersCommand>();
 
         // Communication - Pools
-        services.AddTransient<ICommand, GetPoolsCommand>();
-        services.AddTransient<ICommand, DeployPoolCommand>();
-        services.AddTransient<ICommand, UndeployPoolCommand>();
+        services.AddTransient<ICommand, GetDeploymentSitesCommand>();
+        services.AddTransient<ICommand, DeployDeploymentSiteCommand>();
+        services.AddTransient<ICommand, UndeployDeploymentSiteCommand>();
 
         // Communication - Adapter pool queue (AB#4924 §10): the same queue view as Refinery Studio
         // and the MCP server, off the same endpoint.

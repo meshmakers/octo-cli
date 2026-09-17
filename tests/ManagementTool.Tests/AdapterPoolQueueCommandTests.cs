@@ -394,9 +394,9 @@ public sealed class AdapterPoolQueueCommandTests
 
         public Task DeployTriggersAsync() => throw new NotSupportedException();
         public Task UndeployTriggersAsync() => throw new NotSupportedException();
-        public Task<IReadOnlyList<PoolSummaryDto>> GetPoolsAsync() => throw new NotSupportedException();
-        public Task DeployPoolAsync(string poolRtId) => throw new NotSupportedException();
-        public Task UndeployPoolAsync(string poolRtId) => throw new NotSupportedException();
+        public Task<IReadOnlyList<DeploymentSiteSummaryDto>> GetDeploymentSitesAsync() => throw new NotSupportedException();
+        public Task DeployDeploymentSiteAsync(string poolRtId) => throw new NotSupportedException();
+        public Task UndeployDeploymentSiteAsync(string poolRtId) => throw new NotSupportedException();
         public Task DeployDataFlowAsync(string dataFlowRtId) => throw new NotSupportedException();
         public Task UndeployDataFlowAsync(string dataFlowRtId) => throw new NotSupportedException();
 

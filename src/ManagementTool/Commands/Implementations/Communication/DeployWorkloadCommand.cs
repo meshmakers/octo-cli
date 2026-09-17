@@ -13,7 +13,7 @@ internal class DeployWorkloadCommand : ServiceClientOctoCommand<ICommunicationSe
     public DeployWorkloadCommand(ILogger<DeployWorkloadCommand> logger, IOptions<OctoToolOptions> options,
         ICommunicationServicesClient communicationServicesClient, IAuthenticationService authenticationService)
         : base(logger, Constants.CommunicationServicesGroup, "DeployWorkload",
-            "Triggers a deploy of one workload (Adapter or Application) through its parent pool.",
+            "Triggers a deploy of one workload (Adapter or Application) through its parent deployment site.",
             options, communicationServicesClient, authenticationService)
     {
         _workloadRtId = CommandArgumentValue.AddArgument("id", "workloadRtId",

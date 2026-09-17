@@ -16,7 +16,7 @@ internal class UndeployWorkloadCommand : ServiceClientOctoCommand<ICommunication
         ICommunicationServicesClient communicationServicesClient, IAuthenticationService authenticationService,
         IConfirmationService confirmationService)
         : base(logger, Constants.CommunicationServicesGroup, "UndeployWorkload",
-            "Undeploys one workload (Adapter or Application) through its parent pool. Destructive — the operator helm-uninstalls the chart.",
+            "Undeploys one workload (Adapter or Application) through its parent deployment site. Destructive — the operator helm-uninstalls the chart.",
             options, communicationServicesClient, authenticationService)
     {
         _confirmationService = confirmationService;
