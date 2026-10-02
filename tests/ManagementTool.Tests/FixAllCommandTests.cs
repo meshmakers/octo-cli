@@ -6,22 +6,20 @@ using Meshmakers.Octo.Frontend.ManagementTool.Services;
 using Meshmakers.Octo.Sdk.ServiceClient.AssetRepositoryServices.CkModelCatalog;
 using Meshmakers.Octo.Sdk.ServiceClient.AssetRepositoryServices.System;
 using Meshmakers.Octo.Sdk.ServiceClient.BotServices;
-using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 
 namespace ManagementTool.Tests;
 
-public sealed class ImportFromCatalogCommandTests
+public sealed class FixAllCommandTests
 {
-    private const string JobId = "6abf6b40466e54c8b02451eb";
+    private const string JobId = "6abf74c0466e54c8b0245209";
 
     [Fact]
     public async Task Execute_WithWait_FailsWithTheJobError_WhenTheImportJobFails()
     {
         var botClient = NewBotClient("Failed", "Sequence contains more than one matching element");
-        var command = NewCommand(NewAssetClient(), botClient);
-        command.CommandArgumentValue.ParseLayer(["-cn", "PublicGitHubCatalog", "-m", "EnergyCommunity-4.6.0", "-w"]);
+        var command = NewCommand(botClient, new RecordingLogger<FixAllCommand>());
+        command.CommandArgumentValue.ParseLayer(["-y", "-w"]);
 
         var exception = await Assert.ThrowsAsync<ToolException>(command.Execute);
 
@@ -33,8 +31,8 @@ public sealed class ImportFromCatalogCommandTests
     public async Task Execute_WithWait_ReturnsAfterTheImportJobSucceeded()
     {
         var botClient = NewBotClient("Succeeded", null);
-        var command = NewCommand(NewAssetClient(), botClient);
-        command.CommandArgumentValue.ParseLayer(["-cn", "PublicGitHubCatalog", "-m", "Industry.Basic-2.3.0", "-w"]);
+        var command = NewCommand(botClient, new RecordingLogger<FixAllCommand>());
+        command.CommandArgumentValue.ParseLayer(["-y", "-w"]);
 
         await command.Execute();
 
@@ -45,9 +43,9 @@ public sealed class ImportFromCatalogCommandTests
     public async Task Execute_WithoutWait_PrintsTheJobIdWithoutPollingIt()
     {
         var botClient = NewBotClient("Failed", "never read");
-        var logger = new RecordingLogger<ImportFromCatalogCommand>();
-        var command = NewCommand(NewAssetClient(), botClient, logger);
-        command.CommandArgumentValue.ParseLayer(["-cn", "PublicGitHubCatalog", "-m", "Industry.Basic-2.3.0"]);
+        var logger = new RecordingLogger<FixAllCommand>();
+        var command = NewCommand(botClient, logger);
+        command.CommandArgumentValue.ParseLayer(["-y"]);
 
         await command.Execute();
 
@@ -58,6 +56,18 @@ public sealed class ImportFromCatalogCommandTests
     private static IAssetServicesClient NewAssetClient()
     {
         var assetClient = A.Fake<IAssetServicesClient>();
+        A.CallTo(() => assetClient.GetLibraryStatusAsync(A<string>._))
+            .Returns(new CkModelLibraryStatusResponseDto
+            {
+                Items =
+                [
+                    new CkModelLibraryStatusItemDto
+                    {
+                        Name = "EnergyCommunity", InstalledVersion = "3.3.0", CatalogVersion = "4.6.0",
+                        NeedsAction = true, CatalogName = "PublicGitHubCatalog", FullModelId = "EnergyCommunity-4.6.0"
+                    }
+                ]
+            });
         A.CallTo(() => assetClient.ResolveDependenciesBatchAsync(A<string>._, A<List<ImportFromCatalogRequestDto>>._))
             .Returns(new BatchDependencyResolutionResponseDto { ModelsToImport = ["Basic.Energy-1.7.0", "EnergyCommunity-4.6.0"] });
         A.CallTo(() => assetClient.ImportFromCatalogBatchAsync(A<string>._, A<ImportFromCatalogBatchRequestDto>._))
@@ -73,9 +83,7 @@ public sealed class ImportFromCatalogCommandTests
         return botClient;
     }
 
-    private static ImportFromCatalogCommand NewCommand(IAssetServicesClient assetClient, IBotServicesClient botClient,
-        ILogger<ImportFromCatalogCommand>? logger = null) =>
-        new(logger ?? NullLogger<ImportFromCatalogCommand>.Instance,
-            Options.Create(new OctoToolOptions { TenantId = "ab5470ec" }), assetClient, botClient,
-            A.Fake<IAuthenticationService>());
+    private static FixAllCommand NewCommand(IBotServicesClient botClient, RecordingLogger<FixAllCommand> logger) =>
+        new(logger, Options.Create(new OctoToolOptions { TenantId = "ab5470up" }), NewAssetClient(), botClient,
+            A.Fake<IAuthenticationService>(), A.Fake<IConfirmationService>());
 }
