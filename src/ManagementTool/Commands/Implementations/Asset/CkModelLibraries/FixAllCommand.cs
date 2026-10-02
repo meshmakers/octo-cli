@@ -88,13 +88,7 @@ internal class FixAllCommand : JobWithWaitOctoCommand
         var importResult = await _assetServicesClient.ImportFromCatalogBatchAsync(tenantId,
             new ImportFromCatalogBatchRequestDto { CatalogName = catalogName, ModelIds = depResult.ModelsToImport });
 
-        for (var i = 0; i < importResult.JobIds.Count; i++)
-        {
-            var jobModelName = i < depResult.ModelsToImport.Count ? depResult.ModelsToImport[i] : "Model";
-            Logger.LogInformation("Importing {Model} ({Current}/{Total})...", jobModelName, i + 1, importResult.JobIds.Count);
-            await WaitForJob(importResult.JobIds[i]);
-        }
-
-        Logger.LogInformation("Fix All completed.");
+        Logger.LogInformation("Import with job id \'{Id}\' has been started", importResult.JobId);
+        await WaitForJob(importResult.JobId);
     }
 }
