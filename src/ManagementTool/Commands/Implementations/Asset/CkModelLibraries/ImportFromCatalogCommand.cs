@@ -46,7 +46,7 @@ internal class ImportFromCatalogCommand : JobWithWaitOctoCommand
                     new CodeSampleArgument(_catalogNameArg, "PublicGitHubCatalog"),
                     new CodeSampleArgument(_modelIdArg, "Industry.Energy-2.0.0"),
                 ],
-                    description: "Import without waiting (returns job IDs)"),
+                    description: "Import without waiting (prints the job id)"),
             ]
         );
 
@@ -74,13 +74,7 @@ internal class ImportFromCatalogCommand : JobWithWaitOctoCommand
         var importResult = await _assetServicesClient.ImportFromCatalogBatchAsync(tenantId,
             new ImportFromCatalogBatchRequestDto { CatalogName = catalogName, ModelIds = depResult.ModelsToImport });
 
-        for (var i = 0; i < importResult.JobIds.Count; i++)
-        {
-            var jobModelName = i < depResult.ModelsToImport.Count ? depResult.ModelsToImport[i] : "Model";
-            Logger.LogInformation("Importing {Model} ({Current}/{Total})...", jobModelName, i + 1, importResult.JobIds.Count);
-            await WaitForJob(importResult.JobIds[i]);
-        }
-
-        Logger.LogInformation("Import completed.");
+        Logger.LogInformation("Import with job id \'{Id}\' has been started", importResult.JobId);
+        await WaitForJob(importResult.JobId);
     }
 }
