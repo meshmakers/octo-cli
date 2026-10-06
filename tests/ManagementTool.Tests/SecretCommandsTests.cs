@@ -309,6 +309,36 @@ public sealed class SecretCommandsTests
         Assert.Equal("rotated-test-secret", Assert.IsType<MicrosoftIdentityProviderDto>(sent).ClientSecret);
     }
 
+    [Fact]
+    public async Task GetIdentityProviders_ClientSecretFromOlderService_IsNotPrinted()
+    {
+        const string fakeSecret = "fake-secret-echoed-by-an-old-server";
+        var identity = A.Fake<IIdentityServicesClient>();
+        A.CallTo(() => identity.GetIdentityProviders()).Returns(new List<IdentityProviderDto>
+        {
+            new GoogleIdentityProviderDto { Name = "G", ClientId = "g", ClientSecret = fakeSecret },
+            new MicrosoftIdentityProviderDto { Name = "M", ClientId = "m", ClientSecret = fakeSecret },
+            new FacebookIdentityProviderDto { Name = "F", ClientId = "f", ClientSecret = fakeSecret },
+            new AzureEntraIdProviderDto
+            {
+                Name = "A", ClientId = "a", TenantId = "t", ClientSecret = fakeSecret, ClientSecretIsSet = true
+            }
+        });
+        var console = A.Fake<IConsoleService>();
+        var printed = new List<string>();
+        A.CallTo(() => console.WriteLine(A<string>._)).Invokes((string line) => printed.Add(line));
+        var command = new GetIdentityProviders(new RecordingLogger<GetIdentityProviders>(),
+            Options.Create(new OctoToolOptions { TenantId = "acme" }), console, identity,
+            A.Fake<IAuthenticationService>());
+        command.CommandArgumentValue.ParseLayer([]);
+
+        await command.Execute();
+
+        var output = string.Join("\n", printed);
+        Assert.Contains("clientSecretIsSet", output, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain(fakeSecret, output);
+    }
+
     private static IBotServicesClient NewBotWithJob()
     {
         var bot = A.Fake<IBotServicesClient>();
