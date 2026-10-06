@@ -36,7 +36,8 @@ internal class UpdateIdentityProvider : ServiceClientOctoCommand<IIdentityServic
         _clientId = CommandArgumentValue.AddArgument("cid", "clientId",
             ["ServiceClient ID, provided by provider"], false, 1);
         _clientSecret = CommandArgumentValue.AddArgument("cs", "clientSecret",
-            ["ServiceClient secret, provided by provider"], false, 1);
+            ["New client secret, provided by provider. Omit to keep the stored secret (it is write-only and never returned)"],
+            false, 1);
         _allowSelfRegistration = CommandArgumentValue.AddArgument("asr", "allowSelfRegistration",
             ["Allow self registration (default: true)"], false, 1);
         _defaultGroupRtId = CommandArgumentValue.AddArgument("dgid", "defaultGroupRtId",
@@ -63,6 +64,11 @@ internal class UpdateIdentityProvider : ServiceClientOctoCommand<IIdentityServic
                     new CodeSampleArgument(_clientSecret, "new-client-secret"),
                 ],
                     description: "For OAuth-based providers, you can also update client credentials"),
+            ],
+            Notes:
+            [
+                "The client secret is write-only: GetIdentityProviders shows clientSecretIsSet, never the value.",
+                "Omit -cs to keep the stored client secret; pass a new value to rotate it. It cannot be cleared.",
             ]
         );
 
@@ -86,38 +92,45 @@ internal class UpdateIdentityProvider : ServiceClientOctoCommand<IIdentityServic
         var clientId = CommandArgumentValue.IsArgumentUsed(_clientId)
             ? CommandArgumentValue.GetArgumentScalarValue<string>(_clientId)
             : null;
+        // AB#5543: the client secret is write-only. GET never returns it (clientSecretIsSet instead), and PUT
+        // treats null / "" as "keep the stored secret" — so only a newly supplied value is sent, never the
+        // existing DTO's ClientSecret.
         var clientSecret = CommandArgumentValue.IsArgumentUsed(_clientSecret)
             ? CommandArgumentValue.GetArgumentScalarValueOrDefault<string>(_clientSecret)
             : null;
+        if (string.IsNullOrEmpty(clientSecret))
+        {
+            clientSecret = null;
+        }
 
         IdentityProviderDto newIdentityProviderDto;
 
-        if (identityProviderDto is GoogleIdentityProviderDto)
+        if (identityProviderDto is GoogleIdentityProviderDto existingGoogle)
         {
             newIdentityProviderDto = new GoogleIdentityProviderDto
             {
                 IsEnabled = isEnabled,
-                ClientId = clientId,
+                ClientId = clientId ?? existingGoogle.ClientId,
                 ClientSecret = clientSecret,
                 Name = name
             };
         }
-        else if (identityProviderDto is MicrosoftIdentityProviderDto)
+        else if (identityProviderDto is MicrosoftIdentityProviderDto existingMicrosoft)
         {
             newIdentityProviderDto = new MicrosoftIdentityProviderDto
             {
                 IsEnabled = isEnabled,
-                ClientId = clientId,
+                ClientId = clientId ?? existingMicrosoft.ClientId,
                 ClientSecret = clientSecret,
                 Name = name
             };
         }
-        else if (identityProviderDto is FacebookIdentityProviderDto)
+        else if (identityProviderDto is FacebookIdentityProviderDto existingFacebook)
         {
             newIdentityProviderDto = new FacebookIdentityProviderDto
             {
                 IsEnabled = isEnabled,
-                ClientId = clientId,
+                ClientId = clientId ?? existingFacebook.ClientId,
                 ClientSecret = clientSecret,
                 Name = name
             };
@@ -128,7 +141,7 @@ internal class UpdateIdentityProvider : ServiceClientOctoCommand<IIdentityServic
             {
                 IsEnabled = isEnabled,
                 ClientId = clientId ?? existingAzure.ClientId,
-                ClientSecret = clientSecret ?? existingAzure.ClientSecret,
+                ClientSecret = clientSecret,
                 TenantId = existingAzure.TenantId,
                 Authority = existingAzure.Authority,
                 Name = name

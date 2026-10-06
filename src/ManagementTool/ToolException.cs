@@ -77,6 +77,18 @@ public class ToolException : Exception
             $"The fixup script with the name '{name}' has already been applied. It cannot be replaced or deleted. Please create a new script with a different name.");
     }
 
+    public static Exception InvalidSecretSweepMode(string mode)
+    {
+        return new ToolException(
+            $"Secret sweep mode '{mode}' is not available. Use Verify, Encrypt, Reprotect or ClearUnknownKid " +
+            "(Decrypt is an emergency operation and is not offered by the CLI).");
+    }
+
+    public static Exception SecretScopeConflict()
+    {
+        return new ToolException("Use either --tenantId or --all, not both.");
+    }
+
     public static Exception OperationCancelledByUser()
     {
         return new ToolException("Operation cancelled by user.");

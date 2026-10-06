@@ -7,6 +7,7 @@ using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Ai;
 using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Asset.Blueprints;
 using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Asset.CkModelLibraries;
 using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Asset.FixupScripts;
+using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Asset.Secrets;
 using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Asset.Models;
 using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Asset.Tenants;
 using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Asset.TimeSeries;
@@ -401,6 +402,8 @@ internal static class Program
 
         services.AddTransient<ICommand, CreateFixupScript>();
         services.AddTransient<ICommand, RunFixupScripts>();
+        services.AddTransient<ICommand, SecretStatusCommand>();
+        services.AddTransient<ICommand, ReprotectSecretsCommand>();
 
         services.AddTransient<ICommand, GetApiResources>();
         services.AddTransient<ICommand, CreateApiResource>();

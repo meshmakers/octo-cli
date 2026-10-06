@@ -1,0 +1,340 @@
+using FakeItEasy;
+using Meshmakers.Common.Shared.Services;
+using Meshmakers.Octo.Communication.Contracts.DataTransferObjects;
+using Meshmakers.Octo.ConstructionKit.Contracts;
+using Meshmakers.Octo.Frontend.ManagementTool;
+using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Asset.Secrets;
+using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Identity.IdentityProviders;
+using Meshmakers.Octo.Frontend.ManagementTool.Services;
+using Meshmakers.Octo.Sdk.ServiceClient.BotServices;
+using Meshmakers.Octo.Sdk.ServiceClient.IdentityServices;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+
+namespace ManagementTool.Tests;
+
+/// <summary>
+///     AB#5543 — CLI surface of the SECRET value type: SecretStatus / ReprotectSecrets over the bot service secret
+///     sweep API, and the write-only identity-provider client secret.
+/// </summary>
+public sealed class SecretCommandsTests
+{
+    private const string JobId = "6abf74c0466e54c8b0245209";
+    private const string ProviderId = "507f1f77bcf86cd799439099";
+
+    private static SecretSweepReportDto Report(string tenantId, bool violation = false, int reEnter = 0) => new()
+    {
+        TenantId = tenantId,
+        Mode = SecretSweepModeDto.Verify,
+        Trigger = SecretSweepTriggerDto.Restore,
+        Outcome = SecretSweepOutcomeDto.Succeeded,
+        ActiveKeyId = "k1",
+        StrictModeActive = violation,
+        StrictModeViolation = violation,
+        RemainingLegacyValues = violation ? 2 : 0,
+        Steps =
+        [
+            new SecretSweepStepReportDto
+            {
+                Mode = SecretSweepModeDto.Verify,
+                Success = true,
+                Totals = new SecretFormCountsReportDto
+                {
+                    Plaintext = violation ? 2 : 0, EncV2 = 4, Total = 6,
+                    EncV2ByKeyId = new Dictionary<string, long> { ["k1"] = 4 }
+                },
+                Slots =
+                [
+                    new SecretSlotCountsReportDto
+                    {
+                        CkTypeId = "System.Communication/EMailSenderConfiguration", AttributePath = "Password",
+                        Counts = new SecretFormCountsReportDto { EncV2 = 4, Total = 4 }
+                    }
+                ]
+            }
+        ],
+        SecretsToReEnter = Enumerable.Range(0, reEnter).Select(_ => new SecretValueReferenceDto
+        {
+            CkTypeId = "System.Communication/SftpConfiguration", RtId = "507f1f77bcf86cd799439011",
+            AttributePath = "PrivateKey", PreviousForm = SecretValueFormDto.UnknownKeyId, KeyId = "k0"
+        }).ToList()
+    };
+
+    // ── SecretStatus ──────────────────────────────────────────────────────
+
+    [Fact]
+    public async Task SecretStatus_DefaultsToTheContextTenant_AndPrintsSlotsAndReEntryList()
+    {
+        var bot = A.Fake<IBotServicesClient>();
+        A.CallTo(() => bot.GetSecretSweepReportAsync("acme")).Returns(Report("acme", reEnter: 1));
+        var logger = new RecordingLogger<SecretStatusCommand>();
+        var command = NewStatus(bot, logger);
+        command.CommandArgumentValue.ParseLayer([]);
+
+        await command.Execute();
+
+        Assert.Contains(logger.Entries, e => e.Message.Contains("EMailSenderConfiguration") && e.Message.Contains("Password"));
+        Assert.Contains(logger.Entries, e => e.Message.Contains("encV2 key id k1: 4"));
+        Assert.Contains(logger.Entries,
+            e => e.Level == LogLevel.Warning && e.Message.Contains("1 secret(s) must be re-entered"));
+        Assert.Contains(logger.Entries, e => e.Message.Contains("PrivateKey") && e.Message.Contains("k0"));
+        A.CallTo(() => bot.GetSecretSweepReportsAsync()).MustNotHaveHappened();
+    }
+
+    [Fact]
+    public async Task SecretStatus_ExplicitTenant_IsUsed()
+    {
+        var bot = A.Fake<IBotServicesClient>();
+        A.CallTo(() => bot.GetSecretSweepReportAsync("other")).Returns((SecretSweepReportDto?)null);
+        var logger = new RecordingLogger<SecretStatusCommand>();
+        var command = NewStatus(bot, logger);
+        command.CommandArgumentValue.ParseLayer(["-tid", "Other"]);
+
+        await command.Execute();
+
+        A.CallTo(() => bot.GetSecretSweepReportAsync("other")).MustHaveHappenedOnceExactly();
+        Assert.Contains(logger.Entries, e => e.Message.Contains("No secret sweep report"));
+    }
+
+    [Fact]
+    public async Task SecretStatus_All_PrintsOneLinePerTenantAndWarnsOnViolations()
+    {
+        var bot = A.Fake<IBotServicesClient>();
+        A.CallTo(() => bot.GetSecretSweepReportsAsync())
+            .Returns(new List<SecretSweepReportDto> { Report("a"), Report("b", violation: true) });
+        var logger = new RecordingLogger<SecretStatusCommand>();
+        var command = NewStatus(bot, logger);
+        command.CommandArgumentValue.ParseLayer(["-a"]);
+
+        await command.Execute();
+
+        Assert.Contains(logger.Entries, e => e.Message.Contains("2 tenant report(s)"));
+        Assert.Contains(logger.Entries, e => e.Message.TrimStart().StartsWith("b ") && e.Message.Contains("VIOLATION"));
+        Assert.Contains(logger.Entries, e => e.Level == LogLevel.Warning && e.Message.Contains("strict mode violation"));
+        A.CallTo(() => bot.GetSecretSweepReportAsync(A<string>._)).MustNotHaveHappened();
+    }
+
+    [Fact]
+    public async Task SecretStatus_Json_WritesTheRawReport()
+    {
+        var bot = A.Fake<IBotServicesClient>();
+        A.CallTo(() => bot.GetSecretSweepReportAsync("acme")).Returns(Report("acme"));
+        var console = A.Fake<IConsoleService>();
+        var command = NewStatus(bot, new RecordingLogger<SecretStatusCommand>(), console: console);
+        command.CommandArgumentValue.ParseLayer(["-j"]);
+
+        await command.Execute();
+
+        A.CallTo(() => console.WriteLine(A<string>.That.Contains("\"ActiveKeyId\": \"k1\""))).MustHaveHappened();
+    }
+
+    [Fact]
+    public async Task SecretStatus_TenantAndAll_IsRejected()
+    {
+        var bot = A.Fake<IBotServicesClient>();
+        var command = NewStatus(bot, new RecordingLogger<SecretStatusCommand>());
+        command.CommandArgumentValue.ParseLayer(["-a", "-tid", "x"]);
+
+        await Assert.ThrowsAsync<ToolException>(command.Execute);
+    }
+
+    [Fact]
+    public async Task SecretStatus_WithoutTenant_Throws()
+    {
+        var bot = A.Fake<IBotServicesClient>();
+        var command = NewStatus(bot, new RecordingLogger<SecretStatusCommand>(), tenantId: null);
+        command.CommandArgumentValue.ParseLayer([]);
+
+        await Assert.ThrowsAsync<ToolException>(command.Execute);
+        A.CallTo(() => bot.GetSecretSweepReportAsync(A<string>._)).MustNotHaveHappened();
+    }
+
+    // ── ReprotectSecrets ──────────────────────────────────────────────────
+
+    [Fact]
+    public async Task ReprotectSecrets_DefaultMode_IsReprotectAndAsksForConfirmation()
+    {
+        var bot = NewBotWithJob();
+        var confirmation = new FakeConfirmationService(true);
+        var logger = new RecordingLogger<ReprotectSecretsCommand>();
+        var command = NewReprotect(bot, logger, confirmation);
+        command.CommandArgumentValue.ParseLayer([]);
+
+        await command.Execute();
+
+        A.CallTo(() => bot.StartSecretSweepAsync("acme", SecretSweepModeDto.Reprotect)).MustHaveHappenedOnceExactly();
+        Assert.Contains("re-encrypt all secrets of tenant 'acme'", confirmation.LastMessage);
+        Assert.Contains(logger.Entries, e => e.Message.Contains(JobId));
+        A.CallTo(() => bot.GetImportJobStatus(A<string>._)).MustNotHaveHappened();
+    }
+
+    [Fact]
+    public async Task ReprotectSecrets_Declined_NeverStartsTheJob()
+    {
+        var bot = NewBotWithJob();
+        var confirmation = new FakeConfirmationService(false);
+        var command = NewReprotect(bot, new RecordingLogger<ReprotectSecretsCommand>(), confirmation);
+        command.CommandArgumentValue.ParseLayer(["-m", "ClearUnknownKid"]);
+
+        await Assert.ThrowsAsync<ToolException>(command.Execute);
+
+        A.CallTo(() => bot.StartSecretSweepAsync(A<string>._, A<SecretSweepModeDto>._)).MustNotHaveHappened();
+        Assert.Contains("must be re-entered", confirmation.LastMessage);
+    }
+
+    [Fact]
+    public async Task ReprotectSecrets_Verify_RunsWithoutConfirmation()
+    {
+        var bot = NewBotWithJob();
+        var confirmation = new FakeConfirmationService(false);
+        var command = NewReprotect(bot, new RecordingLogger<ReprotectSecretsCommand>(), confirmation);
+        command.CommandArgumentValue.ParseLayer(["-m", "verify", "-tid", "Other"]);
+
+        await command.Execute();
+
+        A.CallTo(() => bot.StartSecretSweepAsync("other", SecretSweepModeDto.Verify)).MustHaveHappenedOnceExactly();
+        Assert.Null(confirmation.LastMessage);
+    }
+
+    [Fact]
+    public async Task ReprotectSecrets_AllWithYes_UsesTheSystemEndpointWithoutPrompt()
+    {
+        var bot = NewBotWithJob();
+        var confirmation = new FakeConfirmationService(false);
+        var command = NewReprotect(bot, new RecordingLogger<ReprotectSecretsCommand>(), confirmation);
+        command.CommandArgumentValue.ParseLayer(["-a", "-m", "Encrypt", "-y"]);
+
+        await command.Execute();
+
+        A.CallTo(() => bot.StartSecretSweepAllTenantsAsync(SecretSweepModeDto.Encrypt)).MustHaveHappenedOnceExactly();
+        A.CallTo(() => bot.StartSecretSweepAsync(A<string>._, A<SecretSweepModeDto>._)).MustNotHaveHappened();
+        Assert.Null(confirmation.LastMessage);
+    }
+
+    [Theory]
+    [InlineData("Decrypt")]
+    [InlineData("4")]
+    [InlineData("Wipe")]
+    public async Task ReprotectSecrets_DecryptOrUnknownMode_IsRefused(string mode)
+    {
+        var bot = NewBotWithJob();
+        var command = NewReprotect(bot, new RecordingLogger<ReprotectSecretsCommand>(), new FakeConfirmationService(true));
+        command.CommandArgumentValue.ParseLayer(["-m", mode, "-y"]);
+
+        var ex = await Assert.ThrowsAsync<ToolException>(command.Execute);
+
+        Assert.Contains("Verify, Encrypt, Reprotect or ClearUnknownKid", ex.Message);
+        A.CallTo(() => bot.StartSecretSweepAsync(A<string>._, A<SecretSweepModeDto>._)).MustNotHaveHappened();
+    }
+
+    [Fact]
+    public async Task ReprotectSecrets_Wait_PollsTheJobAndPrintsTheReport()
+    {
+        var bot = NewBotWithJob();
+        A.CallTo(() => bot.GetImportJobStatus(JobId)).Returns(new JobDto { Id = JobId, Status = "Succeeded" });
+        A.CallTo(() => bot.GetSecretSweepReportAsync("acme")).Returns(Report("acme"));
+        var logger = new RecordingLogger<ReprotectSecretsCommand>();
+        var command = NewReprotect(bot, logger, new FakeConfirmationService(true));
+        command.CommandArgumentValue.ParseLayer(["-w", "-y"]);
+
+        await command.Execute();
+
+        A.CallTo(() => bot.GetImportJobStatus(JobId)).MustHaveHappenedOnceExactly();
+        Assert.Contains(logger.Entries, e => e.Message.Contains("Tenant 'acme': last sweep"));
+    }
+
+    // ── UpdateIdentityProvider (write-only client secret) ─────────────────
+
+    [Fact]
+    public async Task UpdateIdentityProvider_WithoutSecret_SendsNullAndKeepsClientId()
+    {
+        var identity = A.Fake<IIdentityServicesClient>();
+        A.CallTo(() => identity.GetIdentityProvider(A<OctoObjectId>._)).Returns(new AzureEntraIdProviderDto
+        {
+            Name = "Old", TenantId = "azure-tid", Authority = "https://authority/", ClientId = "cid",
+            ClientSecretIsSet = true
+        });
+        IdentityProviderDto? sent = null;
+        A.CallTo(() => identity.UpdateIdentityProvider(A<OctoObjectId>._, A<IdentityProviderDto>._))
+            .Invokes((OctoObjectId _, IdentityProviderDto dto) => sent = dto);
+        var command = new UpdateIdentityProvider(new RecordingLogger<UpdateIdentityProvider>(),
+            Options.Create(new OctoToolOptions { TenantId = "acme" }), identity, A.Fake<IAuthenticationService>());
+        command.CommandArgumentValue.ParseLayer(["-id", ProviderId, "-n", "New", "-e", "true"]);
+
+        await command.Execute();
+
+        var azure = Assert.IsType<AzureEntraIdProviderDto>(sent);
+        Assert.Null(azure.ClientSecret);
+        Assert.Equal("cid", azure.ClientId);
+        Assert.Equal("azure-tid", azure.TenantId);
+    }
+
+    [Fact]
+    public async Task UpdateIdentityProvider_Google_EchoedSecretIsNeverSentBack()
+    {
+        var identity = A.Fake<IIdentityServicesClient>();
+        A.CallTo(() => identity.GetIdentityProvider(A<OctoObjectId>._)).Returns(new GoogleIdentityProviderDto
+        {
+            Name = "Old", ClientId = "cid", ClientSecret = "echoed-by-an-old-server"
+        });
+        IdentityProviderDto? sent = null;
+        A.CallTo(() => identity.UpdateIdentityProvider(A<OctoObjectId>._, A<IdentityProviderDto>._))
+            .Invokes((OctoObjectId _, IdentityProviderDto dto) => sent = dto);
+        var command = new UpdateIdentityProvider(new RecordingLogger<UpdateIdentityProvider>(),
+            Options.Create(new OctoToolOptions { TenantId = "acme" }), identity, A.Fake<IAuthenticationService>());
+        command.CommandArgumentValue.ParseLayer(["-id", ProviderId, "-n", "New", "-e", "true"]);
+
+        await command.Execute();
+
+        var google = Assert.IsType<GoogleIdentityProviderDto>(sent);
+        Assert.Null(google.ClientSecret);
+        Assert.Equal("cid", google.ClientId);
+    }
+
+    [Fact]
+    public async Task UpdateIdentityProvider_WithNewSecret_RotatesIt()
+    {
+        var identity = A.Fake<IIdentityServicesClient>();
+        A.CallTo(() => identity.GetIdentityProvider(A<OctoObjectId>._))
+            .Returns(new MicrosoftIdentityProviderDto { Name = "Old", ClientId = "cid" });
+        IdentityProviderDto? sent = null;
+        A.CallTo(() => identity.UpdateIdentityProvider(A<OctoObjectId>._, A<IdentityProviderDto>._))
+            .Invokes((OctoObjectId _, IdentityProviderDto dto) => sent = dto);
+        var command = new UpdateIdentityProvider(new RecordingLogger<UpdateIdentityProvider>(),
+            Options.Create(new OctoToolOptions { TenantId = "acme" }), identity, A.Fake<IAuthenticationService>());
+        command.CommandArgumentValue.ParseLayer(["-id", ProviderId, "-n", "New", "-e", "true", "-cs", "rotated-test-secret"]);
+
+        await command.Execute();
+
+        Assert.Equal("rotated-test-secret", Assert.IsType<MicrosoftIdentityProviderDto>(sent).ClientSecret);
+    }
+
+    private static IBotServicesClient NewBotWithJob()
+    {
+        var bot = A.Fake<IBotServicesClient>();
+        A.CallTo(() => bot.StartSecretSweepAsync(A<string>._, A<SecretSweepModeDto>._)).Returns(new JobResponseDto(JobId));
+        A.CallTo(() => bot.StartSecretSweepAllTenantsAsync(A<SecretSweepModeDto>._)).Returns(new JobResponseDto(JobId));
+        return bot;
+    }
+
+    private static SecretStatusCommand NewStatus(IBotServicesClient bot, ILogger<SecretStatusCommand> logger,
+        string? tenantId = "acme", IConsoleService? console = null) =>
+        new(logger, Options.Create(new OctoToolOptions { TenantId = tenantId }), bot,
+            A.Fake<IAuthenticationService>(), console ?? A.Fake<IConsoleService>());
+
+    private static ReprotectSecretsCommand NewReprotect(IBotServicesClient bot, ILogger<ReprotectSecretsCommand> logger,
+        IConfirmationService confirmation, string? tenantId = "acme") =>
+        new(logger, Options.Create(new OctoToolOptions { TenantId = tenantId }), bot,
+            A.Fake<IAuthenticationService>(), confirmation);
+
+    private sealed class FakeConfirmationService(bool answer) : IConfirmationService
+    {
+        public string? LastMessage { get; private set; }
+
+        public bool Confirm(string message)
+        {
+            LastMessage = message;
+            return answer;
+        }
+    }
+}
