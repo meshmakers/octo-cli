@@ -427,6 +427,142 @@ public sealed class SecretCommandsTests
         A.CallTo(() => bot.DeleteSecretSweepDumpAsync(A<string>._, A<string>._)).MustNotHaveHappened();
     }
 
+    // ── SecretStatus: dump key ids (AB#5559) ──────────────────────────────
+
+    [Fact]
+    public async Task SecretStatus_PrintsRequiredKeyIdsAndWarnsAboutDumpKeyMissing()
+    {
+        var bot = A.Fake<IBotServicesClient>();
+        var environment = Environment();
+        environment.RequiredKeyIds = ["k0", "k2"];
+        environment.Warnings = [SecretEnvironmentWarningCodes.DumpKeyMissing];
+        A.CallTo(() => bot.GetSecretEnvironmentStatusAsync("acme")).Returns(environment);
+        A.CallTo(() => bot.GetSecretSweepReportAsync("acme")).Returns((SecretSweepReportDto?)null);
+        var logger = new RecordingLogger<SecretStatusCommand>();
+        var command = NewStatus(bot, logger);
+        command.CommandArgumentValue.ParseLayer([]);
+
+        await command.Execute();
+
+        Assert.Contains(logger.Entries, e => e.Message.Contains("Key ids needed by encrypted dumps: k0, k2"));
+        Assert.Contains(logger.Entries,
+            e => e.Level == LogLevel.Warning && e.Message.Contains("DumpKeyMissing") && e.Message.Contains("k0") &&
+                 !e.Message.Contains("k2"));
+    }
+
+    [Fact]
+    public async Task SecretStatus_NoEncryptedDumps_PrintsNoneAndNoWarning()
+    {
+        var bot = A.Fake<IBotServicesClient>();
+        A.CallTo(() => bot.GetSecretEnvironmentStatusAsync("acme")).Returns(Environment());
+        A.CallTo(() => bot.GetSecretSweepReportAsync("acme")).Returns((SecretSweepReportDto?)null);
+        var logger = new RecordingLogger<SecretStatusCommand>();
+        var command = NewStatus(bot, logger);
+        command.CommandArgumentValue.ParseLayer([]);
+
+        await command.Execute();
+
+        Assert.Contains(logger.Entries, e => e.Message.Contains("Key ids needed by encrypted dumps: none"));
+        Assert.DoesNotContain(logger.Entries, e => e.Message.Contains("DumpKeyMissing"));
+    }
+
+    // ── RestoreSecretSweepDump (AB#5559) ──────────────────────────────────
+
+    [Fact]
+    public async Task RestoreSecretSweepDump_WithYes_StartsTheRestoreWithConfirmAndPrintsTheJobId()
+    {
+        var bot = A.Fake<IBotServicesClient>();
+        A.CallTo(() => bot.RestoreSecretSweepDumpAsync("other", "run-1", true)).Returns(new JobResponseDto(JobId));
+        var confirmation = new FakeConfirmationService(false);
+        var logger = new RecordingLogger<RestoreSecretSweepDumpCommand>();
+        var command = NewRestoreDump(bot, logger, confirmation);
+        command.CommandArgumentValue.ParseLayer(["-tid", "Other", "-r", "run-1", "-y"]);
+
+        await command.Execute();
+
+        A.CallTo(() => bot.RestoreSecretSweepDumpAsync("other", "run-1", true)).MustHaveHappenedOnceExactly();
+        A.CallTo(() => bot.GetImportJobStatus(A<string>._)).MustNotHaveHappened();
+        Assert.Null(confirmation.LastMessage);
+        Assert.Contains(logger.Entries, e => e.Message.Contains(JobId));
+    }
+
+    [Fact]
+    public async Task RestoreSecretSweepDump_Confirmed_PromptMentionsPlaintextAndUsesTheContextTenant()
+    {
+        var bot = A.Fake<IBotServicesClient>();
+        A.CallTo(() => bot.RestoreSecretSweepDumpAsync("acme", "run-1", true)).Returns(new JobResponseDto(JobId));
+        var confirmation = new FakeConfirmationService(true);
+        var command = NewRestoreDump(bot, new RecordingLogger<RestoreSecretSweepDumpCommand>(), confirmation);
+        command.CommandArgumentValue.ParseLayer(["--runId", "run-1"]);
+
+        await command.Execute();
+
+        Assert.Contains("tenant 'acme'", confirmation.LastMessage);
+        Assert.Contains("plaintext", confirmation.LastMessage);
+        A.CallTo(() => bot.RestoreSecretSweepDumpAsync("acme", "run-1", true)).MustHaveHappenedOnceExactly();
+    }
+
+    [Fact]
+    public async Task RestoreSecretSweepDump_Declined_NeverRestores()
+    {
+        var bot = A.Fake<IBotServicesClient>();
+        var command = NewRestoreDump(bot, new RecordingLogger<RestoreSecretSweepDumpCommand>(),
+            new FakeConfirmationService(false));
+        command.CommandArgumentValue.ParseLayer(["-r", "run-1"]);
+
+        await Assert.ThrowsAsync<ToolException>(command.Execute);
+
+        A.CallTo(() => bot.RestoreSecretSweepDumpAsync(A<string>._, A<string>._, A<bool>._)).MustNotHaveHappened();
+    }
+
+    [Fact]
+    public async Task RestoreSecretSweepDump_Wait_PollsTheJob()
+    {
+        var bot = A.Fake<IBotServicesClient>();
+        A.CallTo(() => bot.RestoreSecretSweepDumpAsync("acme", "run-1", true)).Returns(new JobResponseDto(JobId));
+        A.CallTo(() => bot.GetImportJobStatus(JobId)).Returns(new JobDto { Id = JobId, Status = "Succeeded" });
+        var logger = new RecordingLogger<RestoreSecretSweepDumpCommand>();
+        var command = NewRestoreDump(bot, logger, new FakeConfirmationService(true));
+        command.CommandArgumentValue.ParseLayer(["-r", "run-1", "-y", "-w"]);
+
+        await command.Execute();
+
+        A.CallTo(() => bot.GetImportJobStatus(JobId)).MustHaveHappenedOnceExactly();
+        Assert.Contains(logger.Entries, e => e.Message.Contains("restored") && e.Message.Contains("Encrypt"));
+    }
+
+    [Theory]
+    [InlineData(SecretSweepDumpRestoreFailure.NotFound, System.Net.HttpStatusCode.NotFound, "no longer stored")]
+    [InlineData(SecretSweepDumpRestoreFailure.DumpDeleted, System.Net.HttpStatusCode.Conflict, "was deleted")]
+    [InlineData(SecretSweepDumpRestoreFailure.DumpKeyMissing, System.Net.HttpStatusCode.Conflict, "DumpKeyMissing")]
+    public async Task RestoreSecretSweepDump_Refusals_BecomeClearToolErrors(SecretSweepDumpRestoreFailure reason,
+        System.Net.HttpStatusCode status, string expected)
+    {
+        var bot = A.Fake<IBotServicesClient>();
+        A.CallTo(() => bot.RestoreSecretSweepDumpAsync("acme", "run-1", true))
+            .ThrowsAsync(new SecretSweepDumpRestoreException(reason, status));
+        var command = NewRestoreDump(bot, new RecordingLogger<RestoreSecretSweepDumpCommand>(),
+            new FakeConfirmationService(true));
+        command.CommandArgumentValue.ParseLayer(["-r", "run-1", "-y"]);
+
+        var ex = await Assert.ThrowsAsync<ToolException>(command.Execute);
+
+        Assert.Contains(expected, ex.Message);
+        Assert.Contains("run-1", ex.Message);
+    }
+
+    [Fact]
+    public async Task RestoreSecretSweepDump_WithoutTenant_Throws()
+    {
+        var bot = A.Fake<IBotServicesClient>();
+        var command = NewRestoreDump(bot, new RecordingLogger<RestoreSecretSweepDumpCommand>(),
+            new FakeConfirmationService(true), tenantId: null);
+        command.CommandArgumentValue.ParseLayer(["-r", "run-1", "-y"]);
+
+        await Assert.ThrowsAsync<ToolException>(command.Execute);
+        A.CallTo(() => bot.RestoreSecretSweepDumpAsync(A<string>._, A<string>._, A<bool>._)).MustNotHaveHappened();
+    }
+
     // ── UpdateIdentityProvider (write-only client secret) ─────────────────
 
     [Fact]
@@ -545,6 +681,11 @@ public sealed class SecretCommandsTests
 
     private static DeleteSecretSweepDumpCommand NewDeleteDump(IBotServicesClient bot,
         ILogger<DeleteSecretSweepDumpCommand> logger, IConfirmationService confirmation, string? tenantId = "acme") =>
+        new(logger, Options.Create(new OctoToolOptions { TenantId = tenantId }), bot,
+            A.Fake<IAuthenticationService>(), confirmation);
+
+    private static RestoreSecretSweepDumpCommand NewRestoreDump(IBotServicesClient bot,
+        ILogger<RestoreSecretSweepDumpCommand> logger, IConfirmationService confirmation, string? tenantId = "acme") =>
         new(logger, Options.Create(new OctoToolOptions { TenantId = tenantId }), bot,
             A.Fake<IAuthenticationService>(), confirmation);
 

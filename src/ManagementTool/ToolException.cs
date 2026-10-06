@@ -1,3 +1,5 @@
+using Meshmakers.Octo.Sdk.ServiceClient.BotServices;
+
 namespace Meshmakers.Octo.Frontend.ManagementTool;
 
 public class ToolException : Exception
@@ -94,6 +96,22 @@ public class ToolException : Exception
     public static Exception SecretSweepDumpNotFound(string tenantId, string runId)
     {
         return new ToolException($"Sweep run '{runId}' of tenant '{tenantId}' is unknown or has no pre-sweep dump.");
+    }
+
+    public static Exception SecretSweepDumpRestoreRefused(string tenantId, string runId,
+        SecretSweepDumpRestoreFailure reason)
+    {
+        return new ToolException(reason switch
+        {
+            SecretSweepDumpRestoreFailure.NotFound =>
+                $"Sweep run '{runId}' of tenant '{tenantId}' is unknown, has no pre-sweep dump, or the dump is no longer stored.",
+            SecretSweepDumpRestoreFailure.DumpDeleted =>
+                $"The pre-sweep dump of sweep run '{runId}' of tenant '{tenantId}' was deleted (early or expired).",
+            SecretSweepDumpRestoreFailure.DumpKeyMissing =>
+                $"The pre-sweep dump of sweep run '{runId}' is encrypted with a key id that is not in the key ring " +
+                "(DumpKeyMissing, see SecretStatus). Put the key back into SecretEncryption:Keys first.",
+            _ => $"The bot service refused to restore the pre-sweep dump of sweep run '{runId}' ({reason})."
+        });
     }
 
     public static Exception SecretScopeConflict()

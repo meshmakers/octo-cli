@@ -161,6 +161,16 @@ internal static class SecretSweepReportPrinter
         logger.LogInformation("Recurring Verify: {Cron}, last Verify: {LastVerify}",
             status.RecurringVerifyCron ?? "disabled",
             status.LastVerifyAt is { } at ? at.ToString("u") : "never");
+        logger.LogInformation("Key ids needed by encrypted dumps: {RequiredKeyIds}",
+            status.RequiredKeyIds.Count > 0 ? string.Join(", ", status.RequiredKeyIds) : "none");
+        if (status.Warnings.Contains(SecretEnvironmentWarningCodes.DumpKeyMissing))
+        {
+            var missing = status.RequiredKeyIds.Where(k => !status.KnownKeyIds.Contains(k)).ToList();
+            logger.LogWarning(
+                "DumpKeyMissing: an encrypted dump needs key id(s) {MissingKeyIds} that are not in the key ring — " +
+                "it can neither be restored nor downloaded until the key is put back into SecretEncryption:Keys",
+                missing.Count > 0 ? string.Join(", ", missing) : "<unknown>");
+        }
     }
 
     /// <summary>Prints the recent sweep runs, newest first, with the state of their pre-sweep dump.</summary>

@@ -57,7 +57,8 @@ internal class SecretStatusCommand : ServiceClientOctoCommand<IBotServicesClient
                 "Tenant mode prints the environment status (key ring configured, active and known key ids, legacy enc:v1 key, strict mode and since when, recurring Verify cron, this tenant's last Verify), the last 10 sweep runs with the state of their pre-sweep dump, and the last report.",
                 "Shows the last report the bot service stored (recurring Verify sweep, a manual ReprotectSecrets run or the sweep after a restore). Run ReprotectSecrets -m Verify -w for a fresh one.",
                 "Forms: notSet, plaintext, encV1 (legacy key) and encV2 per key id; unknownKeyId means the value is stored encrypted with a key that is not in the key ring (unreadable, listed as a re-entry task). It becomes readable again when that key is added to the key ring.",
-                "Unreadable secrets are removed only by re-entry or ReprotectSecrets -m CleanupUnreadable -y; a pre-sweep dump can be deleted early with DeleteSecretSweepDump.",
+                "Unreadable secrets are removed only by re-entry or ReprotectSecrets -m CleanupUnreadable -y; a pre-sweep dump can be deleted early with DeleteSecretSweepDump or restored with RestoreSecretSweepDump.",
+                "\"Key ids needed by encrypted dumps\" lists the key ids every encrypted dump still needs; DumpKeyMissing warns when one of them is no longer in the key ring (the dump can then neither be restored nor downloaded).",
             ]);
 
     public override async Task Execute()
