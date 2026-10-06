@@ -120,7 +120,7 @@ internal class ReprotectSecretsCommand : JobWithWaitOctoCommand
         Logger.LogInformation("Starting {Mode} secret sweep for {Scope} at '{ServiceClientServiceUri}'", mode, scope,
             ServiceClient.ServiceUri);
         var job = all
-            ? await ServiceClient.StartSecretSweepAllTenantsAsync(mode)
+            ? await ServiceClient.StartSecretSweepAllTenantsAsync(mode, confirm)
             : await ServiceClient.StartSecretSweepAsync(tenantId!, mode, confirm);
         Logger.LogInformation("Secret sweep job '{JobId}' has been started", job.JobId);
 

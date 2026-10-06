@@ -208,7 +208,7 @@ public sealed class SecretCommandsTests
 
         await command.Execute();
 
-        A.CallTo(() => bot.StartSecretSweepAllTenantsAsync(SecretSweepModeDto.Encrypt)).MustHaveHappenedOnceExactly();
+        A.CallTo(() => bot.StartSecretSweepAllTenantsAsync(SecretSweepModeDto.Encrypt, true)).MustHaveHappenedOnceExactly();
         A.CallTo(() => bot.StartSecretSweepAsync(A<string>._, A<SecretSweepModeDto>._, A<bool>._)).MustNotHaveHappened();
         Assert.Null(confirmation.LastMessage);
     }
@@ -527,7 +527,7 @@ public sealed class SecretCommandsTests
     {
         var bot = A.Fake<IBotServicesClient>();
         A.CallTo(() => bot.StartSecretSweepAsync(A<string>._, A<SecretSweepModeDto>._, A<bool>._)).Returns(new JobResponseDto(JobId));
-        A.CallTo(() => bot.StartSecretSweepAllTenantsAsync(A<SecretSweepModeDto>._)).Returns(new JobResponseDto(JobId));
+        A.CallTo(() => bot.StartSecretSweepAllTenantsAsync(A<SecretSweepModeDto>._, A<bool>._)).Returns(new JobResponseDto(JobId));
         return bot;
     }
 
