@@ -404,6 +404,7 @@ internal static class Program
         services.AddTransient<ICommand, RunFixupScripts>();
         services.AddTransient<ICommand, SecretStatusCommand>();
         services.AddTransient<ICommand, ReprotectSecretsCommand>();
+        services.AddTransient<ICommand, DeleteSecretSweepDumpCommand>();
 
         services.AddTransient<ICommand, GetApiResources>();
         services.AddTransient<ICommand, CreateApiResource>();

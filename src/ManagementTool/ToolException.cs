@@ -80,8 +80,20 @@ public class ToolException : Exception
     public static Exception InvalidSecretSweepMode(string mode)
     {
         return new ToolException(
-            $"Secret sweep mode '{mode}' is not available. Use Verify, Encrypt, Reprotect or ClearUnknownKid " +
+            $"Secret sweep mode '{mode}' is not available. Use Verify, Encrypt, Reprotect or CleanupUnreadable " +
             "(Decrypt is an emergency operation and is not offered by the CLI).");
+    }
+
+    public static Exception SecretCleanupRequiresYes()
+    {
+        return new ToolException(
+            "CleanupUnreadable permanently removes secrets whose key id is not in the key ring (recoverable only " +
+            "from the pre-sweep dump). Check the list with SecretStatus first and pass -y to run it.");
+    }
+
+    public static Exception SecretSweepDumpNotFound(string tenantId, string runId)
+    {
+        return new ToolException($"Sweep run '{runId}' of tenant '{tenantId}' is unknown or has no pre-sweep dump.");
     }
 
     public static Exception SecretScopeConflict()

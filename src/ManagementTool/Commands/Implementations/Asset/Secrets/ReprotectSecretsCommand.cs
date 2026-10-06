@@ -9,8 +9,9 @@ namespace Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Asset
 
 /// <summary>
 ///     Starts a secret sweep job in the bot service (AB#5543, concept §5.2): re-protect all Secret attributes
-///     with the active key (default), encrypt remaining legacy values, clear values with an unknown key id, or
-///     only verify. Writing modes ask for confirmation; the emergency Decrypt mode is not offered.
+///     with the active key (default), encrypt remaining legacy values, remove values whose key id is not in the
+///     key ring (CleanupUnreadable, needs -y), or only verify. Writing modes ask for confirmation and send
+///     confirm=true to the bot service; the emergency Decrypt mode is not offered.
 /// </summary>
 internal class ReprotectSecretsCommand : JobWithWaitOctoCommand
 {
@@ -25,8 +26,8 @@ internal class ReprotectSecretsCommand : JobWithWaitOctoCommand
         IConfirmationService confirmationService)
         : base(logger, Constants.BotServicesGroup, "ReprotectSecrets",
             "Starts a secret sweep job: re-encrypts all Secret attributes with the active key (Reprotect, default), " +
-            "encrypts remaining legacy values (Encrypt), clears values with an unknown key id (ClearUnknownKid) or " +
-            "only counts them (Verify). Use -w to wait, -y to skip confirmation.",
+            "encrypts remaining legacy values (Encrypt), removes values whose key id is not in the key ring " +
+            "(CleanupUnreadable, requires -y) or only counts them (Verify). Use -w to wait, -y to skip confirmation.",
             options, botServicesClient, authenticationService)
     {
         _confirmationService = confirmationService;
@@ -35,7 +36,7 @@ internal class ReprotectSecretsCommand : JobWithWaitOctoCommand
         _allArg = CommandArgumentValue.AddArgument("a", "all",
             ["Sweep all tenants (system API, requires system tenant rights)"], false, 0);
         _modeArg = CommandArgumentValue.AddArgument("m", "mode",
-            ["Sweep mode: Reprotect (default), Encrypt, ClearUnknownKid or Verify"], false, 1);
+            ["Sweep mode: Reprotect (default), Encrypt, CleanupUnreadable or Verify"], false, 1);
         _yesArg = CommandArgumentValue.AddArgument("y", "yes", ["Skip confirmation prompt"], false, 0);
     }
 
@@ -57,11 +58,19 @@ internal class ReprotectSecretsCommand : JobWithWaitOctoCommand
                     new CodeSampleArgument(_yesArg),
                 ],
                     description: "Encrypt remaining plaintext / enc:v1 values in all tenants (CI/CD)"),
+                new CodeSample(arguments: [
+                    new CodeSampleArgument(_tenantIdArg, "mytenant"),
+                    new CodeSampleArgument(_modeArg, "CleanupUnreadable"),
+                    new CodeSampleArgument(_yesArg),
+                    new CodeSampleArgument(_waitForJobArg),
+                ],
+                    description: "Remove secrets that cannot be read with this key ring (after a restore, once they were re-entered or are not needed)"),
             ],
             Notes:
             [
-                "Writing modes (Reprotect, Encrypt, ClearUnknownKid) take a pre-sweep backup in the bot service and ask for confirmation; -y skips it.",
-                "ClearUnknownKid permanently clears secrets encrypted with a key id the key ring does not know; SecretStatus lists them as secrets to re-enter.",
+                "Writing modes (Reprotect, Encrypt, CleanupUnreadable) take a pre-sweep dump in the bot service and ask for confirmation; -y skips it. The CLI sends confirm=true to the bot service once confirmed.",
+                "CleanupUnreadable permanently removes secrets whose key id is not in the key ring (e.g. after a restore from another environment) and requires -y; recoverable only from the pre-sweep dump. SecretStatus lists these secrets as unreadable (re-entry tasks) before.",
+                "Restore with the source environment's key: add the key id to the key ring, then run Reprotect to move the values to the active key, then remove the source key.",
                 "Decrypt (writes clear text back) is an emergency operation and is not available in the CLI.",
                 "Without -w the command prints the job id and returns; follow up with SecretStatus.",
             ]);
@@ -93,18 +102,26 @@ internal class ReprotectSecretsCommand : JobWithWaitOctoCommand
         }
 
         var scope = all ? "all tenants" : $"tenant '{tenantId}'";
-        if (mode != SecretSweepModeDto.Verify &&
-            !CommandArgumentValue.IsArgumentUsed(_yesArg) &&
+        var yes = CommandArgumentValue.IsArgumentUsed(_yesArg);
+        if (mode == SecretSweepModeDto.CleanupUnreadable && !yes)
+        {
+            throw ToolException.SecretCleanupRequiresYes();
+        }
+
+        if (mode != SecretSweepModeDto.Verify && !yes &&
             !_confirmationService.Confirm(ConfirmationMessage(mode, scope)))
         {
             throw ToolException.OperationCancelledByUser();
         }
 
+        // Reaching this point for a writing mode means the operator confirmed (prompt or -y).
+        var confirm = mode != SecretSweepModeDto.Verify;
+
         Logger.LogInformation("Starting {Mode} secret sweep for {Scope} at '{ServiceClientServiceUri}'", mode, scope,
             ServiceClient.ServiceUri);
         var job = all
             ? await ServiceClient.StartSecretSweepAllTenantsAsync(mode)
-            : await ServiceClient.StartSecretSweepAsync(tenantId!, mode);
+            : await ServiceClient.StartSecretSweepAsync(tenantId!, mode, confirm);
         Logger.LogInformation("Secret sweep job '{JobId}' has been started", job.JobId);
 
         if (!CommandArgumentValue.IsArgumentUsed(_waitForJobArg))
@@ -131,13 +148,10 @@ internal class ReprotectSecretsCommand : JobWithWaitOctoCommand
 
     private static string ConfirmationMessage(SecretSweepModeDto mode, string scope) => mode switch
     {
-        SecretSweepModeDto.ClearUnknownKid =>
-            $"clear every secret of {scope} that is encrypted with an unknown key id? The values are lost and " +
-            "must be re-entered",
         SecretSweepModeDto.Encrypt =>
             $"encrypt all remaining plaintext / enc:v1 secrets of {scope} with the active key? Older binaries " +
             "cannot read the result",
         _ => $"re-encrypt all secrets of {scope} with the active key? Every stored secret is rewritten (a " +
-             "pre-sweep backup is taken first)"
+             "pre-sweep dump is taken first)"
     };
 }

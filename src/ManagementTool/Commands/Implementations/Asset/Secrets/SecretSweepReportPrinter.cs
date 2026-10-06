@@ -15,7 +15,7 @@ internal static class SecretSweepReportPrinter
     public static readonly SecretSweepModeDto[] OfferedModes =
     [
         SecretSweepModeDto.Verify, SecretSweepModeDto.Encrypt, SecretSweepModeDto.Reprotect,
-        SecretSweepModeDto.ClearUnknownKid
+        SecretSweepModeDto.CleanupUnreadable
     ];
 
     /// <summary>Parses a sweep mode by name (case-insensitive); numbers and Decrypt are refused.</summary>
@@ -54,8 +54,10 @@ internal static class SecretSweepReportPrinter
         }
 
         logger.LogInformation(
-            "Active key id: {ActiveKeyId}, strict mode: {StrictMode}, remaining legacy values: {Legacy}",
-            report.ActiveKeyId ?? "<none>", report.StrictModeActive ? "on" : "off", report.RemainingLegacyValues);
+            "Active key id: {ActiveKeyId}, strict mode: {StrictMode}, remaining legacy values: {Legacy}, legacy " +
+            "placeholders normalised: {Normalized}",
+            report.ActiveKeyId ?? "<none>", report.StrictModeActive ? "on" : "off", report.RemainingLegacyValues,
+            report.PlaceholdersNormalized);
         if (!string.IsNullOrWhiteSpace(report.BackupFileName))
         {
             logger.LogInformation("Pre-sweep backup: {BackupFileName}", report.BackupFileName);
@@ -76,7 +78,7 @@ internal static class SecretSweepReportPrinter
                 step.Mode, step.Success ? "ok" : "with failures", step.EntitiesScanned, step.ValuesRewritten,
                 step.PlaceholdersNormalized, step.SkippedConcurrentlyModified);
             logger.LogInformation(
-                "  Totals: total={Total} notSet={NotSet} placeholder={Placeholder} plaintext={Plaintext} encV1={EncV1} " +
+                "  Totals: total={Total} notSet={NotSet} legacyPlaceholder={Placeholder} plaintext={Plaintext} encV1={EncV1} " +
                 "encV2={EncV2} unknownKeyId={UnknownKeyId} failed={Failed}",
                 totals.Total, totals.NotSet, totals.Placeholder, totals.Plaintext, totals.EncV1, totals.EncV2,
                 totals.UnknownKeyId, totals.Failed);
@@ -110,9 +112,26 @@ internal static class SecretSweepReportPrinter
             }
         }
 
+        if (report.Unreadable.Count > 0)
+        {
+            logger.LogWarning(
+                "{Count} unreadable secret(s) (stored, but the key id is not in the key ring) — re-enter them, add " +
+                "the key to the key ring, or remove them with ReprotectSecrets -m CleanupUnreadable -y:",
+                report.Unreadable.Count);
+            foreach (var secret in report.Unreadable)
+            {
+                logger.LogWarning("  {CkTypeId} {RtId} {AttributePath} (key id {KeyId})", secret.CkTypeId,
+                    secret.RtId, secret.AttributePath, secret.KeyId ?? "-");
+            }
+        }
+        else
+        {
+            logger.LogInformation("Unreadable secrets: none");
+        }
+
         if (report.SecretsToReEnter.Count > 0)
         {
-            logger.LogWarning("{Count} secret(s) must be re-entered (cleared because their key id is unknown):",
+            logger.LogWarning("{Count} secret(s) must be re-entered (removed by CleanupUnreadable):",
                 report.SecretsToReEnter.Count);
             foreach (var secret in report.SecretsToReEnter)
             {
@@ -120,24 +139,78 @@ internal static class SecretSweepReportPrinter
                     secret.CkTypeId, secret.RtId, secret.AttributePath, secret.PreviousForm, secret.KeyId ?? "-");
             }
         }
+    }
+
+    /// <summary>Prints the environment-level encryption status (identical in every tenant, plus this tenant's last Verify).</summary>
+    public static void PrintEnvironment(ILogger logger, SecretEnvironmentStatusDto status)
+    {
+        if (!status.KeyRingConfigured)
+        {
+            logger.LogWarning(
+                "Key ring: NOT configured — writing a secret fails with SecretEncryptionNotConfigured");
+        }
         else
         {
-            logger.LogInformation("Secrets to re-enter: none");
+            logger.LogInformation("Key ring: configured, active key id {ActiveKeyId}, known key ids {KnownKeyIds}",
+                status.ActiveKeyId ?? "<none>", string.Join(", ", status.KnownKeyIds));
         }
+
+        logger.LogInformation("Legacy enc:v1 key: {Legacy}", status.LegacyV1KeyConfigured ? "configured" : "not configured");
+        logger.LogInformation("Strict mode: {StrictMode}{Since}", status.StrictMode ? "on" : "off",
+            status.StrictModeSince is { } since ? $" (since {since:u})" : string.Empty);
+        logger.LogInformation("Recurring Verify: {Cron}, last Verify: {LastVerify}",
+            status.RecurringVerifyCron ?? "disabled",
+            status.LastVerifyAt is { } at ? at.ToString("u") : "never");
+    }
+
+    /// <summary>Prints the recent sweep runs, newest first, with the state of their pre-sweep dump.</summary>
+    public static void PrintRuns(ILogger logger, IReadOnlyCollection<SecretSweepRunDto> runs)
+    {
+        if (runs.Count == 0)
+        {
+            logger.LogInformation("Sweep runs: none");
+            return;
+        }
+
+        const string format = "{RunId,-26} {Mode,-18} {Trigger,-10} {Outcome,-22} {Started,-20} {Unreadable,10} {Dump}";
+        logger.LogInformation("{Count} recent sweep run(s):", runs.Count);
+        logger.LogInformation(format, "RUN ID", "MODE", "TRIGGER", "OUTCOME", "STARTED", "UNREADABLE", "DUMP");
+        foreach (var run in runs)
+        {
+            logger.LogInformation(format, run.RunId, run.Mode, run.Trigger, run.Outcome,
+                run.StartedAt.ToString("u"), run.UnreadableCount, DescribeDump(run.Dump));
+        }
+    }
+
+    internal static string DescribeDump(SecretSweepDumpDto? dump)
+    {
+        if (dump == null)
+        {
+            return "-";
+        }
+
+        if (dump.DeletedAt is { } deletedAt)
+        {
+            return $"deleted {deletedAt:u}" + (dump.DeletedBy != null ? $" by {dump.DeletedBy}" : string.Empty);
+        }
+
+        return dump.Exists
+            ? $"{dump.FileName} ({dump.SizeBytes?.ToString() ?? "?"} bytes, expires {dump.ExpiresAt:u})"
+            : $"{dump.FileName} (missing)";
     }
 
     /// <summary>Prints one line per tenant report.</summary>
     public static void PrintSummary(ILogger logger, IReadOnlyCollection<SecretSweepReportDto> reports)
     {
-        const string format = "{Tenant,-25} {Mode,-16} {Trigger,-10} {Outcome,-22} {Plain,6} {Legacy,7} {Strict,-10} {ReEnter,8}";
+        const string format = "{Tenant,-25} {Mode,-18} {Trigger,-10} {Outcome,-22} {Plain,6} {Legacy,7} {Strict,-10} {Unreadable,10} {ReEnter,8}";
         logger.LogInformation("{Count} tenant report(s):", reports.Count);
-        logger.LogInformation(format, "TENANT", "MODE", "TRIGGER", "OUTCOME", "PLAIN", "LEGACY", "STRICT", "RE-ENTER");
+        logger.LogInformation(format, "TENANT", "MODE", "TRIGGER", "OUTCOME", "PLAIN", "LEGACY", "STRICT", "UNREADABLE", "RE-ENTER");
         foreach (var report in reports.OrderBy(r => r.TenantId, StringComparer.Ordinal))
         {
             var strict = report.StrictModeViolation ? "VIOLATION" : report.StrictModeActive ? "on" : "off";
             logger.LogInformation(format, report.TenantId, report.Mode, report.Trigger, report.Outcome,
                 report.Steps.LastOrDefault()?.Totals.Plaintext ?? 0, report.RemainingLegacyValues, strict,
-                report.SecretsToReEnter.Count);
+                report.Unreadable.Count, report.SecretsToReEnter.Count);
         }
 
         var violations = reports.Count(r => r.StrictModeViolation);
@@ -146,7 +219,7 @@ internal static class SecretSweepReportPrinter
             logger.LogWarning("{Count} tenant(s) report a strict mode violation", violations);
         }
 
-        var reEnter = reports.Sum(r => r.SecretsToReEnter.Count);
+        var reEnter = reports.Sum(r => r.SecretsToReEnter.Count + r.Unreadable.Count);
         if (reEnter > 0)
         {
             logger.LogWarning(
