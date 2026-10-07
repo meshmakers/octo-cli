@@ -403,7 +403,8 @@ octo-cli -c ReRunTenantSetup -tid mytenant
 octo-cli -c GetTenantFeatures
 
 # Blueprints (asset repository) — initial install path is Phase 1
-octo-cli -c ListBlueprints                                          # list catalog blueprints across all sources
+octo-cli -c ListBlueprints                                          # list catalog blueprints across all sources (all pages)
+octo-cli -c ListBlueprints -n Samples.Photovoltaics                 # all versions of one blueprint (-s/-t = single page)
 octo-cli -c RefreshBlueprintCatalogs                                # force-refresh all blueprint catalog caches at the asset repo (AB#4309)
 octo-cli -c RefreshBlueprintCatalogs -cn PrivateGitHubBlueprintCatalog  # force-refresh a single catalog (case-insensitive name)
 octo-cli -c InstallBlueprint -b MyBlueprint-1.0.0                   # apply blueprint to the active tenant
