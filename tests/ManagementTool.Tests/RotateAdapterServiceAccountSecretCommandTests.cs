@@ -156,21 +156,6 @@ public sealed class RotateAdapterServiceAccountSecretCommandTests
         }
     }
 
-    private sealed record LogEntry(LogLevel Level, string Message);
-
-    private sealed class RecordingLogger<T> : ILogger<T>
-    {
-        public List<LogEntry> Entries { get; } = [];
-
-        public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
-
-        public bool IsEnabled(LogLevel logLevel) => true;
-
-        public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception,
-            Func<TState, Exception?, string> formatter) =>
-            Entries.Add(new LogEntry(logLevel, formatter(state, exception)));
-    }
-
     /// <summary>
     /// Only the rotation call is implemented — the rest of the interface exists so the command can be
     /// constructed. A member that throws is the point: the command must not reach for anything else.

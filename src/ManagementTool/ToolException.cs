@@ -1,3 +1,5 @@
+using Meshmakers.Octo.Sdk.ServiceClient.BotServices;
+
 namespace Meshmakers.Octo.Frontend.ManagementTool;
 
 public class ToolException : Exception
@@ -75,6 +77,46 @@ public class ToolException : Exception
     {
         return new ToolException(
             $"The fixup script with the name '{name}' has already been applied. It cannot be replaced or deleted. Please create a new script with a different name.");
+    }
+
+    public static Exception InvalidSecretSweepMode(string mode)
+    {
+        return new ToolException(
+            $"Secret sweep mode '{mode}' is not available. Use Verify, Encrypt, Reprotect or CleanupUnreadable " +
+            "(Decrypt is an emergency operation and is not offered by the CLI).");
+    }
+
+    public static Exception SecretCleanupRequiresYes()
+    {
+        return new ToolException(
+            "CleanupUnreadable permanently removes secrets whose key id is not in the key ring (recoverable only " +
+            "from the pre-sweep dump). Check the list with SecretStatus first and pass -y to run it.");
+    }
+
+    public static Exception SecretSweepDumpNotFound(string tenantId, string runId)
+    {
+        return new ToolException($"Sweep run '{runId}' of tenant '{tenantId}' is unknown or has no pre-sweep dump.");
+    }
+
+    public static Exception SecretSweepDumpRestoreRefused(string tenantId, string runId,
+        SecretSweepDumpRestoreFailure reason)
+    {
+        return new ToolException(reason switch
+        {
+            SecretSweepDumpRestoreFailure.NotFound =>
+                $"Sweep run '{runId}' of tenant '{tenantId}' is unknown, has no pre-sweep dump, or the dump is no longer stored.",
+            SecretSweepDumpRestoreFailure.DumpDeleted =>
+                $"The pre-sweep dump of sweep run '{runId}' of tenant '{tenantId}' was deleted (early or expired).",
+            SecretSweepDumpRestoreFailure.DumpKeyMissing =>
+                $"The pre-sweep dump of sweep run '{runId}' is encrypted with a key id that is not in the key ring " +
+                "(DumpKeyMissing, see SecretStatus). Put the key back into SecretEncryption:Keys first.",
+            _ => $"The bot service refused to restore the pre-sweep dump of sweep run '{runId}' ({reason})."
+        });
+    }
+
+    public static Exception SecretScopeConflict()
+    {
+        return new ToolException("Use either --tenantId or --all, not both.");
     }
 
     public static Exception OperationCancelledByUser()
