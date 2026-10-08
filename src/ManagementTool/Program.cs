@@ -357,6 +357,7 @@ internal static class Program
         services.AddTransient<ICommand, GetTenantFeatures>();
         services.AddTransient<ICommand, ReRunTenantSetup>();
         services.AddTransient<ICommand, ClearTenantCache>();
+        services.AddTransient<ICommand, RecomputeDisplayNames>();
         services.AddTransient<ICommand, UpdateSystemCkModelTenant>();
         services.AddTransient<ICommand, DumpTenant>();
         services.AddTransient<ICommand, RestoreTenant>();
