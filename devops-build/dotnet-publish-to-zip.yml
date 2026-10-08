@@ -12,8 +12,10 @@ steps:
   inputs:
     command: 'restore'
     projects: ${{ parameters.project }}
-    restoreArguments: '--force /p:OctoNugetPrivateServer=$(nugetPrivateServer)'
-    noCache: true
+    # No --force / noCache (AB#5720): the job checks out with clean: true and
+    # the root pipeline purges the private feed's HTTP cache before the
+    # first restore, so floating 0.1.* ranges still resolve fresh packages.
+    restoreArguments: '/p:OctoNugetPrivateServer=$(nugetPrivateServer)'
 - task: DotNetCoreCLI@2
   displayName: Building ${{ parameters.exeName }} ${{ parameters.runtime }}
   inputs:

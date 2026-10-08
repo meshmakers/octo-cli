@@ -57,7 +57,7 @@ resources:
       type: github
       name: meshmakers/octo-pipeline-templates
       endpoint: meshmakers-access-token
-      ref: refs/tags/tpl-v0.4.11
+      ref: refs/tags/tpl-v0.6.5
 
 trigger:
   batch: true
@@ -66,6 +66,15 @@ trigger:
       - dev/*
       - test/*
       - main
+  # Docs-only commits must not start CI (AB#5719). Excluded paths are
+  # never consumed by the build; a root README.md change reaches the
+  # packed NuGet readme with the next code commit.
+  paths:
+    exclude:
+      - 'README.md'
+      - 'CLAUDE.md'
+      - 'CHANGELOG.md'
+      - '.claude/'
   tags:
     exclude:
       - '*'
@@ -91,6 +100,9 @@ steps:
   - checkout: self
     clean: true
   - template: templates/steps/set-version.yml@pipelineTemplates
+  # Fresh package list for the private feed only; nuget.org stays cached.
+  # The test step below does the job's first restore (AB#5720).
+  - template: templates/steps/purge-private-nuget-http-cache.yml@pipelineTemplates
   - task: DotNetCoreCLI@2
     retryCountOnTaskFailure: 2
     displayName: 'Run tests'
