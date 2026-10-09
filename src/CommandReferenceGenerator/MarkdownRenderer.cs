@@ -125,14 +125,15 @@ public static class MarkdownRenderer
     }
 
     /// <summary>
-    ///     Escapes `&lt;` and `&gt;` in free-form prose so Docusaurus' MDX parser doesn't
-    ///     interpret literal placeholders like <c>&lt;OverlayName&gt;</c> as opening JSX tags
-    ///     and fail the docs build with <c>end-tag-mismatch</c>. Applied only to prose fields
+    ///     Escapes `&lt;`, `&gt;`, `{` and `}` in free-form prose so Docusaurus' MDX parser
+    ///     neither interprets literal placeholders like <c>&lt;OverlayName&gt;</c> as opening
+    ///     JSX tags (<c>end-tag-mismatch</c>) nor <c>{PageSize}</c> as a JavaScript expression
+    ///     (ReferenceError during static site generation). Applied only to prose fields
     ///     (description, sample description, arg help, notes); code fences and the canonical
     ///     <c>&lt;long&gt;</c> placeholder live inside fenced blocks where MDX is inert.
     /// </summary>
     private static string EscapeMdxText(string s)
-        => s.Replace("<", "&lt;").Replace(">", "&gt;");
+        => s.Replace("<", "&lt;").Replace(">", "&gt;").Replace("{", "&#123;").Replace("}", "&#125;");
 
     /// <summary>
     ///     Canonical example used when a command has no <c>GetDocumentation()</c> override:

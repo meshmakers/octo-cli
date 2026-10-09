@@ -120,16 +120,20 @@ public static class RoslynExtractor
         foreach (var fieldDecl in root.DescendantNodes().OfType<FieldDeclarationSyntax>())
         {
             if (!fieldDecl.Modifiers.Any(m => m.IsKind(SyntaxKind.ConstKeyword))) continue;
-            if (fieldDecl.Declaration.Type is not PredefinedTypeSyntax pre) continue;
-            if (!pre.Keyword.IsKind(SyntaxKind.StringKeyword)) continue;
+            if (fieldDecl.Declaration.Type is not PredefinedTypeSyntax) continue;
 
+            // String constants and numeric/bool constants: help texts interpolate both
+            // (e.g. $"default {PageSize}" with `const int PageSize = 100`). An unresolved
+            // interpolation would surface as a literal "{PageSize}" in the generated page.
             foreach (var variable in fieldDecl.Declaration.Variables)
             {
-                if (variable.Initializer?.Value is LiteralExpressionSyntax lit
-                    && lit.IsKind(SyntaxKind.StringLiteralExpression))
-                {
+                if (variable.Initializer?.Value is not LiteralExpressionSyntax lit) continue;
+                if (lit.IsKind(SyntaxKind.StringLiteralExpression))
                     constants[variable.Identifier.Text] = lit.Token.ValueText;
-                }
+                else if (lit.IsKind(SyntaxKind.NumericLiteralExpression)
+                         || lit.IsKind(SyntaxKind.TrueLiteralExpression)
+                         || lit.IsKind(SyntaxKind.FalseLiteralExpression))
+                    constants[variable.Identifier.Text] = lit.Token.Text.TrimEnd('L', 'l', 'U', 'u', 'M', 'm', 'F', 'f', 'D', 'd');
             }
         }
 

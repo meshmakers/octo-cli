@@ -541,4 +541,28 @@ public class RoslynExtractorTests
         Assert.Single(commands);
         Assert.Equal("Reads from MY_ENV env var.", commands[0].Description);
     }
+
+    [Fact]
+    public void Extracts_interpolated_string_with_numeric_const()
+    {
+        var source = """
+            namespace Test;
+            internal class FooCommand : Command<X>
+            {
+                internal const int PageSize = 100;
+
+                public FooCommand(ILogger<FooCommand> logger, IOptions<X> options)
+                    : base(logger, "Foo", "Does foo.", options)
+                {
+                    CommandArgumentValue.AddArgument("t", "take", [$"Entries to take (default {PageSize})"], false, 1);
+                }
+            }
+            """;
+
+        var constants = RoslynExtractor.CollectConstants(source);
+        var commands = RoslynExtractor.Extract(source, constants);
+
+        Assert.Single(commands);
+        Assert.Equal("Entries to take (default 100)", commands[0].Args[0].Help);
+    }
 }

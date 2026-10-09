@@ -375,4 +375,23 @@ public class MarkdownRendererTests
         Assert.Contains("octo-cli -c Foo -t <target>", md);
         Assert.DoesNotContain("&lt;target&gt;", md);
     }
+
+    [Fact]
+    public void Escapes_curly_braces_in_help_for_mdx()
+    {
+        var cmd = new CommandDescriptor(
+            Group: null,
+            Verb: "Foo",
+            Description: "Uses {Placeholder}.",
+            Args: new[]
+            {
+                new ArgumentDescriptor("t", "take", "default {PageSize}", IsRequired: false, ValueCount: 1),
+            });
+
+        var md = MarkdownRenderer.Render(cmd);
+
+        Assert.DoesNotContain("{PageSize}", md);
+        Assert.Contains("default &#123;PageSize&#125;", md);
+        Assert.Contains("Uses &#123;Placeholder&#125;.", md);
+    }
 }
