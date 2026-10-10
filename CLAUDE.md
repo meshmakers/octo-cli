@@ -456,6 +456,14 @@ octo-cli -c UpdateBlueprint -tv MyBlueprint-2.0.0                   # apply upda
 octo-cli -c UpdateBlueprint -tv MyBlueprint-2.0.0 -m Full           # apply Full mode
 octo-cli -c UpdateBlueprint -tv MyBlueprint-2.0.0 -dr               # dry-run (no persistent changes)
 
+# Blueprints — blanking protection (AB#6316, server AB#6315). A seed with an empty/omitted attribute would
+# clear a tenant value; the service keeps it unless confirmed. Summaries only, never values.
+octo-cli -c PreviewBlueprintUpdate -tv MyBlueprint-2.0.0            # JSON on stdout; blanking table + hint as warnings (log)
+octo-cli -c PreviewBlueprintUpdate -tv MyBlueprint-2.0.0 -fb        # --failOnBlanking: exit -5 when anything would be blanked (CI gate)
+octo-cli -c UpdateBlueprint -tv MyBlueprint-2.0.0                   # default: tenant values KEPT, kept attributes listed, exit 0
+octo-cli -c UpdateBlueprint -tv MyBlueprint-2.0.0 -cb <rtId>:<attr> -cb <rtId2>:<attr2>  # --confirm-blanking (repeatable): blank exactly these
+octo-cli -c UpdateBlueprint -tv MyBlueprint-2.0.0 -ab               # --allow-blanking: blank EVERY listed attribute (loud warning)
+
 # Stream data lifecycle (asset repository)
 octo-cli -c EnableStreamData
 octo-cli -c ActivateArchive -id 69fda707d47638c68edc7fea       # provisions per-archive CrateDB table

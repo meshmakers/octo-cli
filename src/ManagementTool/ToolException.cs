@@ -119,6 +119,12 @@ public class ToolException : Exception
         return new ToolException("Use either --tenantId or --all, not both.");
     }
 
+    public static Exception BlankingDetected(int count)
+    {
+        return new ToolException(
+            $"The blueprint update would blank {count} tenant value(s) and --failOnBlanking is set.");
+    }
+
     public static Exception OperationCancelledByUser()
     {
         return new ToolException("Operation cancelled by user.");

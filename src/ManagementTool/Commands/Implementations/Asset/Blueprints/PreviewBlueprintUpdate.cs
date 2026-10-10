@@ -14,6 +14,7 @@ internal class PreviewBlueprintUpdate : ServiceClientOctoCommand<IAssetServicesC
     private readonly IConsoleService _consoleService;
     private readonly IArgument _targetVersionArg;
     private readonly IArgument _updateModeArg;
+    private readonly IArgument _failOnBlankingArg;
 
     public PreviewBlueprintUpdate(
         ILogger<PreviewBlueprintUpdate> logger,
@@ -32,7 +33,35 @@ internal class PreviewBlueprintUpdate : ServiceClientOctoCommand<IAssetServicesC
 
         _updateModeArg = CommandArgumentValue.AddArgument("m", "updateMode",
             ["Update mode: Safe, Merge (default), Full, or Migration"], false, 1);
+
+        _failOnBlankingArg = CommandArgumentValue.AddArgument("fb", "failOnBlanking",
+            ["Exit with a non-zero code (-5) when the update would blank at least one tenant value (for CI gates)"],
+            false, 0);
     }
+
+    public override CommandDocumentation? GetDocumentation() =>
+        new(
+            Samples:
+            [
+                new CodeSample(
+                    arguments: [new CodeSampleArgument(_targetVersionArg, "Eda.Adapter-1.2.0")],
+                    description: "Preview an update; blanking candidates are listed after the JSON result"),
+                new CodeSample(
+                    arguments:
+                    [
+                        new CodeSampleArgument(_targetVersionArg, "Eda.Adapter-1.2.0"),
+                        new CodeSampleArgument(_failOnBlankingArg)
+                    ],
+                    description: "CI gate: fail the job when the update would blank a tenant value"),
+            ],
+            Notes:
+            [
+                "A blueprint seed that carries an empty value, or omits an attribute, would clear what the tenant has entered.",
+                "UpdateBlueprint keeps such tenant values unless they are confirmed with --confirm-blanking or --allow-blanking.",
+                "The blanking list shows entity, attribute, reason and a kind/size summary of the current and incoming value - never the value itself.",
+                "The JSON result is written to standard output; the blanking table and warnings are log output.",
+                "Services older than the blanking protection (AB#6315) report no blanking list.",
+            ]);
 
     public override async Task Execute()
     {
@@ -62,5 +91,28 @@ internal class PreviewBlueprintUpdate : ServiceClientOctoCommand<IAssetServicesC
 
         var resultString = JsonConvert.SerializeObject(preview, Formatting.Indented);
         _consoleService.WriteLine(resultString);
+
+        var blanked = preview.BlankedAttributes;
+        if (blanked.Count == 0)
+        {
+            return;
+        }
+
+        Logger.LogWarning(
+            "The update would blank {Count} tenant value(s). UpdateBlueprint keeps them unless you confirm " +
+            "(values are never shown, only kind and size):", blanked.Count);
+        foreach (var line in BlueprintBlanking.FormatTable(blanked))
+        {
+            Logger.LogWarning("{Line}", line);
+        }
+
+        Logger.LogWarning(
+            "Confirm single attributes with '{Example}' or all of them with '--allow-blanking'.",
+            BlueprintBlanking.ConfirmationArgument(blanked[0]));
+
+        if (CommandArgumentValue.IsArgumentUsed(_failOnBlankingArg))
+        {
+            throw ToolException.BlankingDetected(blanked.Count);
+        }
     }
 }
