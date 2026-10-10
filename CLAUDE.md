@@ -190,6 +190,16 @@ Behaviour worth knowing:
 selection — use it only where that selection is itself the subject (`ListContexts`, `UseContext`).
 Everything acting on "the context in use" wants `GetEffectiveContext()` / `SaveEffectiveContext()`.
 
+### Platform file system commands (AB#6182)
+
+`GetFiles`, `UploadFile` and `DownloadFile` (`Commands/Implementations/Asset/PlatformFiles/`) wrap the typed
+`IAssetServicesClient.Files` client of the SDK (System.Files, AB#6171: bytes over REST `/{tenant}/v1/files`,
+metadata over GraphQL). Files are addressed by root well-known name (default `Files`) plus `/`-separated path,
+`DownloadFile` also by `-id <rtId>`. `UploadFile -c fail|replace|keepBoth` maps to `FileConflictMode`;
+`DownloadFile` streams to a `.part` file and moves it into place, and refuses to overwrite an existing local file
+without `-o`. No tenant feature must be enabled; the MCP counterparts are `list_files`, `upload_file`,
+`download_file` (octo-mcp-service). Their reference pages are generated from the command classes like all others.
+
 ### Adapter pool queue (AB#4924 §10)
 
 `GetAdapterPoolQueue -id <adapterPoolRtId>` and `CancelQueuedExecution -id <adapterPoolRtId> -eid
