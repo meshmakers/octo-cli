@@ -1,4 +1,5 @@
 using System.Text;
+using Microsoft.Extensions.Logging;
 using Meshmakers.Octo.Sdk.ServiceClient.AssetRepositoryServices.Blueprints;
 
 namespace Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Asset.Blueprints;
@@ -13,6 +14,7 @@ namespace Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Asset
 internal static class BlueprintBlanking
 {
     private static readonly string[] TableHeader = ["Entity (rtId)", "Type", "Attribute", "Reason", "Current", "Incoming"];
+    private static readonly string[] TenantOwnedHeader = ["Key", "Type", "Entity (rtId)"];
 
     /// <summary>
     ///     Parses the value of <c>--confirm-blanking</c>: <c>&lt;rtId&gt;:&lt;attribute&gt;</c>, split at the
@@ -53,7 +55,73 @@ internal static class BlueprintBlanking
             .Prepend(TableHeader)
             .ToList();
 
-        var widths = Enumerable.Range(0, TableHeader.Length).Select(i => rows.Max(r => r[i].Length)).ToArray();
+        return FormatRows(rows);
+    }
+
+    /// <summary>
+    ///     AB#6454: renders tenant-owned seed entities (key, type, rtId or <c>-</c> for an entity the tenant
+    ///     deleted) as an aligned text table, header first. Identity only - the lists carry no values.
+    ///     Empty when there is nothing to report.
+    /// </summary>
+    public static IReadOnlyList<string> FormatTenantOwnedTable(IReadOnlyCollection<BlueprintTenantOwnedEntityDto> entities)
+    {
+        if (entities.Count == 0)
+        {
+            return [];
+        }
+
+        var rows = entities
+            .Select(e => new[]
+            {
+                e.Key, e.CkTypeId, string.IsNullOrEmpty(e.EntityId) ? "-" : e.EntityId
+            })
+            .Prepend(TenantOwnedHeader)
+            .ToList();
+
+        return FormatRows(rows);
+    }
+
+    /// <summary>
+    ///     AB#6454: logs the two tenant-owned sections of a blueprint update (preview or apply result).
+    ///     Nothing is logged for an empty list. These entities are not blanking, so this is information, not
+    ///     a warning, and <c>--failOnBlanking</c> never looks at them.
+    /// </summary>
+    public static void ReportTenantOwned(
+        ILogger logger,
+        bool preview,
+        IReadOnlyCollection<BlueprintTenantOwnedEntityDto> skipped,
+        IReadOnlyCollection<BlueprintTenantOwnedEntityDto> staysDeleted)
+    {
+        if (skipped.Count > 0)
+        {
+            logger.LogInformation(
+                preview
+                    ? "{Count} tenant-owned seed entity(ies) would be left untouched (tenant-owned, skipped):"
+                    : "{Count} tenant-owned seed entity(ies) were left untouched (tenant-owned, skipped):",
+                skipped.Count);
+            foreach (var line in FormatTenantOwnedTable(skipped))
+            {
+                logger.LogInformation("{Line}", line);
+            }
+        }
+
+        if (staysDeleted.Count > 0)
+        {
+            logger.LogInformation(
+                preview
+                    ? "{Count} tenant-owned seed entity(ies) deleted by the tenant would stay deleted:"
+                    : "{Count} tenant-owned seed entity(ies) deleted by the tenant stay deleted:",
+                staysDeleted.Count);
+            foreach (var line in FormatTenantOwnedTable(staysDeleted))
+            {
+                logger.LogInformation("{Line}", line);
+            }
+        }
+    }
+
+    private static List<string> FormatRows(List<string[]> rows)
+    {
+        var widths = Enumerable.Range(0, rows[0].Length).Select(i => rows.Max(r => r[i].Length)).ToArray();
         return rows.Select(r => FormatRow(r, widths)).ToList();
     }
 
