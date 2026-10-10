@@ -9,6 +9,7 @@ using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Asset.CkM
 using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Asset.FixupScripts;
 using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Asset.Secrets;
 using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Asset.Models;
+using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Asset.PlatformFiles;
 using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Asset.Tenants;
 using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Asset.TimeSeries;
 using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Communication;
@@ -262,6 +263,9 @@ internal static class Program
         services.AddTransient<ICommand, ImportConstructionKitModel>();
         services.AddTransient<ICommand, ImportRuntimeModel>();
         services.AddTransient<ICommand, ExportRuntimeModelByQuery>();
+        services.AddTransient<ICommand, GetFiles>();
+        services.AddTransient<ICommand, UploadFile>();
+        services.AddTransient<ICommand, DownloadFile>();
         services.AddTransient<ICommand, ExportRuntimeModelByDeepGraph>();
 
         // CK Model Library Management
