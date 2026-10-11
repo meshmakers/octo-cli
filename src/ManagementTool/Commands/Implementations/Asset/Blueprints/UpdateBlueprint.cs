@@ -76,6 +76,8 @@ internal class UpdateBlueprint : ServiceClientOctoCommand<IAssetServicesClient>
                 "Run PreviewBlueprintUpdate first: it lists entity, attribute, reason and a kind/size summary of the current and incoming value (never the value).",
                 "--allow-blanking confirms every listed attribute and takes precedence over --confirm-blanking.",
                 "A --confirm-blanking pair that is not a blanking candidate is reported and ignored.",
+                "Tenant-owned seed entities (rtBlueprintLocked: false) are never rewritten; the command lists those left untouched and those the tenant deleted that stay deleted (key, type, rtId, no values).",
+                "The blanking Reason is printed as the service reports it: SeedEmpty, SeedOmitted, or ResetToDefault.",
                 "Against services older than the blanking protection (AB#6315) the update behaves as before and no blanking list is reported.",
             ]);
 
@@ -128,6 +130,8 @@ internal class UpdateBlueprint : ServiceClientOctoCommand<IAssetServicesClient>
             Options.Value.TenantId);
 
         ReportBlanking(result.BlankedAttributes, dryRun, allowBlanking ? [] : confirmations);
+        BlueprintBlanking.ReportTenantOwned(
+            Logger, dryRun, result.TenantOwnedSkipped, result.TenantOwnedStaysDeleted);
     }
 
     private List<BlueprintBlankingConfirmationDto> ParseConfirmations()

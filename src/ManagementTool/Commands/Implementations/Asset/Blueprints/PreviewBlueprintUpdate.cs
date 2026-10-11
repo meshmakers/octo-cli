@@ -59,7 +59,9 @@ internal class PreviewBlueprintUpdate : ServiceClientOctoCommand<IAssetServicesC
                 "A blueprint seed that carries an empty value, or omits an attribute, would clear what the tenant has entered.",
                 "UpdateBlueprint keeps such tenant values unless they are confirmed with --confirm-blanking or --allow-blanking.",
                 "The blanking list shows entity, attribute, reason and a kind/size summary of the current and incoming value - never the value itself.",
-                "The JSON result is written to standard output; the blanking table and warnings are log output.",
+                "The Reason column is printed as the service reports it: SeedEmpty, SeedOmitted, or ResetToDefault (the current value differs from the CK default and the incoming value is the default).",
+                "Tenant-owned seed entities (rtBlueprintLocked: false) are never rewritten: the output lists those left untouched ('tenant-owned, skipped') and those the tenant deleted that stay deleted, with key, type and rtId ('-' when deleted) and no values. They are not blanking and do not trigger --failOnBlanking.",
+                "The JSON result is written to standard output; the blanking and tenant-owned tables and the warnings are log output.",
                 "Services older than the blanking protection (AB#6315) report no blanking list.",
             ]);
 
@@ -91,6 +93,9 @@ internal class PreviewBlueprintUpdate : ServiceClientOctoCommand<IAssetServicesC
 
         var resultString = JsonConvert.SerializeObject(preview, Formatting.Indented);
         _consoleService.WriteLine(resultString);
+
+        BlueprintBlanking.ReportTenantOwned(
+            Logger, preview: true, preview.TenantOwnedSkipped, preview.TenantOwnedStaysDeleted);
 
         var blanked = preview.BlankedAttributes;
         if (blanked.Count == 0)
