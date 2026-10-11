@@ -63,10 +63,11 @@ internal class CreateApiSecretApiResource : ServiceClientOctoCommand<IIdentitySe
 
         var resultSecret = await ServiceClient.CreateApiSecretForApiResource(name, apiSecretDto);
 
-        Logger.LogInformation(
-            "API secret \'{ValueEncrypted}\' for client  \'{Name}\' at \'{ServiceClientServiceUri}\' created",
-            resultSecret.ValueEncrypted, name,
-            ServiceClient.ServiceUri);
+        // The hash identifies the secret for later updates and is part of the printed result, but neither
+        // it nor the clear text is ever written to the log (AB#6258).
+        Logger.LogInformation("API secret for API resource '{Name}' at '{ServiceClientServiceUri}' created",
+            name, ServiceClient.ServiceUri);
+        Logger.LogWarning("The clear-text secret is shown below once only and cannot be retrieved again.");
 
         var resultString = JsonConvert.SerializeObject(resultSecret, Formatting.Indented);
         _consoleService.WriteLine(resultString);
