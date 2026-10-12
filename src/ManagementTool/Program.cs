@@ -28,6 +28,7 @@ using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Identity.
 using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Identity.Groups;
 using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Identity.IdentityProviders;
 using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Identity.DataPermissions;
+using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Identity.PipelineServiceAccounts;
 using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Identity.Roles;
 using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Identity.Users;
 using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Reporting;
@@ -377,6 +378,7 @@ internal static class Program
         services.AddTransient<ICommand, RemoveUserFromRole>();
 
         services.AddTransient<ICommand, GetRoles>();
+        services.AddTransient<ICommand, CheckPipelineServiceAccountFileRoles>();
         services.AddTransient<ICommand, CreateRole>();
         services.AddTransient<ICommand, UpdateRole>();
         services.AddTransient<ICommand, DeleteRole>();
