@@ -362,6 +362,9 @@ public sealed class AdapterPoolQueueCommandTests
         public Task<string> GetAdapterNodesAsync() => throw new NotSupportedException();
         public Task<string> GetPipelineSchemaAsync(string adapterRtId) => throw new NotSupportedException();
 
+        public Task<ServiceAccountImpersonationSwitchReportDto> SwitchServiceAccountsToImpersonationAsync(
+            bool apply, bool redeployDataFlows) => throw new NotSupportedException();
+
         public Task<RotateServiceAccountSecretResultDto> RotateServiceAccountSecretAsync(string adapterRtId) =>
             throw new NotSupportedException();
 

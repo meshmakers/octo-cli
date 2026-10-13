@@ -283,7 +283,7 @@ Environment variables are prefixed with `OCTO_`:
 | Identity | users, roles, clients (+ mirror commands: GetClientMirrors, ProvisionClientInExistingTenants, ProvisionClientInTenant, UnprovisionClientFromTenant, SetClientAutoProvision, ApplyClientOverlay, CleanClientOverlays), identityProviders, groups, emailDomainGroupRules, externalTenantUserMappings, adminProvisioning, apiResources, apiScopes | Identity Services |
 | Asset | tenants, models, blueprints (ListBlueprints, RefreshBlueprintCatalogs, InstallBlueprint, GetBlueprintHistory, PreviewBlueprintUpdate, UpdateBlueprint, ListBlueprintInstallations, UninstallBlueprint), timeSeries (EnableStreamData, DisableStreamData, ActivateArchive, DisableArchive, EnableArchive, RetryArchiveActivation, DeleteArchive, FreezeRollupArchive, UnfreezeRollupArchive, RewindRollupWatermark, ListRollupsForArchive, RecomputeArchive, BackfillRollup, ListRecomputeJobs, AddComputedColumn, RemoveComputedColumn, UpdateComputedColumnFormula) | Asset Repository |
 | Bots | Dump, Restore, ExportArchiveData, ImportArchiveData, RunFixupScripts | Bot Services |
-| Communication | enable/disable, adapters (incl. RotateAdapterServiceAccountSecret), pipelines (incl. MovePipelines for bulk reassignment to a different adapter), triggers, pools, adapter pool queue (GetAdapterPoolQueue, CancelQueuedExecution), dataFlows, workloads (GetWorkloadsByChart, UpdateWorkloadChartVersion, DeployWorkload, UndeployWorkload) | Communication Controller |
+| Communication | enable/disable, adapters (incl. RotateAdapterServiceAccountSecret), SwitchServiceAccountsToImpersonation, pipelines (incl. MovePipelines for bulk reassignment to a different adapter), triggers, pools, adapter pool queue (GetAdapterPoolQueue, CancelQueuedExecution), dataFlows, workloads (GetWorkloadsByChart, UpdateWorkloadChartVersion, DeployWorkload, UndeployWorkload) | Communication Controller |
 | Reporting | enable/disable | Report Services |
 | AI Services | EnableAi, DisableAi, RedeemAiTicket (anonymous — bastion-side), GetAiCredentialsStatus, RevokeAiCredentials | AI Services |
 | DevOps | certificates | Local operations |
@@ -593,6 +593,10 @@ octo-cli -c RotateAdapterServiceAccountSecret -id <adapterRtId> -y   # skip conf
 # ...then redeploy, or the pipelines keep presenting the withdrawn secret:
 octo-cli -c DeployDataFlow -id <dataFlowRtId>
 
+# Impersonation switch of the tenant's pipeline service accounts (AB#6642): dry run by default.
+octo-cli -c SwitchServiceAccountsToImpersonation                 # dry run, changes nothing
+octo-cli -c SwitchServiceAccountsToImpersonation -a -y -rdf true # apply, no prompt
+
 # Multi-tenant ClientCredentials mirroring (Epic 3054, #4047)
 # Create a flagged client in octosystem — gets auto-provisioned into every new sub-tenant.
 octo-cli -c AddClientCredentialsClient -id ci-deploy -n "CI Deploy" -s <secret> -apic
@@ -671,6 +675,7 @@ All communication commands accept plain runtime object IDs (e.g. `69cfa838092b71
 | `GetAdapterNodes` | | List available pipeline nodes from connected adapters |
 | `GetPipelineSchema` | `--adapterId <rtId>`, `--outputFile` (optional) | Get pipeline JSON schema for an adapter |
 | `RotateAdapterServiceAccountSecret` | `--identifier <rtId>`, `--yes` (optional) | Rotate the secret of the adapter's pipeline service account (destructive — prompts) |
+| `SwitchServiceAccountsToImpersonation` | `--apply` (optional, default dry run), `--redeployDataFlows <true\|false>` (default true), `--yes`, `--json` | Dry-run or apply the switch of the tenant's pipeline service accounts to impersonation (apply is destructive — prompts) |
 
 #### `RotateAdapterServiceAccountSecret` (AB#5032 / AB#5048)
 
@@ -691,6 +696,17 @@ deliberate and easy to undo by accident:
   warning is emitted — a redeploy demand nobody needs is how the real one gets ignored later.
 - **No secret is printed**, because the response carries none. Both the controller and
   `Communication.Contracts.Tests` pin that.
+
+#### `SwitchServiceAccountsToImpersonation` (AB#5537 / AB#6642)
+
+Backs `POST {tenantId}/v1/serviceAccount/switchToImpersonation` via
+`ICommunicationServicesClient.SwitchServiceAccountsToImpersonationAsync`. Dry run is the default and
+changes nothing; `-a/--apply` runs it after a confirmation (`-y` skips it). Prints one line per
+account and a count per outcome (`-j` prints the server report as JSON). Exit codes: server 409
+(`OCTO_SERVICEACCOUNTIMPERSONATION__ALLOWSECRETCLEARING` not set) and any `Failed` account or failed
+data-flow redeploy give `-5` (the full report is printed first); `SwitchedPendingInvalidation` only
+warns that a re-run with `--redeployDataFlows true` completes the switch. The report carries no
+secret or token and the command prints only report fields (pinned by tests).
 
 ### Pipelines
 
@@ -793,6 +809,7 @@ deleting rows: a verb that makes an existing credential stop working belongs in 
 | `DeleteArchive` | `delete archive '{archiveRtId}'? The CrateDB table will be dropped and historical data lost` |
 | `UninstallBlueprint` | `uninstall blueprint '{name}' from tenant '{tenantId}'[ together with any blueprints that depend on it and any orphaned dependencies]? Locked owned entities will be erased` |
 | `UnprovisionClientFromTenant` | `remove client '{clientId}' from child tenant '{childTenantId}' of {parent scope}? …` |
+| `SwitchServiceAccountsToImpersonation` (`--apply` without `-y`) | `switch the pipeline service accounts of tenant '{tenantId}' to impersonation? Stored client secrets are cleared and the old secrets are invalidated` |
 | `RotateAdapterServiceAccountSecret` | `rotate the pipeline service account secret of adapter '{adapterRtId}' in tenant '{tenantId}'? The current secret stops working immediately, and the adapter's pipelines / data flows must be redeployed afterwards` |
 | `RevokeAiCredentials` | `revoke AI credential lease for tenant '{tenantId}'? New sessions will fail until a fresh subscription is registered` |
 
