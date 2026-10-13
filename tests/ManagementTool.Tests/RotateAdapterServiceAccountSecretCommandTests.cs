@@ -165,6 +165,9 @@ public sealed class RotateAdapterServiceAccountSecretCommandTests
     {
         public string? RotatedAdapterRtId { get; private set; }
 
+        public Task<ServiceAccountImpersonationSwitchReportDto> SwitchServiceAccountsToImpersonationAsync(
+            bool apply, bool redeployDataFlows) => throw new NotSupportedException();
+
         public Task<RotateServiceAccountSecretResultDto> RotateServiceAccountSecretAsync(string adapterRtId)
         {
             RotatedAdapterRtId = adapterRtId;

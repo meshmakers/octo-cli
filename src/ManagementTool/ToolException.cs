@@ -125,6 +125,21 @@ public class ToolException : Exception
             $"The blueprint update would blank {count} tenant value(s) and --failOnBlanking is set.");
     }
 
+    public static Exception ImpersonationSwitchNotAllowed(Exception inner)
+    {
+        return new ToolException(
+            "Apply is not allowed on this installation (OCTO_SERVICEACCOUNTIMPERSONATION__ALLOWSECRETCLEARING " +
+            "is not set on the communication controller). Review the dry run first, then ask the platform " +
+            "operator to enable it.", inner);
+    }
+
+    public static Exception ImpersonationSwitchIncomplete(int failedAccounts, int failedRedeploys)
+    {
+        return new ToolException(
+            $"The impersonation switch is incomplete: {failedAccounts} account(s) failed and {failedRedeploys} " +
+            "data flow redeploy(s) failed. See the report above.");
+    }
+
     public static Exception OperationCancelledByUser()
     {
         return new ToolException("Operation cancelled by user.");

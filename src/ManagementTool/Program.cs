@@ -436,6 +436,7 @@ internal static class Program
         services.AddTransient<ICommand, GetAdapterNodesCommand>();
         services.AddTransient<ICommand, GetPipelineSchemaCommand>();
         services.AddTransient<ICommand, RotateAdapterServiceAccountSecretCommand>();
+        services.AddTransient<ICommand, SwitchServiceAccountsToImpersonationCommand>();
 
         // Communication - Pipelines
         services.AddTransient<ICommand, GetPipelineStatusCommand>();
