@@ -5,6 +5,7 @@ using Meshmakers.Octo.Sdk.ServiceClient.CommunicationControllerServices;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 
 namespace Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Communication;
 
@@ -13,6 +14,7 @@ internal class GetAdapterCommand : ServiceClientOctoCommand<ICommunicationServic
     private readonly IConsoleService _consoleService;
     private readonly IArgument _idArg;
     private readonly IArgument _jsonArg;
+    private readonly IArgument _showSecretsArg;
 
     public GetAdapterCommand(ILogger<GetAdapterCommand> logger, IOptions<OctoToolOptions> options,
         IConsoleService consoleService,
@@ -24,6 +26,11 @@ internal class GetAdapterCommand : ServiceClientOctoCommand<ICommunicationServic
         _consoleService = consoleService;
         _idArg = CommandArgumentValue.AddArgument("id", "identifier", ["The adapter runtime ID"], true, 1);
         _jsonArg = CommandArgumentValue.AddArgument("j", "json", ["Output as raw JSON"], false);
+        _showSecretsArg = CommandArgumentValue.AddArgument("ss", "show-secrets",
+            [
+                "Print credentials (passwords, secrets, API keys, tokens) of the adapter and pipeline configurations in clear text (AB#6286).",
+                "Without this flag they are masked, so the output is safe for logs and transcripts"
+            ], false);
     }
 
     public override CommandDocumentation? GetDocumentation() =>
@@ -36,6 +43,15 @@ internal class GetAdapterCommand : ServiceClientOctoCommand<ICommunicationServic
                     new CodeSampleArgument(_jsonArg),
                 ],
                     description: "Output as compact JSON"),
+                new CodeSample(arguments: [
+                    new CodeSampleArgument(_idArg, "69cfa838092b710403248acd"),
+                    new CodeSampleArgument(_showSecretsArg),
+                ],
+                    description: "Prints passwords and other credentials in clear text (secrets!)"),
+            ],
+            Notes:
+            [
+                "- Credentials in the adapter configuration and in the pipeline configurations (members named like password, secret, apiKey, accessToken, privateKey, connectionString, ...) are masked by default, because the output of this command ends up in scripts, CI logs and AI-agent transcripts (AB#6286). `--show-secrets` (`-ss`) prints them in clear text; use it only interactively when you really need the value.",
             ]
         );
 
@@ -55,14 +71,15 @@ internal class GetAdapterCommand : ServiceClientOctoCommand<ICommunicationServic
 
         var result = await ServiceClient.GetAdapterConfigurationAsync(id);
 
-        if (CommandArgumentValue.IsArgumentUsed(_jsonArg))
+        var output = JToken.FromObject(result, JsonSerializer.CreateDefault());
+        if (!CommandArgumentValue.IsArgumentUsed(_showSecretsArg))
         {
-            _consoleService.WriteLine(JsonConvert.SerializeObject(result));
+            output = SecretMasker.MaskToken(output);
+            Logger.LogInformation("Credentials are masked; use --show-secrets to print them in clear text");
         }
-        else
-        {
-            var formatted = JsonConvert.SerializeObject(result, Formatting.Indented);
-            _consoleService.WriteLine(formatted);
-        }
+
+        _consoleService.WriteLine(output.ToString(CommandArgumentValue.IsArgumentUsed(_jsonArg)
+            ? Formatting.None
+            : Formatting.Indented));
     }
 }
