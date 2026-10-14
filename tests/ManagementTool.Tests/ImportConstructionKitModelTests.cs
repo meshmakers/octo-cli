@@ -30,6 +30,20 @@ public sealed class ImportConstructionKitModelTests : IDisposable
     }
 
     [Fact]
+    public async Task Execute_FailsForAMissingFile_BeforeAnythingIsUploaded()
+    {
+        var assetClient = A.Fake<IAssetServicesClient>();
+        var path = Path.Combine(_dir, "does-not-exist.yaml");
+        var command = NewCommand(assetClient);
+        command.CommandArgumentValue.ParseLayer(["-f", path]);
+
+        var exception = await Assert.ThrowsAsync<ToolException>(command.Execute);
+
+        Assert.Contains(path, exception.Message);
+        A.CallTo(() => assetClient.ImportCkModelAsync(A<string>._, A<string>._)).MustNotHaveHappened();
+    }
+
+    [Fact]
     public async Task Execute_UploadsAValidCk()
     {
         var assetClient = A.Fake<IAssetServicesClient>();

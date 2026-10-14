@@ -190,7 +190,7 @@ Behaviour worth knowing:
 selection — use it only where that selection is itself the subject (`ListContexts`, `UseContext`).
 Everything acting on "the context in use" wants `GetEffectiveContext()` / `SaveEffectiveContext()`.
 
-### ImportCk rejects empty construction kits (AB#2615)
+### ImportCk rejects empty and missing construction kit files (AB#2615)
 
 `ImportCk` (`Commands/Implementations/Asset/Models/ImportConstructionKitModel.cs`) checks the file with
 `Services/CkModelFileInspector` before anything is uploaded. A CK model is **empty** when none of the top-level
@@ -199,6 +199,8 @@ with only `modelId` and `dependencies`). An empty model raises `ToolException.Em
 non-zero exit code, no request to the server. The check reads `.yaml`/`.yml`/`.json` files and the YAML/JSON
 entries of a `.zip` (a zip is rejected only when every model entry in it is empty) with a light top-level scan,
 without a YAML dependency; files that cannot be classified are passed through and judged by the server.
+A **non-existent input file** also fails with `ToolException.FilePathDoesNotExist` (non-zero exit, no server call) —
+it used to log an error and exit 0.
 Tests: `tests/ManagementTool.Tests/CkModelFileInspectorTests.cs`, `ImportConstructionKitModelTests.cs`.
 
 ### Platform file system commands (AB#6182)
