@@ -47,6 +47,8 @@ internal class DeleteApiSecretClient : ServiceClientOctoCommand<IIdentityService
     {
         var clientId = CommandArgumentValue.GetArgumentScalarValue<string>(_clientIdArg);
         var secretValue = CommandArgumentValue.GetArgumentScalarValue<string>(_secretValueArg);
+        // The secret value is never logged (AB#6692); only a placeholder identifies it in the output.
+        var maskedSecret = SecretMasker.Mask(secretValue);
 
         if (!CommandArgumentValue.IsArgumentUsed(_yesArg) &&
             !_confirmationService.Confirm($"Are you sure you want to delete API secret for client '{clientId}'?"))
@@ -55,13 +57,13 @@ internal class DeleteApiSecretClient : ServiceClientOctoCommand<IIdentityService
         }
 
         Logger.LogInformation(
-            "Deleting API secret \'{SecretValue}\' for client \'{ClientId}\' from \'{ServiceClientServiceUri}\'",
-            secretValue, clientId,
+            "Deleting API secret \'{MaskedSecret}\' for client \'{ClientId}\' from \'{ServiceClientServiceUri}\'",
+            maskedSecret, clientId,
             ServiceClient.ServiceUri);
 
         await ServiceClient.DeleteApiSecretClient(clientId, secretValue);
 
-        Logger.LogInformation("API API secret \'{SecretValue}\' for client \'{ClientId}\' deleted", secretValue,
+        Logger.LogInformation("API secret \'{MaskedSecret}\' for client \'{ClientId}\' deleted", maskedSecret,
             clientId);
     }
 }
