@@ -60,6 +60,9 @@ internal class ImportConstructionKitModel : JobWithWaitOctoCommand
             return;
         }
 
+        // AB#2615: reject an empty CK before anything is sent to the server.
+        CkModelFileInspector.EnsureNotEmpty(ckModelFilePath);
+
         Logger.LogInformation("Importing construction kit model \'{CkModelFilePath}\'", ckModelFilePath);
 
         var id = await _assetServicesClient.ImportCkModelAsync(tenantId, ckModelFilePath);
