@@ -257,6 +257,8 @@ path in effect is logged on every run and shown by `ListContexts`.
 
 **Refresh decision & failure handling (AB#4754).** `EnsureAuthenticated` decides whether to refresh a device/interactive token from the stored `AccessTokenExpiresAt` (with a 30s margin), **not** from a live `/connect/userinfo` probe. A token that is not expiring soon is used as-is — no per-command round-trip to the identity service, and a transient identity-service hiccup no longer forces an unnecessary refresh. Server-side revocation of a not-yet-expired token still surfaces as the target service's own 401. When the refresh itself fails because the **refresh token is expired/revoked** — the typical outcome for a context that has not been used in a while, so it bites hardest when switching between contexts — the tool does one of two things: if `OCTO_CLI_CLIENT_ID` / `OCTO_CLI_CLIENT_SECRET` are set it re-acquires non-interactively via client_credentials; otherwise it fails with an actionable `ToolException` (exit `-5`) naming the effective context and the exact `octo-cli --context <name> -c LogIn` to run, instead of the raw OIDC `invalid_grant`. `AuthStatus` reports the same dead-refresh-token case as an actionable warning rather than letting it bubble up.
 
+**`AuthStatus` masks secrets by default (AB#5744).** The output of `AuthStatus` lands in scripts, CI logs and AI-agent transcripts (it is the recommended silent-refresh command), so by default it prints only status, claims, expiry and the user-info response; the token signature and the raw access token are replaced by `SecretMasker.Mask` (`Services/SecretMasker.cs`, generic helper: reveals only the length). `--show-token` (`-st`) prints the raw access token, signature and refresh token; use it only interactively. Silent refresh behaves the same with and without the flag. Tests: `AuthStatusCommandTests`.
+
 ## Configuration
 
 The CLI uses:
@@ -413,7 +415,7 @@ export OCTO_CLI_CLIENT_SECRET=***
 octo-cli -c LogInClientCredentials
 # Subsequent commands auto-renew the token while the env vars remain exported.
 
-# Check authentication status
+# Check authentication status (tokens are masked; add --show-token to print them)
 octo-cli -c AuthStatus
 
 # Configure the active context (rejected when combined with --context)

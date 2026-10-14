@@ -16,6 +16,7 @@ internal class AuthStatusCommand : Command<OctoToolOptions>
     private readonly IAuthenticatorClient _authenticatorClient;
     private readonly IConsoleService _consoleService;
     private readonly IContextManager _contextManager;
+    private readonly IArgument _showTokenArg;
 
     public AuthStatusCommand(ILogger<AuthStatusCommand> logger, IConsoleService consoleService,
         IOptions<OctoToolOptions> options,
@@ -28,18 +29,33 @@ internal class AuthStatusCommand : Command<OctoToolOptions>
         _authenticatorClient = authenticatorClient;
         _authenticationService = authenticationService;
         _contextManager = contextManager;
+
+        _showTokenArg = CommandArgumentValue.AddArgument("st", "show-token",
+            [
+                "Print the raw access token, its signature and the refresh token (AB#5744).",
+                "Without this flag they are masked, so the output is safe for logs and transcripts"
+            ], false);
     }
 
     public override CommandDocumentation? GetDocumentation() =>
         new(
+            Samples:
+            [
+                new CodeSample(arguments: [], description: "Status, claims and expiry; tokens are masked"),
+                new CodeSample(arguments: [new CodeSampleArgument(_showTokenArg)],
+                    description: "Additionally prints the raw access and refresh token (secrets!)"),
+            ],
             Notes:
             [
+                "- `--show-token` (`-st`) prints the raw access token, the token signature and the refresh token. By default these are masked, because the output of this command ends up in scripts, CI logs and AI-agent transcripts (AB#5744). Use the flag only interactively when you really need the token.",
                 "- No parameters required. Reports the JWT claims of the current access token, including an `Auth Method` line indicating whether the token came from the device-code flow or `client_credentials`. For `client_credentials` tokens (no `sub` claim), the User Info section is omitted because the token is not user-bound.",
             ]
         );
 
     public override async Task Execute()
     {
+        var showToken = CommandArgumentValue.IsArgumentUsed(_showTokenArg);
+
         // Which context the reported token belongs to is the first thing to know here — more so
         // once --context can point the command at a context that is not the active one.
         Logger.LogInformation("Authentication status of context '{ContextName}'{OverrideHint}, file '{ContextFile}'",
@@ -50,7 +66,7 @@ internal class AuthStatusCommand : Command<OctoToolOptions>
         Logger.LogInformation("Check of authentication status at \'{ValueIdentityServiceUrl}\' in progress...",
             Options.Value.IdentityServiceUrl);
 
-        var result = await TestAuthenticationStatus();
+        var result = await TestAuthenticationStatus(showToken);
         if (!result)
         {
             if (_authenticationOptions.Value.RefreshToken != null)
@@ -67,7 +83,7 @@ internal class AuthStatusCommand : Command<OctoToolOptions>
                     Logger.LogInformation("Refresh successful. Token expires at \'{AuthenticationDataExpiresAt}\'",
                         authenticationData.ExpiresAt);
 
-                    await TestAuthenticationStatus();
+                    await TestAuthenticationStatus(showToken);
                 }
                 catch (AuthenticationFailedException ex)
                 {
@@ -99,7 +115,7 @@ internal class AuthStatusCommand : Command<OctoToolOptions>
             : "octo-cli -c LogIn";
     }
 
-    private async Task<bool> TestAuthenticationStatus()
+    private async Task<bool> TestAuthenticationStatus(bool showToken)
     {
         var accessToken = _authenticationOptions.Value.AccessToken;
         if (string.IsNullOrWhiteSpace(accessToken))
@@ -164,7 +180,8 @@ internal class AuthStatusCommand : Command<OctoToolOptions>
             isClientCredentials ? "(none — client_credentials)" : token.Subject);
         _consoleService.WriteColumnLine("Token Type", 20, token.Header["typ"]?.ToString() ?? "N/A");
         _consoleService.WriteColumnLine("Algorithm", 20, token.Header["alg"]?.ToString() ?? "N/A");
-        _consoleService.WriteColumnLine("Signature", 20, token.RawSignature);
+        _consoleService.WriteColumnLine("Signature", 20,
+            showToken ? token.RawSignature : SecretMasker.Mask(token.RawSignature));
 
         var authMethod = isClientCredentials
             ? $"client_credentials (no refresh token; re-login or set {Constants.EnvVarClientId} / {Constants.EnvVarClientSecret} for auto re-login)"
@@ -196,8 +213,23 @@ internal class AuthStatusCommand : Command<OctoToolOptions>
         }
 
         _consoleService.WriteLine("");
-        _consoleService.WriteLine("ACCESS TOKEN");
-        _consoleService.WriteLine(accessToken);
+        if (showToken)
+        {
+            _consoleService.WriteLine("ACCESS TOKEN");
+            _consoleService.WriteLine(accessToken);
+            if (!string.IsNullOrEmpty(_authenticationOptions.Value.RefreshToken))
+            {
+                _consoleService.WriteLine("");
+                _consoleService.WriteLine("REFRESH TOKEN");
+                _consoleService.WriteLine(_authenticationOptions.Value.RefreshToken);
+            }
+        }
+        else
+        {
+            _consoleService.WriteLine("ACCESS TOKEN");
+            _consoleService.WriteLine(SecretMasker.Mask(accessToken));
+            _consoleService.WriteLine("(masked; use --show-token to print the raw access and refresh token)");
+        }
 
         return true;
     }
