@@ -48,18 +48,20 @@ internal class UpdateApiSecretApiResource : ServiceClientOctoCommand<IIdentitySe
     {
         var name = CommandArgumentValue.GetArgumentScalarValue<string>(_nameArg);
         var secretValue = CommandArgumentValue.GetArgumentScalarValue<string>(_secretValueArg);
+        // The secret value is never logged (AB#6692); only a placeholder identifies it in the output.
+        var maskedSecret = SecretMasker.Mask(secretValue);
 
         Logger.LogInformation(
-            "Updating API secret \'{SecretValue}\' for API resource \'{Name}\' at \'{ServiceClientServiceUri}\'",
-            secretValue, name,
+            "Updating API secret \'{MaskedSecret}\' for API resource \'{Name}\' at \'{ServiceClientServiceUri}\'",
+            maskedSecret, name,
             ServiceClient.ServiceUri);
 
         var secretDto = await ServiceClient.GetApiSecretForApiResource(name, secretValue);
         if (secretDto == null)
         {
             Logger.LogError(
-                "API secret \'{SecretValue}\' for API resource \'{Name}\' at \'{ServiceClientServiceUri}\' not found",
-                secretValue, name,
+                "API secret \'{MaskedSecret}\' for API resource \'{Name}\' at \'{ServiceClientServiceUri}\' not found",
+                maskedSecret, name,
                 ServiceClient.ServiceUri);
             return;
         }
@@ -77,8 +79,8 @@ internal class UpdateApiSecretApiResource : ServiceClientOctoCommand<IIdentitySe
         await ServiceClient.UpdateApiSecretApiResource(name, secretDto);
 
         Logger.LogInformation(
-            "API secret \'{SecretValue}\' for API resource \'{Name}\' at \'{ServiceClientServiceUri}\' updated",
-            secretValue, name,
+            "API secret \'{MaskedSecret}\' for API resource \'{Name}\' at \'{ServiceClientServiceUri}\' updated",
+            maskedSecret, name,
             ServiceClient.ServiceUri);
     }
 }
