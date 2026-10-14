@@ -259,6 +259,8 @@ path in effect is logged on every run and shown by `ListContexts`.
 
 **`AuthStatus` masks secrets by default (AB#5744).** The output of `AuthStatus` lands in scripts, CI logs and AI-agent transcripts (it is the recommended silent-refresh command), so by default it prints only status, claims, expiry and the user-info response; the token signature and the raw access token are replaced by `SecretMasker.Mask` (`Services/SecretMasker.cs`, generic helper: reveals only the length). `--show-token` (`-st`) prints the raw access token, signature and refresh token; use it only interactively. Silent refresh behaves the same with and without the flag. Tests: `AuthStatusCommandTests`.
 
+**`GetAdapter` masks credentials by default (AB#6286).** `GetAdapter` printed the adapter configuration and the pipeline configurations verbatim, including passwords (e.g. an EDA adapter). By default every credential-named member (`SecretMasker.IsSecretName`: password, passwd, passphrase, secret, apiKey, privateKey, accessKey, credential(s), connectionString, authorization, bearer, `*token`, `pwd`; status flags such as `ClientSecretIsSet` and names like `tokenEndpoint` stay visible) is replaced by `SecretMasker.Mask` (length only). The adapter configuration (a JSON string), the pipeline configurations (JSON) and the pipeline node definition (YAML/JSON, `key: value` / `key=value` lines) are walked by `SecretMasker.MaskToken` / `MaskText`; the output stays valid JSON. `--show-secrets` (`-ss`) prints the clear text; use it only interactively. Judged by member name only: the DTOs carry no CK secret flag. Other commands: `GetAdapters`, `GetDeploymentSites`, `GetWorkloadsByChart` and `GetAdapterPoolQueue` print status summaries without configuration and are unchanged. Tests: `GetAdapterSecretMaskingTests`.
+
 ## Configuration
 
 The CLI uses:
@@ -673,7 +675,7 @@ All communication commands accept plain runtime object IDs (e.g. `69cfa838092b71
 | Command | Parameters | Description |
 |---------|-----------|-------------|
 | `GetAdapters` | `--json` (optional) | List all adapters for the tenant |
-| `GetAdapter` | `--identifier <rtId>`, `--json` (optional) | Get adapter configuration |
+| `GetAdapter` | `--identifier <rtId>`, `--json`, `--show-secrets` (optional) | Get adapter configuration; credentials masked unless `--show-secrets` (AB#6286) |
 | `GetAdapterNodes` | | List available pipeline nodes from connected adapters |
 | `GetPipelineSchema` | `--adapterId <rtId>`, `--outputFile` (optional) | Get pipeline JSON schema for an adapter |
 | `RotateAdapterServiceAccountSecret` | `--identifier <rtId>`, `--yes` (optional) | Rotate the secret of the adapter's pipeline service account (destructive — prompts) |
@@ -752,7 +754,7 @@ secret or token and the command prints only report fields (pinned by tests).
 octo-cli -c GetAdapters
 
 # Get adapter config as compact JSON
-octo-cli -c GetAdapter --identifier 69cfa838092b710403248acd --json
+octo-cli -c GetAdapter --identifier 69cfa838092b710403248acd --json   # credentials masked; add --show-secrets for clear text
 
 # Deploy a pipeline from YAML file
 octo-cli -c DeployPipeline --adapterId 69cfa838092b710403248acd --pipelineId cc0000000000000000000003 --file pipeline.yaml
