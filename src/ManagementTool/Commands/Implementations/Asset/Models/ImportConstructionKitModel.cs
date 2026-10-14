@@ -56,9 +56,12 @@ internal class ImportConstructionKitModel : JobWithWaitOctoCommand
 
         if (!File.Exists(ckModelFilePath))
         {
-            Logger.LogError("File \'{CkModelFilePath}\' does not exist", ckModelFilePath);
-            return;
+            // AB#2615: a missing input file is an error (non-zero exit), not a silent return.
+            throw ToolException.FilePathDoesNotExist(ckModelFilePath);
         }
+
+        // AB#2615: reject an empty CK before anything is sent to the server.
+        CkModelFileInspector.EnsureNotEmpty(ckModelFilePath);
 
         Logger.LogInformation("Importing construction kit model \'{CkModelFilePath}\'", ckModelFilePath);
 

@@ -43,6 +43,13 @@ public class ToolException : Exception
             $"The file path '{filePath}' does not exist. Please check the path and try again.");
     }
 
+    public static Exception EmptyCkModel(string filePath)
+    {
+        return new ToolException(
+            $"The construction kit file '{filePath}' is empty: it declares no types, records, enums, attributes, " +
+            "association roles or interfaces. Nothing was uploaded. Compile the model and import the compiled file.");
+    }
+
     public static Exception InvalidFilterTerm(string filterArg)
     {
         return new ToolException(
