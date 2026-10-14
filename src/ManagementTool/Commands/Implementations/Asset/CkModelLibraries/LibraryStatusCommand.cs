@@ -31,11 +31,12 @@ internal class LibraryStatusCommand : ServiceClientOctoCommand<IAssetServicesCli
                 new CodeSample(arguments: [new CodeSampleArgument(_needsActionArg)],
                     description: "Only models needing attention",
                     expectedOutput: """
-                    NAME                      INSTALLED    CATALOG      STATE           ACTION
-                    ------------------------- ------------ ------------ --------------- --------------------
-                    System                    2.0.7        2.0.7        Available       Service-Managed
-                    Basic                     2.0.2        2.0.2        Available       -
-                    Industry.Energy           -            2.0.0        Not Installed   Install
+                    NAME                      INSTALLED    CATALOG      STATE           ACTION               REASON
+                    ------------------------- ------------ ------------ --------------- -------------------- ------
+                    System                    2.0.7        2.0.7        Available       Service-Managed      -
+                    Basic                     2.0.2        2.0.2        Available       -                    -
+                    Loxone                    5.2.0        5.3.0        ResolveFailed   Fix                  Unmet dependency: System.Communication-[4.5,5.0) (floor 4.5.0): installed System.Communication-4.4.0
+                    Industry.Energy           -            2.0.0        Not Installed   Install              -
                     """),
             ]
         );
@@ -55,8 +56,9 @@ internal class LibraryStatusCommand : ServiceClientOctoCommand<IAssetServicesCli
             items = items.Where(i => i.InstalledVersion != null).ToList();
 
         Logger.LogInformation("{Count} model(s) ({NeedsAction} need action):", items.Count, status.ModelsNeedingActionCount);
-        Logger.LogInformation("{N,-25} {I,-12} {C,-12} {S,-15} {A}", "NAME", "INSTALLED", "CATALOG", "STATE", "ACTION");
-        Logger.LogInformation("{S1,-25} {S2,-12} {S3,-12} {S4,-15} {S5}", new string('-', 25), new string('-', 12), new string('-', 12), new string('-', 15), new string('-', 20));
+        // AB#6674: REASON is last (it is free text and long): why a ResolveFailed model failed, "-" otherwise.
+        Logger.LogInformation("{N,-25} {I,-12} {C,-12} {S,-15} {A,-20} {R}", "NAME", "INSTALLED", "CATALOG", "STATE", "ACTION", "REASON");
+        Logger.LogInformation("{S1,-25} {S2,-12} {S3,-12} {S4,-15} {S5,-20} {S6}", new string('-', 25), new string('-', 12), new string('-', 12), new string('-', 15), new string('-', 20), new string('-', 6));
 
         foreach (var item in items)
         {
@@ -65,9 +67,10 @@ internal class LibraryStatusCommand : ServiceClientOctoCommand<IAssetServicesCli
                 : item.NeedsAction ? (item.HasUpdate ? "Update" : "Fix")
                 : item.InstalledVersion == null ? "Install"
                 : "-";
-            Logger.LogInformation("{N,-25} {I,-12} {C,-12} {S,-15} {A}",
+            Logger.LogInformation("{N,-25} {I,-12} {C,-12} {S,-15} {A,-20} {R}",
                 item.Name, item.InstalledVersion ?? "-", item.CatalogVersion ?? "-",
-                item.ModelState ?? "Not Installed", action);
+                item.ModelState ?? "Not Installed", action,
+                string.IsNullOrWhiteSpace(item.ResolveFailedReason) ? "-" : item.ResolveFailedReason);
         }
     }
 }
