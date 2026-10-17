@@ -18,7 +18,9 @@ internal class FixAllCommand : JobWithWaitOctoCommand
         IAssetServicesClient assetServicesClient, IBotServicesClient botServicesClient,
         IAuthenticationService authenticationService, IConfirmationService confirmationService)
         : base(logger, Constants.AssetRepositoryServicesGroup, "FixAll",
-            "Imports all CK models that need update or fix. Use -w to wait, -y to skip confirmation.",
+            "Imports all CK models that need update or fix. Updates that would break an installed model are skipped " +
+            "and reported (FixAll never forces them; use ImportFromCatalog --force deliberately). " +
+            "Use -w to wait, -y to skip confirmation.",
             options, botServicesClient, authenticationService)
     {
         _assetServicesClient = assetServicesClient;
@@ -57,9 +59,16 @@ internal class FixAllCommand : JobWithWaitOctoCommand
             .Where(i => i.NeedsAction && !i.IsServiceManaged && i.IsCompatible && i.CatalogName != null && i.FullModelId != null)
             .ToList();
 
+        // Tenant upgrade guard (AB#6870): a blocked row has HasUpdate but not NeedsAction. It is never imported by
+        // FixAll - report it with the reason and the proven next step.
+        var blockedModels = status.Items.Where(i => i.IsBlocked && !i.IsServiceManaged).ToList();
+        ReportSkipped(blockedModels.Select(m => (m.Name, m.CatalogVersion, (IReadOnlyList<CkUpgradeBlockerDto>)m.Blockers)));
+
         if (actionModels.Count == 0)
         {
-            Logger.LogInformation("All models are up to date. Nothing to do.");
+            Logger.LogInformation(blockedModels.Count == 0
+                ? "All models are up to date. Nothing to do."
+                : "Nothing to import: the remaining updates are blocked (see above).");
             return;
         }
 
@@ -71,7 +80,34 @@ internal class FixAllCommand : JobWithWaitOctoCommand
             .Select(m => new ImportFromCatalogRequestDto { CatalogName = m.CatalogName!, ModelId = m.FullModelId! })
             .ToList();
 
+        // The resolved import set (models plus the dependencies they pull in) is judged together by the service. When it
+        // is blocked, drop the requested models whose tree contains a blocking update and resolve the rest again - the
+        // unblocked models are still imported.
         var depResult = await _assetServicesClient.ResolveDependenciesBatchAsync(tenantId, requests);
+        while (depResult.IsBlocked)
+        {
+            var dropped = requests
+                .Select(r => (Request: r, Blockers: BlockersOfTree(r, depResult)))
+                .Where(x => x.Blockers.Count > 0)
+                .ToList();
+            if (dropped.Count == 0)
+            {
+                Logger.LogError("The import set would break installed models and no single model can be left out; nothing was imported:");
+                UpgradeGuardReport.LogBlockers(Logger, LogLevel.Error, depResult.Blockers);
+                throw new ToolException("The resolved import set would break installed models (CK_UPGRADE_BLOCKED); " +
+                                        "nothing was imported. FixAll never forces.");
+            }
+
+            ReportSkipped(dropped.Select(x => (x.Request.ModelId, (string?)null, (IReadOnlyList<CkUpgradeBlockerDto>)x.Blockers)));
+            requests = requests.Except(dropped.Select(x => x.Request)).ToList();
+            if (requests.Count == 0)
+            {
+                Logger.LogInformation("Nothing to import: all remaining updates are blocked (see above).");
+                return;
+            }
+
+            depResult = await _assetServicesClient.ResolveDependenciesBatchAsync(tenantId, requests);
+        }
 
         if (depResult.ModelsToImport.Count == 0)
         {
@@ -85,10 +121,61 @@ internal class FixAllCommand : JobWithWaitOctoCommand
             _confirmationService.Confirm($"Import {depResult.ModelsToImport.Count} model(s)");
 
         var catalogName = requests[0].CatalogName;
-        var importResult = await _assetServicesClient.ImportFromCatalogBatchAsync(tenantId,
-            new ImportFromCatalogBatchRequestDto { CatalogName = catalogName, ModelIds = depResult.ModelsToImport });
+        BatchImportResponseDto importResult;
+        try
+        {
+            // FixAll never sends the force flag (ForceBreakingUpdate stays false): an update that breaks an installed
+            // model is a deliberate decision of an operator (ImportFromCatalog --force), never a bulk side effect.
+            importResult = await _assetServicesClient.ImportFromCatalogBatchAsync(tenantId,
+                new ImportFromCatalogBatchRequestDto
+                {
+                    CatalogName = catalogName, ModelIds = depResult.ModelsToImport, ForceBreakingUpdate = false
+                });
+        }
+        catch (CkUpgradeBlockedException blocked)
+        {
+            Logger.LogError("The service refused the import; nothing was imported:");
+            UpgradeGuardReport.LogBlockers(Logger, LogLevel.Error, blocked.Blockers);
+            throw new ToolException("The import set would break installed models (CK_UPGRADE_BLOCKED); nothing was " +
+                                    "imported. FixAll never forces.", blocked);
+        }
 
         Logger.LogInformation("Import with job id \'{Id}\' has been started", importResult.JobId);
         await WaitForJob(importResult.JobId);
     }
+
+    private void ReportSkipped(IEnumerable<(string Name, string? Version, IReadOnlyList<CkUpgradeBlockerDto> Blockers)> skipped)
+    {
+        var list = skipped.ToList();
+        if (list.Count == 0)
+        {
+            return;
+        }
+
+        Logger.LogWarning("{Count} update(s) skipped because they would break installed models (FixAll never forces):", list.Count);
+        foreach (var (name, version, blockers) in list)
+        {
+            Logger.LogWarning("  {Name}{Version}", name, version == null ? string.Empty : $" -> {version}");
+            UpgradeGuardReport.LogBlockers(Logger, LogLevel.Warning, blockers, "    ");
+        }
+    }
+
+    /// <summary>
+    ///     The blockers of the combined import set that are caused by a model inside the dependency tree of
+    ///     <paramref name="request" /> (the request itself or a dependency it pulls in).
+    /// </summary>
+    private static List<CkUpgradeBlockerDto> BlockersOfTree(ImportFromCatalogRequestDto request,
+        BatchDependencyResolutionResponseDto resolution)
+    {
+        var tree = resolution.DependencyTrees.FirstOrDefault(t => t.RootModel?.ModelId == request.ModelId);
+        if (tree?.RootModel == null)
+        {
+            return [];
+        }
+
+        return resolution.Blockers.Where(b => TreeContains(tree.RootModel, b.Update)).ToList();
+    }
+
+    private static bool TreeContains(DependencyResolutionItemDto item, string modelId) =>
+        item.ModelId == modelId || item.Dependencies.Any(d => TreeContains(d, modelId));
 }

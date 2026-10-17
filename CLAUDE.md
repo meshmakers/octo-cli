@@ -24,6 +24,23 @@ dotnet run --project src/ManagementTool/ManagementTool.csproj -- <command> [opti
 dotnet test Octo.Cli.sln
 ```
 
+## CK model import and the tenant upgrade guard (AB#6870)
+
+`ImportFromCatalog` and `FixAll` (`Commands/Implementations/Asset/CkModelLibraries/`) import through `ResolveDependenciesBatchAsync` +
+`ImportFromCatalogBatchAsync`. The asset repository judges the whole import set with the tenant upgrade guard and refuses a set that
+would break an installed model with `409 CK_UPGRADE_BLOCKED` (SDK: `CkUpgradeBlockedException`, no partial import).
+
+- **`ImportFromCatalog`**: when `ResolveDependenciesBatch` reports `IsBlocked`, the command prints every blocker (dependent, kind, pin,
+  resolve hint via `UpgradeGuardReport`) and stops **before** the import with a `ToolException` that names `--force`. `-f/--force` sends
+  `ForceBreakingUpdate = true` (the service logs the blockers and the caller at WARN) and warns first; the help text names the
+  consequence (the broken models become `ResolveFailed`). A 409 from a service that did not preview the blockers is reported the same way.
+- **`FixAll` never forces** (`ForceBreakingUpdate` is always `false`; there is no force option). Blocked `LibraryStatus` rows (they have
+  `NeedsAction = false`) are skipped and printed with reason and resolve hint. If the resolved import set is blocked through a dependency,
+  the requested models whose tree contains a blocking update are dropped and reported, the set is resolved again and the rest is imported;
+  when no model can be left out, or the service refuses anyway, it fails with `ToolException` ("never forces") and imports nothing.
+  A blocker can disappear after another update was imported, so `FixAll` may have to be run twice (update `Registration` first).
+- Tests: `tests/ManagementTool.Tests/CkUpgradeGuardImportCommandTests.cs`.
+
 ## Build Configurations
 
 - **Debug/Release**: Standard configurations
