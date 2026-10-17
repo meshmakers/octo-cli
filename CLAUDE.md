@@ -825,6 +825,27 @@ octo-cli -c GetPipelineDebug --identifier cc0000000000000000000003
 octo-cli -c GetPipelineDebug --identifier cc0000000000000000000003 --json
 ```
 
+## CK library status: ACTION terms and the upgrade guard (AB#6869)
+
+`LibraryStatus` derives the ACTION column per row, first match wins: `Service-Managed`, `Incompatible`
+(incompatible with the installed System models), **`Blocked`**, `Update` / `Fix` (needs action), `Install`, `-`.
+
+- **`Blocked`** means the offered catalog version would break an installed dependent (tenant upgrade guard,
+  AB#6867/AB#6868). The server row has `IsBlocked`, `HasUpdate = true`, `NeedsAction = false`; therefore
+  **`--needs-action` does not list blocked rows** (it follows the server flag). REASON shows the first blocker
+  (`<dependent>: <message>`), `(+N more)` and the resolve hint of the first blocker when the server proved one.
+- The summary line appends `, N blocked` only when N > 0; below the table a **`Would break:`** section lists every
+  blocker of every shown blocked row (dependent, pin/element message, `resolve:` hint).
+- `CheckUpgrade` appends a `Would break:` section (one line per blocker) after the unchanged fields only when
+  `IsBlocked`. **The exit code is unchanged** (0): both commands stay read-only reports; an unblocked update and an
+  older server without the members (`IsBlocked`/`Blockers` default to `false`/empty) print exactly as before.
+  The story text of AB#6869 asked for a non-zero exit of `CheckUpgrade`; the CPO lane brief of
+  2026-10-17 says exit code unchanged, so a non-zero exit stays an open point (possible later pre-flight switch).
+- Rendering lives in `UpgradeBlockerFormatter` (null-safe). The commands print through the logger; there is no
+  JSON output mode for these two commands. The SDK DTOs carry the new members, so MCP/GraphQL consumers see them.
+- Tests: `LibraryStatusCommandTests`, `CheckUpgradeCommandTests`. The command reference page is generated from the
+  `GetDocumentation()` samples.
+
 ## Confirmation Dialogs for Destructive Commands
 
 All destructive commands (Delete, Clean, Reset, Remove, and credential-invalidating verbs such as
