@@ -38,6 +38,22 @@ internal class LibraryStatusCommand : ServiceClientOctoCommand<IAssetServicesCli
                     Loxone                    5.2.0        5.3.0        ResolveFailed   Fix                  Unmet dependency: System.Communication-[4.5,5.0) (floor 4.5.0): installed System.Communication-4.4.0
                     Industry.Energy           -            2.0.0        Not Installed   Install              -
                     """),
+                new CodeSample(arguments: [],
+                    description: "Blocked update (AB#6869): the offered catalog version would break an installed model. " +
+                                 "A blocked row keeps its update but is not 'needs action', so --needs-action does not list it",
+                    expectedOutput: """
+                    2 model(s) (0 need action, 1 blocked):
+                    NAME                      INSTALLED    CATALOG      STATE           ACTION               REASON
+                    ------------------------- ------------ ------------ --------------- -------------------- ------
+                    Basic                     2.4.0        2.5.0        Available       Blocked              EnergyCommunity.Registration-2.8.0: exact pin Basic-2.4.0: Basic-2.5.0 replaces it (+1 more); update EnergyCommunity.Registration to 2.10.0 first
+                    System                    2.0.7        2.0.7        Available       Service-Managed      -
+
+                    Would break:
+                    Basic 2.4.0 -> 2.5.0
+                      - EnergyCommunity.Registration-2.8.0: exact pin Basic-2.4.0: Basic-2.5.0 replaces it
+                          resolve: update EnergyCommunity.Registration to 2.10.0 first
+                      - EnergyCommunity.Billing-1.3.0: exact pin Basic-2.4.0: Basic-2.5.0 replaces it
+                    """),
             ]
         );
 
@@ -55,7 +71,14 @@ internal class LibraryStatusCommand : ServiceClientOctoCommand<IAssetServicesCli
         if (CommandArgumentValue.IsArgumentUsed(_installedOnlyArg))
             items = items.Where(i => i.InstalledVersion != null).ToList();
 
-        Logger.LogInformation("{Count} model(s) ({NeedsAction} need action):", items.Count, status.ModelsNeedingActionCount);
+        // AB#6869: a blocked row (offered update would break an installed model) keeps HasUpdate=true but is not
+        // NeedsAction, so --needs-action does not list it. The summary counts the blocked rows of the answer.
+        var blockedCount = status.Items.Count(i => i.IsBlocked);
+        if (blockedCount > 0)
+            Logger.LogInformation("{Count} model(s) ({NeedsAction} need action, {Blocked} blocked):", items.Count,
+                status.ModelsNeedingActionCount, blockedCount);
+        else
+            Logger.LogInformation("{Count} model(s) ({NeedsAction} need action):", items.Count, status.ModelsNeedingActionCount);
         // AB#6674: REASON is last (it is free text and long): why a ResolveFailed model failed, "-" otherwise.
         Logger.LogInformation("{N,-25} {I,-12} {C,-12} {S,-15} {A,-20} {R}", "NAME", "INSTALLED", "CATALOG", "STATE", "ACTION", "REASON");
         Logger.LogInformation("{S1,-25} {S2,-12} {S3,-12} {S4,-15} {S5,-20} {S6}", new string('-', 25), new string('-', 12), new string('-', 12), new string('-', 15), new string('-', 20), new string('-', 6));
@@ -64,13 +87,30 @@ internal class LibraryStatusCommand : ServiceClientOctoCommand<IAssetServicesCli
         {
             var action = item.IsServiceManaged ? "Service-Managed"
                 : !item.IsCompatible ? "Incompatible"
+                : item.IsBlocked ? "Blocked"
                 : item.NeedsAction ? (item.HasUpdate ? "Update" : "Fix")
                 : item.InstalledVersion == null ? "Install"
                 : "-";
+            var reason = action == "Blocked" ? UpgradeBlockerFormatter.Reason(item.Blockers)
+                : string.IsNullOrWhiteSpace(item.ResolveFailedReason) ? "-" : item.ResolveFailedReason;
             Logger.LogInformation("{N,-25} {I,-12} {C,-12} {S,-15} {A,-20} {R}",
                 item.Name, item.InstalledVersion ?? "-", item.CatalogVersion ?? "-",
                 item.ModelState ?? "Not Installed", action,
-                string.IsNullOrWhiteSpace(item.ResolveFailedReason) ? "-" : item.ResolveFailedReason);
+                reason);
+        }
+
+        // AB#6869: every blocker of every shown blocked row, so the operator sees the update order without Studio.
+        var blocked = items.Where(i => i.IsBlocked && !i.IsServiceManaged && i.IsCompatible).ToList();
+        if (blocked.Count == 0)
+            return;
+
+        Logger.LogInformation("");
+        Logger.LogInformation("Would break:");
+        foreach (var item in blocked)
+        {
+            Logger.LogInformation("{Name} {Installed} -> {Catalog}", item.Name, item.InstalledVersion ?? "-", item.CatalogVersion ?? "-");
+            foreach (var line in UpgradeBlockerFormatter.DetailLines(item.Blockers))
+                Logger.LogInformation("{Line}", line);
         }
     }
 }
