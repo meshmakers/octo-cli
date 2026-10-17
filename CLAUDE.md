@@ -141,6 +141,38 @@ The CLI uses named contexts (similar to `kubectl config use-context`) stored in 
 
 **Migration**: On first run, if `contexts.json` does not exist but `settings.json` does, the CLI automatically imports the legacy settings as a `"default"` context. The original `settings.json` is kept intact.
 
+### Tokens per tenant — guard and exchange (AB#6836)
+
+A command addressing tenant X never sends a token whose `tenant_id` claim is another tenant. The tenant a
+command addresses is the tenant of the effective context (`OctoToolOptions.TenantId`). Authority of a
+root-tenant operator in a child tenant comes **only from explicit provisioning** there
+(`octo-cli -c ProvisionCurrentUser -ttid <child>`, per child tenant, also for new tenants); identity gives
+ancestor users no implicit admin role, and octo-cli has no allow-list or exemption.
+
+- `AuthenticationService.ApplyAsync` is the only place that hands a token to the service clients. Token of the
+  context's tenant: used as before (no exchange, no extra request). Token of another tenant (a context for a
+  child tenant that was signed in on the root tenant): exchanged (RFC 8693, `AuthenticatorClient`, client
+  `octo-cli`) for a token of the context's tenant, and **only the exchanged token** reaches the clients. Blank or
+  opaque tokens and contexts without a tenant behave as before.
+- The SDK does the same at its own choke point (`AssetServicesClient.CreateTenantScopeClientAsync`, see the
+  octo-sdk CLAUDE.md), so a call that names another tenant explicitly cannot carry the wrong token either.
+- **Cache:** exchanged tokens are kept per target tenant in `Authentication.TenantTokens` of the context entry
+  (`ContextTenantTokenStore`), next to the token they were exchanged from and protected exactly like it (same
+  file, nothing new is written elsewhere). Renewed silently 60 s before expiry or when the context's token
+  changed; there is no refresh token and no re-login. Expired entries are dropped on write. An older octo-cli
+  ignores the field.
+- **Denial, no fallback:** the command stops (exit code -4) with a message that names the tenant and the cause:
+  not provisioned (`ProvisionCurrentUser -ttid <tenant>`), access to the tenant denied (not a descendant, not
+  provisioned), client not allowed to exchange (identity lacks the grant: use a context for the tenant), sign-in
+  rejected (`octo-cli -c LogIn`), tenant unknown, identity unreachable. A plain HTTP 403 of the service becomes the
+  same hint (provisioning), from the SDK for tenant scope calls and from `Runner` otherwise. The context's own
+  token is never sent as a fallback. No message or log line contains token content.
+- **Per-tenant contexts stay** for CI and machines (`LogInClientCredentials`, `deploy-workload.yml`): their token
+  is issued for the context's tenant, so nothing is exchanged.
+- Tests: `TenantTokenAuthenticationTests` (service, cache, denial causes), `TenantScopedCommandPathTests`
+  (real commands LibraryStatus, ListBlueprintInstallations, ClearCache against a loopback listener: the request
+  carries only the child token), shared fakes in `TenantTokenTestSupport`.
+
 ### Per-invocation context override (`--context`)
 
 `UseContext` switches the active context persistently, which makes it useless for running two
