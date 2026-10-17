@@ -62,6 +62,24 @@ internal class Runner
             _logger.LogError("{Message}, Please use the 'config' command", ex.Message);
             return -2;
         }
+        catch (TenantTokenMismatchException ex)
+        {
+            _logger.LogError("Authentication failed: {Message}", ex.Message);
+            return -4;
+        }
+        catch (TenantTokenExchangeDeniedException ex)
+        {
+            _logger.LogError("Authentication failed: {Message}", ex.Message);
+            return -4;
+        }
+        catch (ServiceClientResultException ex) when (ex.HttpStatusCode == System.Net.HttpStatusCode.Forbidden)
+        {
+            _logger.LogError("{Message}", ex.Message);
+            _logger.LogError(
+                "Access denied (HTTP 403). If the context addresses a tenant other than the one you signed in on, your " +
+                "user must be provisioned there: octo-cli -c ProvisionCurrentUser -ttid <tenant>");
+            return -3;
+        }
         catch (ServiceClientResultException ex)
         {
             _logger.LogError("{Message}", ex.Message);

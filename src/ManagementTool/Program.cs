@@ -243,6 +243,10 @@ internal static class Program
         services.AddSingleton<IIdentityServicesSetupClient, IdentityServicesSetupClient>();
         services.AddSingleton<IBotServicesClient, BotServicesClient>();
         services.AddSingleton<IAuthenticatorClient, AuthenticatorClient>();
+        // AB#6836: the same authenticator exchanges the context's token for the tenant it addresses.
+        services.AddSingleton<ITokenExchangeClient>(sp => (AuthenticatorClient)sp.GetRequiredService<IAuthenticatorClient>());
+        services.AddSingleton<ITenantTokenStore, ContextTenantTokenStore>();
+        services.AddSingleton<ITenantTokenProvider, TenantTokenProvider>();
         services.AddSingleton<IAuthenticationService, AuthenticationService>();
         services.AddSingleton<ICommunicationServicesClient, CommunicationServicesClient>();
         services.AddSingleton<IStreamDataServicesClient, StreamDataServicesClient>();

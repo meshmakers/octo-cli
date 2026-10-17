@@ -12,10 +12,13 @@ public class AuthenticationService : IAuthenticationService
     private readonly IOptions<OctoToolAuthenticationOptions> _authenticationOptions;
     private readonly IAuthenticatorClient _authenticatorClient;
     private readonly IContextManager _contextManager;
+    private readonly ITenantTokenProvider? _tenantTokenProvider;
 
     public AuthenticationService(IOptions<OctoToolAuthenticationOptions> authenticationOptions,
-        IAuthenticatorClient authenticatorClient, IContextManager contextManager)
+        IAuthenticatorClient authenticatorClient, IContextManager contextManager,
+        ITenantTokenProvider? tenantTokenProvider = null)
     {
+        _tenantTokenProvider = tenantTokenProvider;
         _authenticationOptions = authenticationOptions;
         _authenticatorClient = authenticatorClient;
         _contextManager = contextManager;
@@ -41,7 +44,7 @@ public class AuthenticationService : IAuthenticationService
             // has not yet expired is surfaced by the target service's own 401, as before.
             if (!IsTokenExpiringSoon())
             {
-                serviceClientAccessToken.AccessToken = _authenticationOptions.Value.AccessToken;
+                await ApplyAsync(serviceClientAccessToken, _authenticationOptions.Value.AccessToken);
                 return;
             }
 
@@ -49,7 +52,7 @@ public class AuthenticationService : IAuthenticationService
             {
                 var refreshed = await _authenticatorClient.RefreshTokenAsync(_authenticationOptions.Value.RefreshToken);
                 SaveAuthenticationData(refreshed);
-                serviceClientAccessToken.AccessToken = refreshed.AccessToken;
+                await ApplyAsync(serviceClientAccessToken, refreshed.AccessToken);
                 Logger.Info("Access token has been refreshed via the refresh token.");
                 return;
             }
@@ -68,7 +71,7 @@ public class AuthenticationService : IAuthenticationService
                         clientId: fallbackClientId,
                         clientSecret: fallbackClientSecret);
                     SaveAuthenticationData(reacquired);
-                    serviceClientAccessToken.AccessToken = reacquired.AccessToken;
+                    await ApplyAsync(serviceClientAccessToken, reacquired.AccessToken);
                     Logger.Info("Refresh token was rejected; re-acquired via client_credentials env vars.");
                     return;
                 }
@@ -90,13 +93,39 @@ public class AuthenticationService : IAuthenticationService
                 clientId: clientId,
                 clientSecret: clientSecret);
             SaveAuthenticationData(newAuthData);
-            serviceClientAccessToken.AccessToken = newAuthData.AccessToken;
+            await ApplyAsync(serviceClientAccessToken, newAuthData.AccessToken);
             Logger.Info("Access token re-acquired via client_credentials env vars.");
             return;
         }
 
         // Use the existing access token (even without refresh token)
-        serviceClientAccessToken.AccessToken = _authenticationOptions.Value.AccessToken;
+        await ApplyAsync(serviceClientAccessToken, _authenticationOptions.Value.AccessToken);
+    }
+
+    /// <summary>
+    ///     Hands the token to the service clients, but only a token issued for the tenant the effective
+    ///     context addresses (AB#6836). A token of another tenant (a context for a child tenant that was
+    ///     signed in on the root tenant) is exchanged for a token of the context's tenant, cached per tenant
+    ///     and silently renewed from the context's own token. The other token is never handed on as a
+    ///     fallback: without an exchange the command stops with the reason.
+    /// </summary>
+    private async Task ApplyAsync(IServiceClientAccessToken serviceClientAccessToken, string? accessToken)
+    {
+        var tenantId = _contextManager.GetEffectiveContext()?.OctoToolOptions.TenantId;
+        if (!string.IsNullOrWhiteSpace(tenantId) && !string.IsNullOrWhiteSpace(accessToken) &&
+            AccessTokenInspector.IsIssuedForOtherTenant(accessToken, tenantId))
+        {
+            if (_tenantTokenProvider == null)
+            {
+                throw new TenantTokenMismatchException(tenantId);
+            }
+
+            Logger.Info("The token of context '{0}' was issued for tenant '{1}'; exchanging it for tenant '{2}'.",
+                _contextManager.GetEffectiveContextName(), AccessTokenInspector.TryGetTenantId(accessToken), tenantId);
+            accessToken = await _tenantTokenProvider.GetAccessTokenAsync(tenantId, accessToken);
+        }
+
+        serviceClientAccessToken.AccessToken = accessToken;
     }
 
     // Turns a failed refresh-token exchange into an actionable error: name the context to re-login
