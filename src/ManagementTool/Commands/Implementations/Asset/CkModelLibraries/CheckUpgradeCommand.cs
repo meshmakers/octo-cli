@@ -15,7 +15,9 @@ internal class CheckUpgradeCommand : ServiceClientOctoCommand<IAssetServicesClie
     public CheckUpgradeCommand(ILogger<CheckUpgradeCommand> logger, IOptions<OctoToolOptions> options,
         IAssetServicesClient assetServicesClient, IAuthenticationService authenticationService)
         : base(logger, Constants.AssetRepositoryServicesGroup, "CheckUpgrade",
-            "Pre-flight check for CK model upgrade/migration.",
+            "Pre-flight check for CK model upgrade/migration. 'Breaking Changes' is the migration view of the model itself; " +
+            "'Would break' (isBlocked/blockers) is the tenant upgrade guard: which installed models the import would break, " +
+            "also for System.",
             options, assetServicesClient, authenticationService)
     {
         _catalogNameArg = CommandArgumentValue.AddArgument("cn", "catalogName", ["Catalog name"], true, 1);
