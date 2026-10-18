@@ -1,0 +1,24 @@
+{
+  "id": "6ad50698836cb56f143f67fb",
+  "createdAt": "2026-10-18T17:49:12.1Z",
+  "stateChangedAt": "2026-10-18T17:49:20.9Z",
+  "status": "Succeeded",
+  "reason": null,
+  "errorMessage": null,
+  "outcome": "SucceededWithWarnings",
+  "failedArchives": [
+    {
+      "archiveRtId": "ecaa00000000000000000a03",
+      "reason": "0 rows were loaded, 9 were expected."
+    }
+  ],
+  "notCheckedRollups": [
+    {
+      "rollupRtId": "ecaa00000000000000000a03",
+      "cause": "ArchiveFailed",
+      "reason": "the archive failed to restore, so its rows were not checked",
+      "isBlocking": true
+    }
+  ],
+  "hasWarnings": true
+}

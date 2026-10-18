@@ -14,19 +14,20 @@ namespace ManagementTool.Tests;
 /// <summary>
 ///     Contract test for <c>Restore -w</c> (AB#6969): the job result is read by the real <see cref="BotServicesClient" />
 ///     from the exact wire form the bot sends (<c>GET system/v1/jobs?id=…</c>, camelCase) and fed into the command, so a
-///     rename on either side of the contract fails here. The payloads are the ones captured in the bot tests
+///     rename on either side of the contract fails here. The payloads (Fixtures/*.json) are the ones captured in the bot tests
 ///     (<c>RestoreOutcomeTests</c>, <c>CapturedFailedArchiveResult</c> / <c>CapturedCleanResult</c>).
 /// </summary>
 public sealed class RestoreOutcomeContractTests : IDisposable
 {
-    private const string FailedArchiveResult =
-        """{"id":"6ad50698836cb56f143f67fb","status":"Succeeded","outcome":"SucceededWithWarnings","failedArchives":[{"archiveRtId":"ecaa00000000000000000a03","reason":"0 rows were loaded, 9 were expected."}],"notCheckedRollups":[{"rollupRtId":"ecaa00000000000000000a03","cause":"ArchiveFailed","reason":"the archive failed to restore, so its rows were not checked","isBlocking":true}]}""";
+    // Sanitised results as the bot writes them (ASP.NET web defaults: camelCase, nulls included, derived hasWarnings).
+    private static string FailedArchiveResult => Fixture("restore-job-failed-archive.json");
 
-    private const string CleanResult =
-        """{"id":"x","status":"Succeeded","outcome":"Succeeded","failedArchives":[],"notCheckedRollups":[]}""";
+    private static string CleanResult => Fixture("restore-job-clean.json");
 
-    private const string InformationalResult =
-        """{"id":"x","status":"Succeeded","outcome":"Succeeded","failedArchives":[],"notCheckedRollups":[{"rollupRtId":"ecaa00000000000000000a02","cause":"NeverActivated","reason":"never activated","isBlocking":false}]}""";
+    private static string InformationalResult => Fixture("restore-job-informational.json");
+
+    private static string Fixture(string name) =>
+        File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "Fixtures", name));
 
     private readonly string _file = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName() + ".tar.gz");
 
@@ -74,7 +75,7 @@ public sealed class RestoreOutcomeContractTests : IDisposable
 
         Assert.Contains(logger.Entries, e => e.Message.EndsWith(" restored", StringComparison.Ordinal));
         Assert.Contains(logger.Entries,
-            e => e.Message.Contains("(info)") && e.Message.Contains("ecaa00000000000000000a02"));
+            e => e.Message.Contains("(info)") && e.Message.Contains("ecab00000000000000000a02"));
     }
 
     private async Task<(RestoreTenant Command, RecordingLogger<RestoreTenant> Logger)> NewRestoreAsync(string jobJson)

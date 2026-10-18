@@ -34,4 +34,8 @@
     <ProjectReference Include="..\..\src\ManagementTool\ManagementTool.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <None Update="Fixtures\*.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
 </Project>

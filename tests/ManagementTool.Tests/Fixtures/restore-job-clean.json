@@ -1,0 +1,12 @@
+{
+  "id": "6ad50896ff1b6e21a53a8147",
+  "createdAt": "2026-10-18T17:49:12.1Z",
+  "stateChangedAt": "2026-10-18T17:49:20.9Z",
+  "status": "Succeeded",
+  "reason": null,
+  "errorMessage": null,
+  "outcome": "Succeeded",
+  "failedArchives": [],
+  "notCheckedRollups": [],
+  "hasWarnings": false
+}
