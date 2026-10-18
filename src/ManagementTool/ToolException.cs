@@ -132,6 +132,12 @@ public class ToolException : Exception
             $"The blueprint update would blank {count} tenant value(s) and --failOnBlanking is set.");
     }
 
+    public static Exception UpdateBlocked(int dependents)
+    {
+        return new ToolException(
+            $"The CK models of the blueprint update would break {dependents} installed model(s) (CK_UPGRADE_BLOCKED) and --failOnBlocked is set.");
+    }
+
     public static Exception ImpersonationSwitchNotAllowed(Exception inner)
     {
         return new ToolException(

@@ -533,6 +533,10 @@ octo-cli -c PreviewBlueprintUpdate -tv MyBlueprint-2.0.0 -m Safe    # preview in
 octo-cli -c UpdateBlueprint -tv MyBlueprint-2.0.0                   # apply update with Merge mode
 octo-cli -c UpdateBlueprint -tv MyBlueprint-2.0.0 -m Full           # apply Full mode
 octo-cli -c UpdateBlueprint -tv MyBlueprint-2.0.0 -dr               # dry-run (no persistent changes)
+# Tenant upgrade guard (AB#6871): the blueprint's CK models are judged against the installed models
+octo-cli -c PreviewBlueprintUpdate -tv MyBlueprint-2.0.0 -fob       # --failOnBlocked: non-zero exit when the CK models would break an installed model (CI gate)
+octo-cli -c UpdateBlueprint -tv MyBlueprint-2.0.0 -f                # --force (= --forceBreakingUpdate): proceed although installed models break
+octo-cli -c InstallBlueprint -b MyBlueprint-2.0.0 -fbu              # --forceBreakingUpdate (InstallBlueprint -f already means re-apply)
 
 # Blueprints — blanking protection (AB#6316, server AB#6315). A seed with an empty/omitted attribute would
 # clear a tenant value; the service keeps it unless confirmed. Summaries only, never values.
@@ -862,6 +866,23 @@ octo-cli -c GetPipelineDebug --identifier cc0000000000000000000003 --json
   JSON output mode for these two commands. The SDK DTOs carry the new members, so MCP/GraphQL consumers see them.
 - Tests: `LibraryStatusCommandTests`, `CheckUpgradeCommandTests`. The command reference page is generated from the
   `GetDocumentation()` samples.
+
+### Tenant upgrade guard for blueprints (CK v2 F2.5, AB#6871)
+
+`InstallBlueprint`, `UpdateBlueprint` and `PreviewBlueprintUpdate` carry the guard of `ImportFromCatalog` (AB#6870) to blueprints:
+the CK models a blueprint installs or raises are judged against the installed models by the asset repository.
+
+- `PreviewBlueprintUpdate` prints the unchanged JSON (now with `isBlocked`, `ckUpdateSet`, `blockers`) and, when blocked, a warning
+  with every blocker (dependent, pin/element, update, resolve hint - the same lines as `ImportFromCatalog`, via
+  `UpgradeGuardReport`). `--failOnBlocked` (`-fob`) ends with a `ToolException` for CI gates; without it the exit code is unchanged.
+- `UpdateBlueprint --dry-run` lists the blockers as a warning and states that nothing was changed. A real update that the service
+  refuses (`CkUpgradeBlockedException`, HTTP 409 `CK_UPGRADE_BLOCKED`) logs the blockers as errors and ends with a `ToolException`
+  that names the override. `--force` (`-f`, alias `--forceBreakingUpdate` / `-fbu`) sends `forceBreakingUpdate`; the forced blockers
+  of the result are printed as a warning (they become `ResolveFailed`). The caller needs the data model management role (403 otherwise).
+- `InstallBlueprint`: `--forceBreakingUpdate` (`-fbu`). **`--force` keeps its meaning (re-apply seed data) and never overrides the
+  guard** - that is why the override has a different name here than on `ImportFromCatalog` / `UpdateBlueprint`.
+- Against a service without the guard the new DTO members are absent (`IsBlocked` false, `Blockers` empty) and nothing extra is printed.
+- Tests: `BlueprintUpgradeGuardCommandTests`. The command reference pages are generated from the command classes.
 
 ## Confirmation Dialogs for Destructive Commands
 

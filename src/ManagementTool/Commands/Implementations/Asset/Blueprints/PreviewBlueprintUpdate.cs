@@ -15,6 +15,7 @@ internal class PreviewBlueprintUpdate : ServiceClientOctoCommand<IAssetServicesC
     private readonly IArgument _targetVersionArg;
     private readonly IArgument _updateModeArg;
     private readonly IArgument _failOnBlankingArg;
+    private readonly IArgument _failOnBlockedArg;
 
     public PreviewBlueprintUpdate(
         ILogger<PreviewBlueprintUpdate> logger,
@@ -37,6 +38,10 @@ internal class PreviewBlueprintUpdate : ServiceClientOctoCommand<IAssetServicesC
         _failOnBlankingArg = CommandArgumentValue.AddArgument("fb", "failOnBlanking",
             ["Exit with a non-zero code (-5) when the update would blank at least one tenant value (for CI gates)"],
             false, 0);
+
+        _failOnBlockedArg = CommandArgumentValue.AddArgument("fob", "failOnBlocked",
+            ["Exit with a non-zero code when the CK models of the update would break an installed model (tenant upgrade guard, for CI gates)"],
+            false, 0);
     }
 
     public override CommandDocumentation? GetDocumentation() =>
@@ -53,6 +58,13 @@ internal class PreviewBlueprintUpdate : ServiceClientOctoCommand<IAssetServicesC
                         new CodeSampleArgument(_failOnBlankingArg)
                     ],
                     description: "CI gate: fail the job when the update would blank a tenant value"),
+                new CodeSample(
+                    arguments:
+                    [
+                        new CodeSampleArgument(_targetVersionArg, "Eda.Adapter-1.2.0"),
+                        new CodeSampleArgument(_failOnBlockedArg)
+                    ],
+                    description: "CI gate: fail the job when the update's CK models would break an installed model"),
             ],
             Notes:
             [
@@ -63,6 +75,7 @@ internal class PreviewBlueprintUpdate : ServiceClientOctoCommand<IAssetServicesC
                 "Tenant-owned seed entities (rtBlueprintLocked: false) are never rewritten: the output lists those left untouched ('tenant-owned, skipped') and those the tenant deleted that stay deleted, with key, type and rtId ('-' when deleted) and no values. They are not blanking and do not trigger --failOnBlanking.",
                 "The JSON result is written to standard output; the blanking and tenant-owned tables and the warnings are log output.",
                 "Services older than the blanking protection (AB#6315) report no blanking list.",
+                "Tenant upgrade guard: isBlocked, ckUpdateSet and blockers in the JSON list the installed models the CK models of the update would break (dependent, update, kind, subject, code, resolve hint); the same lines are logged. Nothing is written. UpdateBlueprint refuses such an update (CK_UPGRADE_BLOCKED) unless it is forced with --force. Services older than the guard report no blockers.",
             ]);
 
     public override async Task Execute()
@@ -97,9 +110,26 @@ internal class PreviewBlueprintUpdate : ServiceClientOctoCommand<IAssetServicesC
         BlueprintBlanking.ReportTenantOwned(
             Logger, preview: true, preview.TenantOwnedSkipped, preview.TenantOwnedStaysDeleted);
 
+        // --failOnBlocked ends the command only after the blanking report below, so a CI log that uses it together
+        // with --failOnBlanking still shows every finding.
+        Exception? blockedFailure = null;
+        if (preview.IsBlocked)
+        {
+            BlueprintUpgradeGuardReport.LogWouldBeRefused(Logger, "--force", preview.CkUpdateSet, preview.Blockers);
+            if (CommandArgumentValue.IsArgumentUsed(_failOnBlockedArg))
+            {
+                blockedFailure = ToolException.UpdateBlocked(preview.Blockers.Select(b => b.Dependent).Distinct().Count());
+            }
+        }
+
         var blanked = preview.BlankedAttributes;
         if (blanked.Count == 0)
         {
+            if (blockedFailure != null)
+            {
+                throw blockedFailure;
+            }
+
             return;
         }
 
@@ -118,6 +148,11 @@ internal class PreviewBlueprintUpdate : ServiceClientOctoCommand<IAssetServicesC
         if (CommandArgumentValue.IsArgumentUsed(_failOnBlankingArg))
         {
             throw ToolException.BlankingDetected(blanked.Count);
+        }
+
+        if (blockedFailure != null)
+        {
+            throw blockedFailure;
         }
     }
 }

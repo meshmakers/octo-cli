@@ -1,6 +1,7 @@
 using Meshmakers.Common.CommandLineParser;
 using Meshmakers.Octo.Frontend.ManagementTool.Services;
 using Meshmakers.Octo.Sdk.ServiceClient.AssetRepositoryServices.Blueprints;
+using Meshmakers.Octo.Sdk.ServiceClient.AssetRepositoryServices.CkModelCatalog;
 using Meshmakers.Octo.Sdk.ServiceClient.AssetRepositoryServices.System;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -14,6 +15,8 @@ internal class UpdateBlueprint : ServiceClientOctoCommand<IAssetServicesClient>
     private readonly IArgument _dryRunArg;
     private readonly IArgument _allowBlankingArg;
     private readonly IArgument _confirmBlankingArg;
+    private readonly IArgument _forceArg;
+    private readonly IArgument _forceBreakingUpdateArg;
 
     public UpdateBlueprint(
         ILogger<UpdateBlueprint> logger,
@@ -44,6 +47,15 @@ internal class UpdateBlueprint : ServiceClientOctoCommand<IAssetServicesClient>
                 "Confirm blanking of one attribute: '<rtId>:<attribute>' as listed by PreviewBlueprintUpdate.",
                 "Repeat the option for several attributes; everything not confirmed is kept."
             ], false, 1, true);
+
+        _forceArg = CommandArgumentValue.AddArgument("f", "force",
+            [
+                "Update although the CK models of the target blueprint would break an installed CK model (tenant upgrade guard).",
+                "Without it the service refuses with CK_UPGRADE_BLOCKED before the first change. Needs the data model management role."
+            ], false, 0);
+
+        _forceBreakingUpdateArg = CommandArgumentValue.AddArgument("fbu", "forceBreakingUpdate",
+            ["Same as --force (the name InstallBlueprint uses, where --force means re-apply)"], false, 0);
     }
 
     public override CommandDocumentation? GetDocumentation() =>
@@ -68,6 +80,13 @@ internal class UpdateBlueprint : ServiceClientOctoCommand<IAssetServicesClient>
                         new CodeSampleArgument(_allowBlankingArg)
                     ],
                     description: "Blank every listed attribute (loud warning; prefer --confirm-blanking)"),
+                new CodeSample(
+                    arguments:
+                    [
+                        new CodeSampleArgument(_targetVersionArg, "Eda.Adapter-1.2.0"),
+                        new CodeSampleArgument(_forceArg)
+                    ],
+                    description: "Update although the blueprint's CK models would break installed models (they become ResolveFailed)"),
             ],
             Notes:
             [
@@ -79,6 +98,8 @@ internal class UpdateBlueprint : ServiceClientOctoCommand<IAssetServicesClient>
                 "Tenant-owned seed entities (rtBlueprintLocked: false) are never rewritten; the command lists those left untouched and those the tenant deleted that stay deleted (key, type, rtId, no values).",
                 "The blanking Reason is printed as the service reports it: SeedEmpty, SeedOmitted, or ResetToDefault.",
                 "Against services older than the blanking protection (AB#6315) the update behaves as before and no blanking list is reported.",
+                "Tenant upgrade guard: the CK models the target blueprint installs or raises are judged as one set against the installed models. A set that would break an installed model is refused with CK_UPGRADE_BLOCKED before the first change (blockers are listed, nothing is changed); --force overrides it and needs the data model management role.",
+                "With --dry-run the blockers are listed and nothing is written, whether or not --force is given.",
             ]);
 
     public override async Task Execute()
@@ -95,6 +116,8 @@ internal class UpdateBlueprint : ServiceClientOctoCommand<IAssetServicesClient>
             : "Merge";
         var dryRun = CommandArgumentValue.IsArgumentUsed(_dryRunArg);
         var allowBlanking = CommandArgumentValue.IsArgumentUsed(_allowBlankingArg);
+        var forceBreakingUpdate = CommandArgumentValue.IsArgumentUsed(_forceArg) ||
+                                  CommandArgumentValue.IsArgumentUsed(_forceBreakingUpdateArg);
         var confirmations = ParseConfirmations();
 
         if (allowBlanking)
@@ -119,15 +142,33 @@ internal class UpdateBlueprint : ServiceClientOctoCommand<IAssetServicesClient>
             UpdateMode = updateMode,
             DryRun = dryRun,
             AllowBlanking = allowBlanking,
-            ConfirmedBlankings = allowBlanking || confirmations.Count == 0 ? null : confirmations
+            ConfirmedBlankings = allowBlanking || confirmations.Count == 0 ? null : confirmations,
+            ForceBreakingUpdate = forceBreakingUpdate
         };
 
-        var result = await ServiceClient.ApplyBlueprintUpdateAsync(Options.Value.TenantId, request);
+        BlueprintUpdateResultDto result;
+        try
+        {
+            result = await ServiceClient.ApplyBlueprintUpdateAsync(Options.Value.TenantId, request);
+        }
+        catch (CkUpgradeBlockedException blocked)
+        {
+            throw BlueprintUpgradeGuardReport.Refused(Logger, "update", targetVersion, blocked, "--force");
+        }
 
         Logger.LogInformation(dryRun
                 ? "Blueprint update of tenant '{TenantId}' simulated, nothing was changed"
                 : "Blueprint update applied to tenant '{TenantId}'",
             Options.Value.TenantId);
+
+        if (dryRun && result.IsBlocked)
+        {
+            BlueprintUpgradeGuardReport.LogWouldBeRefused(Logger, "--force", result.CkUpdateSet, result.Blockers);
+        }
+        else if (!dryRun)
+        {
+            BlueprintUpgradeGuardReport.LogForced(Logger, "--force", result.Blockers);
+        }
 
         ReportBlanking(result.BlankedAttributes, dryRun, allowBlanking ? [] : confirmations);
         BlueprintBlanking.ReportTenantOwned(
