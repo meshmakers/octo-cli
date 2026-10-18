@@ -68,7 +68,7 @@ plain "restored" when the restore only partly succeeded. `RestoreOutcome.ThrowIf
 not-checked rollup as an error and ends with a `ToolException` (exit -5): `Tenant 'x' (database 'y') restored with N failed archive(s): <ids>;
 M rollup(s) not checked: <id> [Cause]. The tenant is not fully restored.` (`restored with warnings` when only rollups are blocking).
 Informational not-checked rollups (never activated) are logged as `not checked (info)` and do not change the result. A bot without these
-fields (older bot, no `-w`) behaves as before. Tests: `RestoreOutcomeTests`.
+fields (older bot, no `-w`) behaves as before. Tests: `RestoreOutcomeTests`; `RestoreOutcomeContractTests` feeds the wire JSON captured in the bot tests (failed archive, clean, informational) through the real `BotServicesClient` into the command.
 
 ## Rollup validate and repair (AB#6968)
 
