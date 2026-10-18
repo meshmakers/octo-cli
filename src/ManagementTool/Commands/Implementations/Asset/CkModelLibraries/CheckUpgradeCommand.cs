@@ -39,6 +39,22 @@ internal class CheckUpgradeCommand : ServiceClientOctoCommand<IAssetServicesClie
                     Migration Path:     True
                     Breaking Changes:   False
                     """),
+                new CodeSample(arguments: [
+                    new CodeSampleArgument(_catalogNameArg, "PublicGitHubCatalog"),
+                    new CodeSampleArgument(_modelIdArg, "Basic-2.5.0"),
+                ],
+                    description: "Blocked update (AB#6869): importing it would break installed models. Read-only, the exit code is unchanged",
+                    expectedOutput: """
+                    Model:              Basic
+                    Installed Version:  2.4.0
+                    Target Version:     2.5.0
+                    Upgrade Needed:     True
+                    Migration Path:     True
+                    Breaking Changes:   False
+                    Would break:
+                      - EnergyCommunity.Registration-2.8.0: exact pin Basic-2.4.0: Basic-2.5.0 replaces it
+                          resolve: update EnergyCommunity.Registration to 2.10.0 first
+                    """),
             ]
         );
 
@@ -60,6 +76,14 @@ internal class CheckUpgradeCommand : ServiceClientOctoCommand<IAssetServicesClie
         Logger.LogInformation("Upgrade Needed:     {Needed}", result.UpgradeNeeded);
         Logger.LogInformation("Migration Path:     {Available}", result.MigrationPathAvailable);
         Logger.LogInformation("Breaking Changes:   {Breaking}", result.HasBreakingChanges);
+
+        // AB#6869: tenant upgrade guard result (AB#6868). Unchanged output for an unblocked update or an older server.
+        if (result.IsBlocked)
+        {
+            Logger.LogInformation("Would break:");
+            foreach (var line in UpgradeBlockerFormatter.DetailLines(result.Blockers))
+                Logger.LogInformation("{Line}", line);
+        }
 
         if (result.ErrorMessage != null)
             Logger.LogWarning("Error: {Error}", result.ErrorMessage);
