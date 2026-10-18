@@ -33,7 +33,14 @@ public sealed class RollupConsistencyCommandTests
     [
         new RollupConsistencyEntryDto(RollupId, true, []),
         new RollupConsistencyEntryDto(OtherRollupId, false, [], true,
-            new RollupNotCheckedDto("NeverActivated", "The archive was never activated."))
+            new RollupNotCheckedDto("NoLiveTable", "The rollup has no table.", true), true)
+    ], true, true);
+
+    private static RollupConsistencyReportDto OkWithInformationalNotChecked() => new(true, DateTime.UtcNow,
+    [
+        new RollupConsistencyEntryDto(RollupId, true, []),
+        new RollupConsistencyEntryDto(OtherRollupId, true, [], true,
+            new RollupNotCheckedDto("NeverActivated", "The archive was never activated.", false))
     ], true);
 
     private static RollupRepairActionDto Action(string status, string kind = "DeleteOrphans") =>
@@ -59,7 +66,7 @@ public sealed class RollupConsistencyCommandTests
 
         Assert.Contains(console.Lines, l => l == "Not checked (1):");
         Assert.Contains(console.Lines,
-            l => l.Contains(OtherRollupId) && l.Contains("NOT CHECKED [NeverActivated]") && l.Contains("never activated"));
+            l => l.Contains(OtherRollupId) && l.Contains("NOT CHECKED [NoLiveTable]") && l.Contains("no table"));
         Assert.Contains(console.Lines, l => l.Contains("0 inconsistent") && l.Contains("1 NOT CHECKED"));
         Assert.DoesNotContain(console.Lines, l => l.Contains(OtherRollupId) && l.Contains("OK"));
     }
@@ -78,6 +85,21 @@ public sealed class RollupConsistencyCommandTests
     }
 
     [Fact]
+    public async Task Validate_InformationalNotChecked_IsListedSeparately_AndDoesNotFailFailOnFindings()
+    {
+        var (command, client, console, _) = NewValidate();
+        A.CallTo(() => client.ValidateRollupsAsync("acme", null)).Returns(OkWithInformationalNotChecked());
+        command.CommandArgumentValue.ParseLayer(["-ff"]);
+
+        await command.Execute();
+
+        Assert.Contains(console.Lines, l => l == "Not checked (informational, 1):");
+        Assert.Contains(console.Lines, l => l.Contains(OtherRollupId) && l.Contains("not checked (info) [NeverActivated]"));
+        Assert.DoesNotContain(console.Lines, l => l.StartsWith("Not checked (") && !l.Contains("informational"));
+        Assert.Contains(console.Lines, l => l.Contains("all consistent") && l.Contains("1 not checked (info)"));
+    }
+
+    [Fact]
     public async Task Repair_DryRun_ListsTheRollupsItSkippedAsNotChecked()
     {
         var (command, client, console, _, _) = NewRepair();
@@ -88,7 +110,7 @@ public sealed class RollupConsistencyCommandTests
         await command.Execute();
 
         Assert.Contains(console.Lines, l => l.Contains("Skipped, not repaired because they could not be checked"));
-        Assert.Contains(console.Lines, l => l.Contains(OtherRollupId) && l.Contains("NOT CHECKED [NeverActivated]"));
+        Assert.Contains(console.Lines, l => l.Contains(OtherRollupId) && l.Contains("NOT CHECKED [NoLiveTable]"));
     }
 
     [Fact]

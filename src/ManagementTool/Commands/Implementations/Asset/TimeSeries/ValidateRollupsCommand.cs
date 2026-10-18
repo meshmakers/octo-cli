@@ -33,7 +33,7 @@ internal class ValidateRollupsCommand : ServiceClientOctoCommand<IStreamDataServ
             ["Optional: comma-separated runtime ids of the rollup archives to check (default: all rollups of the tenant)"],
             false, 1);
         _failOnFindingsArg = CommandArgumentValue.AddArgument("ff", "failOnFindings",
-            ["Exit with a non-zero code when any rollup is inconsistent or could not be checked (for scripts and the DR runbook)"], false, 0);
+            ["Exit with a non-zero code when any rollup is inconsistent or could not be checked in a way that matters, i.e. when the report is not ok (for scripts and the DR runbook; a never-activated rollup does not count)"], false, 0);
         _jsonArg = CommandArgumentValue.AddArgument("j", "json", ["Output the report as raw JSON"], false, 0);
     }
 
@@ -51,7 +51,7 @@ internal class ValidateRollupsCommand : ServiceClientOctoCommand<IStreamDataServ
             [
                 "Run it after a CrateDB restore. If it reports findings, run RepairRollups (dry run first).",
                 "Read only and safe to repeat; the check uses counts and MAX/MIN statements and exports no rows.",
-                "A rollup the validator cannot check (no live table, never activated, source missing) is listed in its own 'Not checked' section with the reason; it is never reported as consistent.",
+                "A rollup the validator cannot check is listed in its own 'Not checked' section with the reason; it is never reported as consistent. No live table and a missing source are problems (they fail the report and -ff); a rollup that was never activated has no data and is listed as 'Not checked, informational' without failing anything.",
                 "The tenant is the tenant of the active context."
             ]);
 
@@ -88,8 +88,8 @@ internal class ValidateRollupsCommand : ServiceClientOctoCommand<IStreamDataServ
                 "a rollup that is not checked is not known to be consistent.");
             if (CommandArgumentValue.IsArgumentUsed(_failOnFindingsArg))
             {
-                var notChecked = report.Entries.Count(e => e.IsNotChecked);
-                var inconsistent = report.Entries.Count(e => !e.IsOk && (!e.IsNotChecked || e.Findings.Count > 0));
+                var notChecked = report.Entries.Count(e => e.IsBlockedByNotChecked);
+                var inconsistent = report.Entries.Count(e => e.Findings.Count > 0);
                 throw new ToolException(
                     $"Rollups of tenant '{tenantId}' are not consistent: {inconsistent} inconsistent, {notChecked} not checked.");
             }

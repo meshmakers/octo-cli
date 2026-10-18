@@ -108,6 +108,14 @@ internal class RestoreTenant : JobWithWaitOctoCommand
             progressCallback: progress.Report);
         Logger.LogInformation("Upload complete. Restore job with id \'{Id}\' has been started", response.JobId);
         await WaitForJob(response.JobId);
+
+        // The job succeeded, but archives may have failed or rollups may be unchecked: that is not a plain "restored"
+        // (AB#6969). Without -w nothing is known yet, so the line below is only printed after the wait.
+        if (LastCompletedJob is { } job)
+        {
+            RestoreOutcome.ThrowIfWarnings(Logger, tenantId, databaseName, job);
+        }
+
         Logger.LogInformation(
             "Tenant \'{TenantId}\' (database \'{DatabaseName}\') at \'{ServiceClientServiceUri}\' restored", tenantId,
             databaseName, ServiceClient.ServiceUri);

@@ -61,6 +61,15 @@ staging-1, prod-1, prod-2; before, one PATCH of the whole file was refused with 
 - Tests: `TusUploadCommandTests` (fake `IBotServicesClient`: part size option, refusal, progress). The tus test server lives in
   the SDK tests (internal there); the wire behaviour (parts, 413, resume) is tested in the SDK, not repeated here.
 
+## Restore outcome (AB#6969)
+
+`Restore -w` reads the finished job (`JobDto`: `Outcome`, `FailedArchives`, `NotCheckedRollups`, derived `HasWarnings`) and does not print a
+plain "restored" when the restore only partly succeeded. `RestoreOutcome.ThrowIfWarnings` logs every failed archive and every blocking
+not-checked rollup as an error and ends with a `ToolException` (exit -5): `Tenant 'x' (database 'y') restored with N failed archive(s): <ids>;
+M rollup(s) not checked: <id> [Cause]. The tenant is not fully restored.` (`restored with warnings` when only rollups are blocking).
+Informational not-checked rollups (never activated) are logged as `not checked (info)` and do not change the result. A bot without these
+fields (older bot, no `-w`) behaves as before. Tests: `RestoreOutcomeTests`.
+
 ## Rollup validate and repair (AB#6968)
 
 `ValidateRollups`, `RepairRollups` and `GetRollupRepairStatus` (`Asset/TimeSeries/`) are the operator check for the rollup state after a
@@ -79,7 +88,7 @@ asset repository `streamdata/rollups/validate|repair`).
   returns the active request. Idempotent.
 - **`GetRollupRepairStatus -rid <requestId>`** shows the state (Pending, Running, Done, Failed) and, once ended, the final report;
   `-ff/--failOnFailed` makes a failed request exit -5; `-j` JSON. Read only.
-- **NotChecked:** a rollup the validator could not check (no live table, never activated, source missing) is never printed as OK. `ValidateRollups` lists it in its own section `Not checked (N):` with `[Cause] reason`, the summary says `N NOT CHECKED`, and `-ff` exits -5 when anything is inconsistent **or** not checked. `RepairRollups` (dry run and applied) prints the rollups it skipped under `Skipped, not repaired because they could not be checked:`.
+- **NotChecked:** a rollup the validator could not check is never printed as OK. A blocking gap (NoLiveTable, SourceMissing; `isBlocking`) is listed in `Not checked (N):` with `[Cause] reason`, the summary says `N NOT CHECKED`, and `-ff` exits -5 (it follows the report's `IsOk`). A never-activated rollup (NeverActivated, informational) has no data: it is listed separately as `Not checked (informational, N):` / `not checked (info)`, the summary adds `N not checked (info)`, and it neither fails the report nor `-ff`. `RepairRollups` (dry run and applied) prints the rollups it skipped under `Skipped, not repaired because they could not be checked:`.
 - Output goes through `RollupConsistencyFormatter` (only report fields are printed). Tests: `RollupConsistencyCommandTests`.
 
 ## Build Configurations

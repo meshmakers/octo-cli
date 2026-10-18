@@ -34,34 +34,47 @@ internal static class RollupConsistencyFormatter
 
         PrintNotChecked(console, report);
 
-        var notChecked = report.Entries.Count(e => e.IsNotChecked);
-        var bad = report.Entries.Count(e => !e.IsOk && !e.IsNotChecked || e.IsNotChecked && e.Findings.Count > 0);
-        var suffix = notChecked > 0 ? $", {notChecked} NOT CHECKED" : string.Empty;
+        var blocking = report.Entries.Count(e => e.IsBlockedByNotChecked);
+        var informational = report.Entries.Count(e => e.IsNotChecked && !e.IsBlockedByNotChecked);
+        var bad = report.Entries.Count(e => e.Findings.Count > 0);
+        var info = informational > 0 ? $", {informational} not checked (info)" : string.Empty;
         console.WriteLine(report.IsOk
-            ? $"Summary: {report.Entries.Count} rollup(s) checked, all consistent."
-            : $"Summary: {report.Entries.Count} rollup(s) listed, {bad} inconsistent{suffix}. A rollup that is not checked is not known to be consistent.");
+            ? $"Summary: {report.Entries.Count} rollup(s) listed, all consistent{info}."
+            : $"Summary: {report.Entries.Count} rollup(s) listed, {bad} inconsistent, {blocking} NOT CHECKED{info}. " +
+              "A rollup that is not checked is not known to be consistent.");
     }
 
     /// <summary>
-    ///     Prints the rollups the validator could not check as their own section, with the cause and the reason
-    ///     (AB#6968). Prints nothing when every rollup was checked.
+    ///     Prints the rollups the validator could not check as their own sections, with the cause and the reason
+    ///     (AB#6968): blocking gaps (problems, the report is not ok) and informational ones (a rollup that was never
+    ///     activated has no data; the report stays ok). Prints nothing when every rollup was checked.
     /// </summary>
     public static void PrintNotChecked(IConsoleService console, RollupConsistencyReportDto report)
     {
-        var notChecked = report.Entries.Where(e => e.IsNotChecked).ToList();
-        if (notChecked.Count == 0)
+        var blocking = report.Entries.Where(e => e.IsBlockedByNotChecked).ToList();
+        if (blocking.Count > 0)
         {
-            return;
+            console.WriteLine($"Not checked ({blocking.Count}):");
+            foreach (var entry in blocking)
+            {
+                console.WriteLine($"  {entry.RollupRtId}  NOT CHECKED [{Cause(entry)}] {Reason(entry)}");
+            }
         }
 
-        console.WriteLine($"Not checked ({notChecked.Count}):");
-        foreach (var entry in notChecked)
+        var informational = report.Entries.Where(e => e.IsNotChecked && !e.IsBlockedByNotChecked).ToList();
+        if (informational.Count > 0)
         {
-            var cause = entry.NotChecked is null ? "Unknown" : entry.NotChecked.Cause;
-            var reason = entry.NotChecked?.Reason ?? "The server did not say why.";
-            console.WriteLine($"  {entry.RollupRtId}  NOT CHECKED [{cause}] {reason}");
+            console.WriteLine($"Not checked (informational, {informational.Count}):");
+            foreach (var entry in informational)
+            {
+                console.WriteLine($"  {entry.RollupRtId}  not checked (info) [{Cause(entry)}] {Reason(entry)}");
+            }
         }
     }
+
+    private static string Cause(RollupConsistencyEntryDto entry) => entry.NotChecked?.Cause ?? "Unknown";
+
+    private static string Reason(RollupConsistencyEntryDto entry) => entry.NotChecked?.Reason ?? "The server did not say why.";
 
     public static void Print(IConsoleService console, RollupRepairReportDto report)
     {
