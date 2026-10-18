@@ -357,6 +357,7 @@ internal static class Program
         services.AddTransient<ICommand, DeleteAdminProvisioningMapping>();
 
         services.AddTransient<ICommand, GetTenants>();
+        services.AddTransient<ICommand, ReconcileTenantRegistry>();
         services.AddTransient<ICommand, CreateTenant>();
         services.AddTransient<ICommand, CleanTenant>();
         services.AddTransient<ICommand, AttachTenant>();
