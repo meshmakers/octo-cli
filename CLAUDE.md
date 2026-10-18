@@ -79,6 +79,7 @@ asset repository `streamdata/rollups/validate|repair`).
   returns the active request. Idempotent.
 - **`GetRollupRepairStatus -rid <requestId>`** shows the state (Pending, Running, Done, Failed) and, once ended, the final report;
   `-ff/--failOnFailed` makes a failed request exit -5; `-j` JSON. Read only.
+- **NotChecked:** a rollup the validator could not check (no live table, never activated, source missing) is never printed as OK. `ValidateRollups` lists it in its own section `Not checked (N):` with `[Cause] reason`, the summary says `N NOT CHECKED`, and `-ff` exits -5 when anything is inconsistent **or** not checked. `RepairRollups` (dry run and applied) prints the rollups it skipped under `Skipped, not repaired because they could not be checked:`.
 - Output goes through `RollupConsistencyFormatter` (only report fields are printed). Tests: `RollupConsistencyCommandTests`.
 
 ## Build Configurations

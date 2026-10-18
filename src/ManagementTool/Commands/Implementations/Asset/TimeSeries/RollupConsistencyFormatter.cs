@@ -17,7 +17,7 @@ internal static class RollupConsistencyFormatter
             console.WriteLine("  No rollup archives were checked.");
         }
 
-        foreach (var entry in report.Entries)
+        foreach (var entry in report.Entries.Where(e => !e.IsNotChecked || e.Findings.Count > 0))
         {
             if (entry.IsOk)
             {
@@ -32,10 +32,35 @@ internal static class RollupConsistencyFormatter
             }
         }
 
-        var bad = report.Entries.Count(e => !e.IsOk);
+        PrintNotChecked(console, report);
+
+        var notChecked = report.Entries.Count(e => e.IsNotChecked);
+        var bad = report.Entries.Count(e => !e.IsOk && !e.IsNotChecked || e.IsNotChecked && e.Findings.Count > 0);
+        var suffix = notChecked > 0 ? $", {notChecked} NOT CHECKED" : string.Empty;
         console.WriteLine(report.IsOk
             ? $"Summary: {report.Entries.Count} rollup(s) checked, all consistent."
-            : $"Summary: {report.Entries.Count} rollup(s) checked, {bad} inconsistent.");
+            : $"Summary: {report.Entries.Count} rollup(s) listed, {bad} inconsistent{suffix}. A rollup that is not checked is not known to be consistent.");
+    }
+
+    /// <summary>
+    ///     Prints the rollups the validator could not check as their own section, with the cause and the reason
+    ///     (AB#6968). Prints nothing when every rollup was checked.
+    /// </summary>
+    public static void PrintNotChecked(IConsoleService console, RollupConsistencyReportDto report)
+    {
+        var notChecked = report.Entries.Where(e => e.IsNotChecked).ToList();
+        if (notChecked.Count == 0)
+        {
+            return;
+        }
+
+        console.WriteLine($"Not checked ({notChecked.Count}):");
+        foreach (var entry in notChecked)
+        {
+            var cause = entry.NotChecked is null ? "Unknown" : entry.NotChecked.Cause;
+            var reason = entry.NotChecked?.Reason ?? "The server did not say why.";
+            console.WriteLine($"  {entry.RollupRtId}  NOT CHECKED [{cause}] {reason}");
+        }
     }
 
     public static void Print(IConsoleService console, RollupRepairReportDto report)
@@ -61,6 +86,13 @@ internal static class RollupConsistencyFormatter
         if (!string.IsNullOrEmpty(report.FailedStep))
         {
             console.WriteLine($"Failed step: {report.FailedStep}");
+        }
+
+        // A rollup the validator could not check is not repaired either: say so instead of leaving it out.
+        if (report.Before.HasNotChecked)
+        {
+            console.WriteLine("Skipped, not repaired because they could not be checked:");
+            PrintNotChecked(console, report.Before);
         }
     }
 

@@ -33,7 +33,7 @@ internal class ValidateRollupsCommand : ServiceClientOctoCommand<IStreamDataServ
             ["Optional: comma-separated runtime ids of the rollup archives to check (default: all rollups of the tenant)"],
             false, 1);
         _failOnFindingsArg = CommandArgumentValue.AddArgument("ff", "failOnFindings",
-            ["Exit with a non-zero code when any rollup is inconsistent (for scripts and the DR runbook)"], false, 0);
+            ["Exit with a non-zero code when any rollup is inconsistent or could not be checked (for scripts and the DR runbook)"], false, 0);
         _jsonArg = CommandArgumentValue.AddArgument("j", "json", ["Output the report as raw JSON"], false, 0);
     }
 
@@ -45,12 +45,13 @@ internal class ValidateRollupsCommand : ServiceClientOctoCommand<IStreamDataServ
                 new CodeSample(arguments: [new CodeSampleArgument(_rollupRtIdsArg, "69fda707d47638c68edc7fea")],
                     description: "Check one rollup archive"),
                 new CodeSample(arguments: [new CodeSampleArgument(_failOnFindingsArg)],
-                    description: "Check all rollups and exit non-zero when one is inconsistent (DR runbook gate after a restore)")
+                    description: "Check all rollups and exit non-zero when one is inconsistent or not checked (DR runbook gate after a restore)")
             ],
             Notes:
             [
                 "Run it after a CrateDB restore. If it reports findings, run RepairRollups (dry run first).",
                 "Read only and safe to repeat; the check uses counts and MAX/MIN statements and exports no rows.",
+                "A rollup the validator cannot check (no live table, never activated, source missing) is listed in its own 'Not checked' section with the reason; it is never reported as consistent.",
                 "The tenant is the tenant of the active context."
             ]);
 
@@ -83,11 +84,14 @@ internal class ValidateRollupsCommand : ServiceClientOctoCommand<IStreamDataServ
         if (!report.IsOk)
         {
             Logger.LogWarning(
-                "Rollups are inconsistent. Run RepairRollups (dry run first) to see the planned repairs.");
+                "Rollups are inconsistent or could not be checked. Run RepairRollups (dry run first) to see the planned repairs; " +
+                "a rollup that is not checked is not known to be consistent.");
             if (CommandArgumentValue.IsArgumentUsed(_failOnFindingsArg))
             {
+                var notChecked = report.Entries.Count(e => e.IsNotChecked);
+                var inconsistent = report.Entries.Count(e => !e.IsOk && (!e.IsNotChecked || e.Findings.Count > 0));
                 throw new ToolException(
-                    $"{report.Entries.Count(e => !e.IsOk)} rollup(s) of tenant '{tenantId}' are inconsistent.");
+                    $"Rollups of tenant '{tenantId}' are not consistent: {inconsistent} inconsistent, {notChecked} not checked.");
             }
         }
     }

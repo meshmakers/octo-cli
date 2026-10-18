@@ -27,6 +27,15 @@ public sealed class RollupConsistencyCommandTests
         ])
     ]);
 
+    private const string OtherRollupId = "6700000000000000000000a2";
+
+    private static RollupConsistencyReportDto OkWithNotChecked() => new(false, DateTime.UtcNow,
+    [
+        new RollupConsistencyEntryDto(RollupId, true, []),
+        new RollupConsistencyEntryDto(OtherRollupId, false, [], true,
+            new RollupNotCheckedDto("NeverActivated", "The archive was never activated."))
+    ], true);
+
     private static RollupRepairActionDto Action(string status, string kind = "DeleteOrphans") =>
         new(RollupId, kind, "step", status, null, null, 3, null);
 
@@ -38,6 +47,49 @@ public sealed class RollupConsistencyCommandTests
         new(false, ok, Broken(), [Action("Done")], ok ? Ok() : Broken(), failedStep);
 
     // ── ValidateRollups ────────────────────────────────────────────────────
+
+    [Fact]
+    public async Task Validate_NotCheckedRollup_IsPrintedInItsOwnSectionWithCauseAndReason()
+    {
+        var (command, client, console, _) = NewValidate();
+        A.CallTo(() => client.ValidateRollupsAsync("acme", null)).Returns(OkWithNotChecked());
+        command.CommandArgumentValue.ParseLayer([]);
+
+        await command.Execute();
+
+        Assert.Contains(console.Lines, l => l == "Not checked (1):");
+        Assert.Contains(console.Lines,
+            l => l.Contains(OtherRollupId) && l.Contains("NOT CHECKED [NeverActivated]") && l.Contains("never activated"));
+        Assert.Contains(console.Lines, l => l.Contains("0 inconsistent") && l.Contains("1 NOT CHECKED"));
+        Assert.DoesNotContain(console.Lines, l => l.Contains(OtherRollupId) && l.Contains("OK"));
+    }
+
+    [Fact]
+    public async Task Validate_FailOnFindings_ThrowsWhenARollupIsOnlyNotChecked()
+    {
+        var (command, client, _, _) = NewValidate();
+        A.CallTo(() => client.ValidateRollupsAsync("acme", null)).Returns(OkWithNotChecked());
+        command.CommandArgumentValue.ParseLayer(["-ff"]);
+
+        var exception = await Assert.ThrowsAsync<ToolException>(() => command.Execute());
+
+        Assert.Contains("1 not checked", exception.Message);
+        Assert.Contains("0 inconsistent", exception.Message);
+    }
+
+    [Fact]
+    public async Task Repair_DryRun_ListsTheRollupsItSkippedAsNotChecked()
+    {
+        var (command, client, console, _, _) = NewRepair();
+        A.CallTo(() => client.PlanRollupRepairAsync("acme", null))
+            .Returns(new RollupRepairReportDto(true, true, OkWithNotChecked(), [], null, null));
+        command.CommandArgumentValue.ParseLayer([]);
+
+        await command.Execute();
+
+        Assert.Contains(console.Lines, l => l.Contains("Skipped, not repaired because they could not be checked"));
+        Assert.Contains(console.Lines, l => l.Contains(OtherRollupId) && l.Contains("NOT CHECKED [NeverActivated]"));
+    }
 
     [Fact]
     public async Task Validate_PrintsTheFindingsAndDoesNotFailByDefault()
