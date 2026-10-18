@@ -110,18 +110,26 @@ internal class PreviewBlueprintUpdate : ServiceClientOctoCommand<IAssetServicesC
         BlueprintBlanking.ReportTenantOwned(
             Logger, preview: true, preview.TenantOwnedSkipped, preview.TenantOwnedStaysDeleted);
 
+        // --failOnBlocked ends the command only after the blanking report below, so a CI log that uses it together
+        // with --failOnBlanking still shows every finding.
+        Exception? blockedFailure = null;
         if (preview.IsBlocked)
         {
             BlueprintUpgradeGuardReport.LogWouldBeRefused(Logger, "--force", preview.CkUpdateSet, preview.Blockers);
             if (CommandArgumentValue.IsArgumentUsed(_failOnBlockedArg))
             {
-                throw ToolException.UpdateBlocked(preview.Blockers.Select(b => b.Dependent).Distinct().Count());
+                blockedFailure = ToolException.UpdateBlocked(preview.Blockers.Select(b => b.Dependent).Distinct().Count());
             }
         }
 
         var blanked = preview.BlankedAttributes;
         if (blanked.Count == 0)
         {
+            if (blockedFailure != null)
+            {
+                throw blockedFailure;
+            }
+
             return;
         }
 
@@ -140,6 +148,11 @@ internal class PreviewBlueprintUpdate : ServiceClientOctoCommand<IAssetServicesC
         if (CommandArgumentValue.IsArgumentUsed(_failOnBlankingArg))
         {
             throw ToolException.BlankingDetected(blanked.Count);
+        }
+
+        if (blockedFailure != null)
+        {
+            throw blockedFailure;
         }
     }
 }

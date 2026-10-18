@@ -83,6 +83,29 @@ public sealed class BlueprintUpgradeGuardCommandTests
     }
 
     [Fact]
+    public async Task Preview_BlockedAndBlanking_WithBothGates_ReportsTheBlankingBeforeFailingOnBlocked()
+    {
+        var (command, logger) = NewPreview(new BlueprintUpdatePreviewDto
+        {
+            TargetVersion = "Shop-2.0.0", IsBlocked = true, CkUpdateSet = ["Basic-2.5.0"], Blockers = [Blocker()],
+            BlankedAttributes =
+            [
+                new BlueprintBlankedAttributeDto
+                {
+                    RtId = "65a1b2c3d4e5f60718293a4b", CkTypeId = "Test/Rule", AttributeName = "configuration",
+                    Reason = "SeedEmpty"
+                }
+            ]
+        });
+        command.CommandArgumentValue.ParseLayer(["-tv", "Shop-2.0.0", "--failOnBlocked"]);
+
+        var ex = await Assert.ThrowsAsync<ToolException>(command.Execute);
+
+        Assert.Contains("--failOnBlocked", ex.Message);
+        Assert.Contains("would blank 1 tenant value", Joined(logger, LogLevel.Warning));
+    }
+
+    [Fact]
     public async Task Preview_NotBlocked_PrintsNothingAboutTheGuard_EvenWithFailOnBlocked()
     {
         var (command, logger) = NewPreview(new BlueprintUpdatePreviewDto { TargetVersion = "Shop-2.0.0" });
