@@ -250,6 +250,21 @@ public sealed class RollupConsistencyCommandTests
     }
 
     [Fact]
+    public async Task Repair_ApplyWithWaitAndJson_PrintsOnlyTheFinalRequestAsOneDocument()
+    {
+        var (command, client, console, _, _) = NewRepair();
+        A.CallTo(() => client.EnqueueRollupRepairAsync("acme", null)).Returns(Request("Pending"));
+        A.CallTo(() => client.GetRollupRepairRequestAsync("acme", "req-1"))
+            .ReturnsNextFromSequence(Request("Running"), Request("Done", FinalReport()));
+        command.CommandArgumentValue.ParseLayer(["-a", "-y", "-w", "-j"]);
+
+        await command.Execute();
+
+        var document = Assert.Single(console.Lines);
+        Assert.Contains("Done", document);
+    }
+
+    [Fact]
     public async Task Repair_ApplyWithWait_FailedRequest_ThrowsNamingTheFailedStep()
     {
         var (command, client, console, _, _) = NewRepair();

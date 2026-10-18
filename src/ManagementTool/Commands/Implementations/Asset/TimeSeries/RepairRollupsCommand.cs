@@ -135,7 +135,11 @@ internal class RepairRollupsCommand : ServiceClientOctoCommand<IStreamDataServic
         Logger.LogInformation(
             "Rollup repair request '{RequestId}' is {State}; it runs in the background on the server. Follow it with " +
             "'GetRollupRepairStatus -rid {RequestId}'.", request.RequestId, request.State, request.RequestId);
-        PrintRequest(request, json);
+        // With --wait --json only the final request is printed, so stdout stays one JSON document a script can parse.
+        if (!(wait && json))
+        {
+            PrintRequest(request, json);
+        }
 
         if (!wait)
         {
