@@ -19,6 +19,9 @@ internal abstract class JobOctoCommand(
 {
     protected IBotServicesClient ServiceClient { get; } = botServiceClient;
 
+    /// <summary>The job as last read by <see cref="WaitForJob" /> when it succeeded; <c>null</c> before or without a wait.</summary>
+    protected JobDto? LastCompletedJob { get; private set; }
+
     public override async Task PreValidate()
     {
         Logger.LogInformation("Service URI: {ServiceClientServiceUri}", ServiceClient.ServiceUri);
@@ -58,6 +61,7 @@ internal abstract class JobOctoCommand(
             var jobDto = await ServiceClient.GetImportJobStatus(id);
             if (jobDto.Status == "Succeeded")
             {
+                LastCompletedJob = jobDto;
                 Logger.LogInformation("Job id \'{Id}\' has completed at \'{LocalTime}\'", id,
                     jobDto.StateChangedAt?.ToLocalTime());
                 break;

@@ -41,6 +41,56 @@ would break an installed model with `409 CK_UPGRADE_BLOCKED` (SDK: `CkUpgradeBlo
   A blocker can disappear after another update was imported, so `FixAll` may have to be run twice (update `Registration` first).
 - Tests: `tests/ManagementTool.Tests/CkUpgradeGuardImportCommandTests.cs`.
 
+## Large uploads: Restore and ImportArchiveData (AB#6970, Bug AB#6786)
+
+`Restore` (`Asset/Tenants/RestoreTenant.cs`) and `ImportArchiveData` (`Asset/TimeSeries/ImportArchiveData.cs`) upload through
+the SDK's `RestoreRepositoryWithTusAsync` / `StartImportArchiveDataWithTusAsync`, which send the file in parts of at most
+50 MiB (SDK `BotServiceClientOptions.TusPartSizeBytes`), so a backup of several GB passes the ingress body limit (100 MiB on
+staging-1, prod-1, prod-2; before, one PATCH of the whole file was refused with 413 and the command failed later on an
+"empty (0 bytes)" file). MCP uses the same SDK methods.
+
+- **`-ps/--part-size-mib <n>`** (both commands, 1 to 90, default 50) sets the part size for this run. The commands receive
+  `IOptions<BotServiceClientOptions>` and assign the value before the upload (the bot client reads the same options object);
+  `TusUploadSupport.ApplyPartSize` turns an out-of-range value into a `ToolException` before anything is sent. There is no
+  config-file or environment setting.
+- **A refused upload** surfaces as the SDK's `TusUploadException` (status, part number, offset, e.g. "Upload of part 3 of 70
+  (offset 104857600, at most 52428800 bytes) was refused: 413 RequestEntityTooLarge"). `Runner` logs the message (exit -3);
+  no job is started. A lost connection is retried by the SDK from the server's offset.
+- **Progress** is logged by `UploadProgressLogger`: one line per 5 percent or after 30 quiet seconds, with sent / total size
+  and the average rate (the SDK reports about once per MiB).
+- Tests: `TusUploadCommandTests` (fake `IBotServicesClient`: part size option, refusal, progress). The tus test server lives in
+  the SDK tests (internal there); the wire behaviour (parts, 413, resume) is tested in the SDK, not repeated here.
+
+## Restore outcome (AB#6969)
+
+`Restore -w` reads the finished job (`JobDto`: `Outcome`, `FailedArchives`, `NotCheckedRollups`, derived `HasWarnings`) and does not print a
+plain "restored" when the restore only partly succeeded. `RestoreOutcome.ThrowIfWarnings` logs every failed archive and every blocking
+not-checked rollup as an error and ends with a `ToolException` (exit -5): `Tenant 'x' (database 'y') restored with N failed archive(s): <ids>;
+M rollup(s) not checked: <id> [Cause]. The tenant is not fully restored.` (`restored with warnings` when only rollups are blocking).
+Informational not-checked rollups (never activated) are logged as `not checked (info)` and do not change the result. A bot without these
+fields (older bot, no `-w`) behaves as before. Tests: `RestoreOutcomeTests`; `RestoreOutcomeContractTests` feeds the wire JSON captured in the bot tests (failed archive, clean, informational) through the real `BotServicesClient` into the command.
+
+## Rollup validate and repair (AB#6968)
+
+`ValidateRollups`, `RepairRollups` and `GetRollupRepairStatus` (`Asset/TimeSeries/`) are the operator check for the rollup state after a
+CrateDB restore (DR runbook: `ValidateRollups`, then `RepairRollups` as a dry run, then `RepairRollups --apply --wait`). They call
+`IStreamDataServicesClient` (`ValidateRollupsAsync`, `PlanRollupRepairAsync`, `EnqueueRollupRepairAsync`, `GetRollupRepairRequestAsync`;
+asset repository `streamdata/rollups/validate|repair`).
+
+- **`ValidateRollups`** is read only: `-id` (optional comma list, default all rollups), `-j` JSON, `-ff/--failOnFindings` (exit -5 when a
+  rollup is inconsistent; without it findings are printed and the exit code stays 0). Checks: pointer without rows, rows above the
+  pointer, watermark ahead of the rows, missing generation map.
+- **`RepairRollups`** is a **dry run by default** (lists the planned steps per rollup, asks nothing, changes nothing). `-a/--apply`
+  asks for confirmation (`-y` skips it) and **requests** the repair: the server executes it in the background (nothing runs inside the
+  call, so an ingress timeout cannot cut a long recompute) and answers with a request id. `-w/--wait` polls the request (5 s, up to 4 h)
+  until Done or Failed and prints the final report incl. the validation after the repair; exit -5 when the request failed, a step failed
+  or the tenant still does not validate ok. Without `--wait` the request id is printed. A second `--apply` while a repair is active
+  returns the active request. Idempotent.
+- **`GetRollupRepairStatus -rid <requestId>`** shows the state (Pending, Running, Done, Failed) and, once ended, the final report;
+  `-ff/--failOnFailed` makes a failed request exit -5; `-j` JSON. Read only.
+- **NotChecked:** a rollup the validator could not check is never printed as OK. A blocking gap (NoLiveTable, SourceMissing; `isBlocking`) is listed in `Not checked (N):` with `[Cause] reason`, the summary says `N NOT CHECKED`, and `-ff` exits -5 (it follows the report's `IsOk`). A never-activated rollup (NeverActivated, informational) has no data: it is listed separately as `Not checked (informational, N):` / `not checked (info)`, the summary adds `N not checked (info)`, and it neither fails the report nor `-ff`. `RepairRollups` (dry run and applied) prints the rollups it skipped under `Skipped, not repaired because they could not be checked:`.
+- Output goes through `RollupConsistencyFormatter` (only report fields are printed). Tests: `RollupConsistencyCommandTests`.
+
 ## Build Configurations
 
 - **Debug/Release**: Standard configurations
@@ -349,7 +399,7 @@ Environment variables are prefixed with `OCTO_`:
 | Category | Commands | Service |
 |----------|----------|---------|
 | Identity | users, roles, clients (+ mirror commands: GetClientMirrors, ProvisionClientInExistingTenants, ProvisionClientInTenant, UnprovisionClientFromTenant, SetClientAutoProvision, ApplyClientOverlay, CleanClientOverlays), identityProviders, groups, emailDomainGroupRules, externalTenantUserMappings, adminProvisioning, apiResources, apiScopes | Identity Services |
-| Asset | tenants, models, blueprints (ListBlueprints, RefreshBlueprintCatalogs, InstallBlueprint, GetBlueprintHistory, PreviewBlueprintUpdate, UpdateBlueprint, ListBlueprintInstallations, UninstallBlueprint), timeSeries (EnableStreamData, DisableStreamData, ActivateArchive, DisableArchive, EnableArchive, RetryArchiveActivation, DeleteArchive, FreezeRollupArchive, UnfreezeRollupArchive, RewindRollupWatermark, ListRollupsForArchive, RecomputeArchive, BackfillRollup, ListRecomputeJobs, AddComputedColumn, RemoveComputedColumn, UpdateComputedColumnFormula) | Asset Repository |
+| Asset | tenants, models, blueprints (ListBlueprints, RefreshBlueprintCatalogs, InstallBlueprint, GetBlueprintHistory, PreviewBlueprintUpdate, UpdateBlueprint, ListBlueprintInstallations, UninstallBlueprint), timeSeries (EnableStreamData, DisableStreamData, ActivateArchive, DisableArchive, EnableArchive, RetryArchiveActivation, DeleteArchive, FreezeRollupArchive, UnfreezeRollupArchive, RewindRollupWatermark, ListRollupsForArchive, RecomputeArchive, BackfillRollup, ListRecomputeJobs, ValidateRollups, RepairRollups, GetRollupRepairStatus, AddComputedColumn, RemoveComputedColumn, UpdateComputedColumnFormula) | Asset Repository |
 | Bots | Dump, Restore, ExportArchiveData, ImportArchiveData, RunFixupScripts | Bot Services |
 | Communication | enable/disable, adapters (incl. RotateAdapterServiceAccountSecret), SwitchServiceAccountsToImpersonation, pipelines (incl. MovePipelines for bulk reassignment to a different adapter), triggers, pools, adapter pool queue (GetAdapterPoolQueue, CancelQueuedExecution), dataFlows, workloads (GetWorkloadsByChart, UpdateWorkloadChartVersion, DeployWorkload, UndeployWorkload) | Communication Controller |
 | Reporting | enable/disable | Report Services |
