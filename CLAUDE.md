@@ -41,6 +41,26 @@ would break an installed model with `409 CK_UPGRADE_BLOCKED` (SDK: `CkUpgradeBlo
   A blocker can disappear after another update was imported, so `FixAll` may have to be run twice (update `Registration` first).
 - Tests: `tests/ManagementTool.Tests/CkUpgradeGuardImportCommandTests.cs`.
 
+## Large uploads: Restore and ImportArchiveData (AB#6970, Bug AB#6786)
+
+`Restore` (`Asset/Tenants/RestoreTenant.cs`) and `ImportArchiveData` (`Asset/TimeSeries/ImportArchiveData.cs`) upload through
+the SDK's `RestoreRepositoryWithTusAsync` / `StartImportArchiveDataWithTusAsync`, which send the file in parts of at most
+50 MiB (SDK `BotServiceClientOptions.TusPartSizeBytes`), so a backup of several GB passes the ingress body limit (100 MiB on
+staging-1, prod-1, prod-2; before, one PATCH of the whole file was refused with 413 and the command failed later on an
+"empty (0 bytes)" file). MCP uses the same SDK methods.
+
+- **`-ps/--part-size-mib <n>`** (both commands, 1 to 90, default 50) sets the part size for this run. The commands receive
+  `IOptions<BotServiceClientOptions>` and assign the value before the upload (the bot client reads the same options object);
+  `TusUploadSupport.ApplyPartSize` turns an out-of-range value into a `ToolException` before anything is sent. There is no
+  config-file or environment setting.
+- **A refused upload** surfaces as the SDK's `TusUploadException` (status, part number, offset, e.g. "Upload of part 3 of 70
+  (offset 104857600, at most 52428800 bytes) was refused: 413 RequestEntityTooLarge"). `Runner` logs the message (exit -3);
+  no job is started. A lost connection is retried by the SDK from the server's offset.
+- **Progress** is logged by `UploadProgressLogger`: one line per 5 percent or after 30 quiet seconds, with sent / total size
+  and the average rate (the SDK reports about once per MiB).
+- Tests: `TusUploadCommandTests` (fake `IBotServicesClient`: part size option, refusal, progress). The tus test server lives in
+  the SDK tests (internal there); the wire behaviour (parts, 413, resume) is tested in the SDK, not repeated here.
+
 ## Build Configurations
 
 - **Debug/Release**: Standard configurations

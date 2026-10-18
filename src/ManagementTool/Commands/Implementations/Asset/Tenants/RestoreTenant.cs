@@ -1,4 +1,5 @@
 using Meshmakers.Common.CommandLineParser;
+using Meshmakers.Octo.Frontend.ManagementTool.Commands;
 using Meshmakers.Octo.Frontend.ManagementTool.Services;
 using Meshmakers.Octo.Sdk.ServiceClient.AssetRepositoryServices.System;
 using Meshmakers.Octo.Sdk.ServiceClient.BotServices;
@@ -14,9 +15,12 @@ internal class RestoreTenant : JobWithWaitOctoCommand
     private readonly IArgument _fileArg;
     private readonly IArgument _oldDatabaseNameArg;
     private readonly IArgument _restoreArchiveDataArg;
+    private readonly IArgument _partSizeArg;
+    private readonly IOptions<BotServiceClientOptions> _botOptions;
 
     public RestoreTenant(ILogger<RestoreTenant> logger, IOptions<OctoToolOptions> options,
-        IBotServicesClient botServicesClient, IAuthenticationService authenticationService)
+        IBotServicesClient botServicesClient, IAuthenticationService authenticationService,
+        IOptions<BotServiceClientOptions> botOptions)
         : base(logger, Constants.BotServicesGroup, "Restore", "Restore a tenant from a dump file",
             options, botServicesClient,
             authenticationService)
@@ -30,6 +34,10 @@ internal class RestoreTenant : JobWithWaitOctoCommand
         _restoreArchiveDataArg = CommandArgumentValue.AddArgument("rad", "restore-archive-data",
             ["Restore CrateDB archive data contained in an '*.octobak.zip' backup (no-op on a plain '*.tar.gz')"],
             false, 0);
+        _partSizeArg = CommandArgumentValue.AddArgument("ps", "part-size-mib",
+            ["Size of one upload request in MiB (default 50, from 1 to 90). Keep it below the body limit of the ingress (100 MiB on staging-1, prod-1 and prod-2)."],
+            false, 1);
+        _botOptions = botOptions;
     }
 
     public override CommandDocumentation? GetDocumentation() =>
@@ -55,6 +63,8 @@ internal class RestoreTenant : JobWithWaitOctoCommand
             Notes:
             [
                 "--restore-archive-data restores archives to their backed-up state; it is a no-op on a plain '*.tar.gz' backup.",
+                "The backup is uploaded in parts of 50 MiB (change with --part-size-mib), so a backup of several GB passes the body limit of the ingress; an interrupted upload resumes from the server's offset.",
+                "When the upload is refused, the command reports the HTTP status, the part number and the offset of the failed part, and no restore job is started.",
                 "The target tenant's archive schemas must match those in the backup; mismatched archives are skipped and reported.",
             ]
         );
@@ -72,6 +82,12 @@ internal class RestoreTenant : JobWithWaitOctoCommand
 
         var restoreArchiveData = CommandArgumentValue.IsArgumentUsed(_restoreArchiveDataArg);
 
+        if (CommandArgumentValue.IsArgumentUsed(_partSizeArg))
+        {
+            TusUploadSupport.ApplyPartSize(_botOptions,
+                CommandArgumentValue.GetArgumentScalarValue<int>(_partSizeArg));
+        }
+
         Logger.LogInformation(
             "Restoring tenant \'{TenantId}\' (database \'{DatabaseName}\') at \'{ServiceClientServiceUri}\'. Old database name: \'{oldDatabaseName}\', restore archive data: {RestoreArchiveData}", tenantId,
             databaseName, ServiceClient.ServiceUri, oldDatabaseName ?? databaseName, restoreArchiveData);
@@ -85,13 +101,11 @@ internal class RestoreTenant : JobWithWaitOctoCommand
         {
             throw ToolException.FilePathDoesNotExist(filePath);
         }
-        
+
+        var progress = new UploadProgressLogger(Logger, new FileInfo(filePath).Length);
         var response = await ServiceClient.RestoreRepositoryWithTusAsync(tenantId, databaseName, filePath, oldDatabaseName,
             restoreArchiveData: restoreArchiveData,
-            progressCallback: progress =>
-            {
-                Logger.LogInformation("Upload progress: {Progress:P0}", progress);
-            });
+            progressCallback: progress.Report);
         Logger.LogInformation("Upload complete. Restore job with id \'{Id}\' has been started", response.JobId);
         await WaitForJob(response.JobId);
         Logger.LogInformation(
