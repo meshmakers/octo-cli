@@ -61,6 +61,21 @@ staging-1, prod-1, prod-2; before, one PATCH of the whole file was refused with 
 - Tests: `TusUploadCommandTests` (fake `IBotServicesClient`: part size option, refusal, progress). The tus test server lives in
   the SDK tests (internal there); the wire behaviour (parts, 413, resume) is tested in the SDK, not repeated here.
 
+## Rollup validate and repair (AB#6968)
+
+`ValidateRollups` and `RepairRollups` (`Asset/TimeSeries/`) are the operator check for the rollup state after a CrateDB restore
+(DR runbook: `ValidateRollups`, then `RepairRollups` as a dry run, then `RepairRollups --apply --wait`). They call
+`IStreamDataServicesClient.ValidateRollupsAsync` / `RepairRollupsAsync` (asset repository `streamdata/rollups/validate|repair`).
+
+- **`ValidateRollups`** is read only: `-id` (optional comma list, default all rollups), `-j` JSON, `-ff/--failOnFindings` (exit -5 when a
+  rollup is inconsistent; without it findings are printed and the exit code stays 0). Checks: pointer without rows, rows above the
+  pointer, watermark ahead of the rows, missing generation map.
+- **`RepairRollups`** is a **dry run by default** (lists the planned steps per rollup, asks nothing, changes nothing). `-a/--apply`
+  asks for confirmation (`-y` skips it). The server runs the fast steps at once and **enqueues the recompute ranges as recompute jobs**
+  (HTTP 202 with job ids), so a long repair is never bound to the HTTP request; `-w/--wait` polls those jobs (`ListRecomputeJobs`
+  data, up to 4 h) and validates again. Exit -5 when a step failed, a job failed or the tenant still does not validate ok. Idempotent.
+- Output goes through `RollupConsistencyFormatter` (only report fields are printed). Tests: `RollupConsistencyCommandTests`.
+
 ## Build Configurations
 
 - **Debug/Release**: Standard configurations
@@ -369,7 +384,7 @@ Environment variables are prefixed with `OCTO_`:
 | Category | Commands | Service |
 |----------|----------|---------|
 | Identity | users, roles, clients (+ mirror commands: GetClientMirrors, ProvisionClientInExistingTenants, ProvisionClientInTenant, UnprovisionClientFromTenant, SetClientAutoProvision, ApplyClientOverlay, CleanClientOverlays), identityProviders, groups, emailDomainGroupRules, externalTenantUserMappings, adminProvisioning, apiResources, apiScopes | Identity Services |
-| Asset | tenants, models, blueprints (ListBlueprints, RefreshBlueprintCatalogs, InstallBlueprint, GetBlueprintHistory, PreviewBlueprintUpdate, UpdateBlueprint, ListBlueprintInstallations, UninstallBlueprint), timeSeries (EnableStreamData, DisableStreamData, ActivateArchive, DisableArchive, EnableArchive, RetryArchiveActivation, DeleteArchive, FreezeRollupArchive, UnfreezeRollupArchive, RewindRollupWatermark, ListRollupsForArchive, RecomputeArchive, BackfillRollup, ListRecomputeJobs, AddComputedColumn, RemoveComputedColumn, UpdateComputedColumnFormula) | Asset Repository |
+| Asset | tenants, models, blueprints (ListBlueprints, RefreshBlueprintCatalogs, InstallBlueprint, GetBlueprintHistory, PreviewBlueprintUpdate, UpdateBlueprint, ListBlueprintInstallations, UninstallBlueprint), timeSeries (EnableStreamData, DisableStreamData, ActivateArchive, DisableArchive, EnableArchive, RetryArchiveActivation, DeleteArchive, FreezeRollupArchive, UnfreezeRollupArchive, RewindRollupWatermark, ListRollupsForArchive, RecomputeArchive, BackfillRollup, ListRecomputeJobs, ValidateRollups, RepairRollups, AddComputedColumn, RemoveComputedColumn, UpdateComputedColumnFormula) | Asset Repository |
 | Bots | Dump, Restore, ExportArchiveData, ImportArchiveData, RunFixupScripts | Bot Services |
 | Communication | enable/disable, adapters (incl. RotateAdapterServiceAccountSecret), SwitchServiceAccountsToImpersonation, pipelines (incl. MovePipelines for bulk reassignment to a different adapter), triggers, pools, adapter pool queue (GetAdapterPoolQueue, CancelQueuedExecution), dataFlows, workloads (GetWorkloadsByChart, UpdateWorkloadChartVersion, DeployWorkload, UndeployWorkload) | Communication Controller |
 | Reporting | enable/disable | Report Services |

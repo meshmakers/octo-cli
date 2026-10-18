@@ -495,6 +495,8 @@ internal static class Program
         services.AddTransient<ICommand, RecomputeArchiveCommand>();
         services.AddTransient<ICommand, BackfillRollupCommand>();
         services.AddTransient<ICommand, ListRecomputeJobsCommand>();
+        services.AddTransient<ICommand, ValidateRollupsCommand>();
+        services.AddTransient<ICommand, RepairRollupsCommand>();
         services.AddTransient<ICommand, AddComputedColumnCommand>();
         services.AddTransient<ICommand, RemoveComputedColumnCommand>();
         services.AddTransient<ICommand, UpdateComputedColumnFormulaCommand>();
