@@ -867,6 +867,21 @@ octo-cli -c GetPipelineDebug --identifier cc0000000000000000000003 --json
 - Tests: `LibraryStatusCommandTests`, `CheckUpgradeCommandTests`. The command reference page is generated from the
   `GetDocumentation()` samples.
 
+### Tenant upgrade guard for the file import (CK v2 F2.5, AB#6966)
+
+`ImportCk -f <file>` is guarded by the service like `ImportFromCatalog`: a file that would break an installed model - a `System` file
+included - is refused with `409 CK_UPGRADE_BLOCKED`, nothing is imported. The command calls the additive SDK overload
+`ImportCkModelAsync(tenantId, path, forceBreakingUpdate)`, logs the blockers (`UpgradeGuardReport`, level Error), and fails with a
+`ToolException` whose message carries `CK_UPGRADE_BLOCKED` (non-zero exit code, as for `ImportFromCatalog`).
+
+- **Override**: `--forceBreakingUpdate` (short `-fbu`, the same name as `InstallBlueprint` / `UpdateBlueprint`; `-f` is the file here, so
+  `--force` was not reused). It logs a WARN and needs the data model management role (403 otherwise). A CLI without the option against an
+  older service behaves as before (the older service does not guard); a new CLI against an older service sends a form member that is ignored.
+- **CheckUpgrade** help now says that "Breaking Changes" is the migration view of the model itself and "Would break" (`isBlocked` /
+  `blockers`) is the tenant upgrade guard; the service judges `System` too since AB#6966 (before, `CheckUpgrade -m System-2.8.0` printed
+  `Breaking Changes: False` and no blockers for a release that made the tenant unloadable).
+- Tests: `ImportConstructionKitModelTests` (refused -> blockers printed + exit error, override sent + WARN, empty/missing file unchanged).
+
 ### Tenant upgrade guard for blueprints (CK v2 F2.5, AB#6871)
 
 `InstallBlueprint`, `UpdateBlueprint` and `PreviewBlueprintUpdate` carry the guard of `ImportFromCatalog` (AB#6870) to blueprints:
