@@ -27,8 +27,15 @@ public sealed class RollupConsistencyCommandTests
         ])
     ]);
 
-    private static RollupRepairActionDto Action(string status, string kind = "DeleteOrphans", string? jobId = null) =>
-        new(RollupId, kind, "step", status, null, null, 120, null, jobId);
+    private static RollupRepairActionDto Action(string status, string kind = "DeleteOrphans") =>
+        new(RollupId, kind, "step", status, null, null, 3, null);
+
+    private static RollupRepairRequestDto Request(string state, RollupRepairReportDto? report = null) =>
+        new("req-1", state, DateTime.UtcNow, report is null ? null : DateTime.UtcNow,
+            [Action("Planned", "RecomputePointerRange")], report);
+
+    private static RollupRepairReportDto FinalReport(bool ok = true, string? failedStep = null) =>
+        new(false, ok, Broken(), [Action("Done")], ok ? Ok() : Broken(), failedStep);
 
     // ── ValidateRollups ────────────────────────────────────────────────────
 
@@ -108,133 +115,91 @@ public sealed class RollupConsistencyCommandTests
     // ── RepairRollups ──────────────────────────────────────────────────────
 
     [Fact]
-    public async Task Repair_DefaultsToADryRun_WithoutConfirmationAndWithoutValidatingAgain()
+    public async Task Repair_DefaultsToADryRun_WithoutConfirmationAndWithoutEnqueueing()
     {
         var (command, client, console, confirmation, _) = NewRepair();
-        A.CallTo(() => client.RepairRollupsAsync("acme", null, true))
-            .Returns(new RollupRepairReportDto(true, true, Broken(), [Action("Planned")], null, null, []));
+        A.CallTo(() => client.PlanRollupRepairAsync("acme", null))
+            .Returns(new RollupRepairReportDto(true, true, Broken(), [Action("Planned")], null, null));
         command.CommandArgumentValue.ParseLayer([]);
 
         await command.Execute();
 
-        A.CallTo(() => client.RepairRollupsAsync("acme", null, true)).MustHaveHappenedOnceExactly();
-        A.CallTo(() => client.RepairRollupsAsync("acme", A<IReadOnlyCollection<string>?>._, false))
+        A.CallTo(() => client.PlanRollupRepairAsync("acme", null)).MustHaveHappenedOnceExactly();
+        A.CallTo(() => client.EnqueueRollupRepairAsync(A<string>._, A<IReadOnlyCollection<string>?>._))
             .MustNotHaveHappened();
         Assert.Null(confirmation.LastMessage);
         Assert.Contains(console.Lines, l => l.Contains("DRY RUN"));
         Assert.Contains(console.Lines, l => l.Contains("DeleteOrphans") && l.Contains("Planned"));
-        A.CallTo(() => client.ValidateRollupsAsync(A<string>._, A<IReadOnlyCollection<string>?>._))
-            .MustNotHaveHappened();
     }
 
     [Fact]
-    public async Task Repair_ApplyDeclined_ThrowsAndChangesNothing()
+    public async Task Repair_ApplyDeclined_ThrowsAndEnqueuesNothing()
     {
         var (command, client, _, _, _) = NewRepair(confirm: false);
         command.CommandArgumentValue.ParseLayer(["-a"]);
 
         await Assert.ThrowsAsync<ToolException>(() => command.Execute());
 
-        A.CallTo(() => client.RepairRollupsAsync(A<string>._, A<IReadOnlyCollection<string>?>._, A<bool>._))
+        A.CallTo(() => client.EnqueueRollupRepairAsync(A<string>._, A<IReadOnlyCollection<string>?>._))
             .MustNotHaveHappened();
     }
 
     [Fact]
-    public async Task Repair_ApplyWithoutJobs_ValidatesAgainAndPassesWhenConsistent()
+    public async Task Repair_ApplyWithoutWait_PrintsTheRequestIdAndReturns()
     {
-        var (command, client, console, confirmation, _) = NewRepair();
-        A.CallTo(() => client.RepairRollupsAsync("acme", null, false))
-            .Returns(new RollupRepairReportDto(false, true, Broken(), [Action("Executed")], null, null, []));
-        A.CallTo(() => client.ValidateRollupsAsync("acme", null)).Returns(Ok());
+        var (command, client, console, confirmation, logger) = NewRepair();
+        A.CallTo(() => client.EnqueueRollupRepairAsync("acme", null)).Returns(Request("Pending"));
         command.CommandArgumentValue.ParseLayer(["-a"]);
 
         await command.Execute();
 
         Assert.NotNull(confirmation.LastMessage);
+        Assert.Contains(console.Lines, l => l.Contains("req-1") && l.Contains("Pending"));
+        Assert.Contains(logger.Entries, e => e.Message.Contains("GetRollupRepairStatus -rid req-1"));
+        A.CallTo(() => client.GetRollupRepairRequestAsync(A<string>._, A<string>._)).MustNotHaveHappened();
+    }
+
+    [Fact]
+    public async Task Repair_ApplyWithWait_PollsUntilDoneAndPrintsTheFinalReport()
+    {
+        var (command, client, console, _, _) = NewRepair();
+        A.CallTo(() => client.EnqueueRollupRepairAsync("acme", null)).Returns(Request("Pending"));
+        A.CallTo(() => client.GetRollupRepairRequestAsync("acme", "req-1"))
+            .ReturnsNextFromSequence(Request("Running"), Request("Done", FinalReport()));
+        command.CommandArgumentValue.ParseLayer(["-a", "-y", "-w"]);
+
+        await command.Execute();
+
+        A.CallTo(() => client.GetRollupRepairRequestAsync("acme", "req-1")).MustHaveHappenedTwiceExactly();
         Assert.Contains(console.Lines, l => l.Contains("after the repair"));
         Assert.Contains(console.Lines, l => l.Contains("all consistent"));
     }
 
     [Fact]
-    public async Task Repair_ApplyWithoutJobs_StillInconsistent_Throws()
-    {
-        var (command, client, _, _, _) = NewRepair();
-        A.CallTo(() => client.RepairRollupsAsync("acme", null, false))
-            .Returns(new RollupRepairReportDto(false, true, Broken(), [Action("Executed")], null, null, []));
-        A.CallTo(() => client.ValidateRollupsAsync("acme", null)).Returns(Broken());
-        command.CommandArgumentValue.ParseLayer(["-a", "-y"]);
-
-        var exception = await Assert.ThrowsAsync<ToolException>(() => command.Execute());
-
-        Assert.Contains("still inconsistent", exception.Message);
-    }
-
-    [Fact]
-    public async Task Repair_ApplyWithJobsAndNoWait_ReturnsAfterNamingTheJobs()
-    {
-        var (command, client, _, _, logger) = NewRepair();
-        A.CallTo(() => client.RepairRollupsAsync("acme", null, false))
-            .Returns(new RollupRepairReportDto(false, true, Broken(),
-                [Action("Enqueued", "RecomputePointerRange", "job-1")], null, null, ["job-1"]));
-        command.CommandArgumentValue.ParseLayer(["-a", "-y"]);
-
-        await command.Execute();
-
-        Assert.Contains(logger.Entries, e => e.Message.Contains("job-1") && e.Message.Contains("enqueued"));
-        A.CallTo(() => client.ValidateRollupsAsync(A<string>._, A<IReadOnlyCollection<string>?>._))
-            .MustNotHaveHappened();
-    }
-
-    [Fact]
-    public async Task Repair_ApplyWithWait_PollsTheJobAndValidatesAgain()
+    public async Task Repair_ApplyWithWait_FailedRequest_ThrowsNamingTheFailedStep()
     {
         var (command, client, console, _, _) = NewRepair();
-        A.CallTo(() => client.RepairRollupsAsync("acme", null, false))
-            .Returns(new RollupRepairReportDto(false, true, Broken(),
-                [Action("Enqueued", "RecomputePointerRange", "job-1")], null, null, ["job-1"]));
-        A.CallTo(() => client.ListRecomputeJobsForArchiveAsync("acme", RollupId)).Returns(
-            (IReadOnlyList<RollupRecomputeJobInfoDto>)
-            [new RollupRecomputeJobInfoDto("job-1", "Completed", 10, 1, null, null, 5, null)]);
-        A.CallTo(() => client.ValidateRollupsAsync("acme", null)).Returns(Ok());
-        command.CommandArgumentValue.ParseLayer(["-a", "-y", "-w"]);
-
-        await command.Execute();
-
-        A.CallTo(() => client.ListRecomputeJobsForArchiveAsync("acme", RollupId)).MustHaveHappened();
-        Assert.Contains(console.Lines, l => l.Contains("all consistent"));
-    }
-
-    [Fact]
-    public async Task Repair_ApplyWithWait_FailedJob_Throws()
-    {
-        var (command, client, _, _, _) = NewRepair();
-        A.CallTo(() => client.RepairRollupsAsync("acme", null, false))
-            .Returns(new RollupRepairReportDto(false, true, Broken(),
-                [Action("Enqueued", "RecomputePointerRange", "job-1")], null, null, ["job-1"]));
-        A.CallTo(() => client.ListRecomputeJobsForArchiveAsync("acme", RollupId)).Returns(
-            (IReadOnlyList<RollupRecomputeJobInfoDto>)
-            [new RollupRecomputeJobInfoDto("job-1", "Failed", null, null, null, null, 5, "boom")]);
+        A.CallTo(() => client.EnqueueRollupRepairAsync("acme", null)).Returns(Request("Pending"));
+        A.CallTo(() => client.GetRollupRepairRequestAsync("acme", "req-1"))
+            .Returns(Request("Failed", FinalReport(false, "RecomputePointerRange on r1: timeout")));
         command.CommandArgumentValue.ParseLayer(["-a", "-y", "-w"]);
 
         var exception = await Assert.ThrowsAsync<ToolException>(() => command.Execute());
 
-        Assert.Contains("job-1", exception.Message);
-        Assert.Contains("boom", exception.Message);
-    }
-
-    [Fact]
-    public async Task Repair_FailedStep_ThrowsAfterPrintingTheReport()
-    {
-        var (command, client, console, _, _) = NewRepair();
-        A.CallTo(() => client.RepairRollupsAsync("acme", null, false))
-            .Returns(new RollupRepairReportDto(false, false, Broken(), [Action("Failed")], null,
-                "DeleteOrphans on r1: timeout", []));
-        command.CommandArgumentValue.ParseLayer(["-a", "-y"]);
-
-        var exception = await Assert.ThrowsAsync<ToolException>(() => command.Execute());
-
-        Assert.Contains("DeleteOrphans on r1: timeout", exception.Message);
+        Assert.Contains("RecomputePointerRange on r1: timeout", exception.Message);
         Assert.Contains(console.Lines, l => l.Contains("Failed step"));
+    }
+
+    [Fact]
+    public async Task Repair_ApplyWithWait_DoneButStillInconsistent_Throws()
+    {
+        var (command, client, _, _, _) = NewRepair();
+        A.CallTo(() => client.EnqueueRollupRepairAsync("acme", null)).Returns(Request("Pending"));
+        A.CallTo(() => client.GetRollupRepairRequestAsync("acme", "req-1"))
+            .Returns(Request("Done", FinalReport(false)));
+        command.CommandArgumentValue.ParseLayer(["-a", "-y", "-w"]);
+
+        await Assert.ThrowsAsync<ToolException>(() => command.Execute());
     }
 
     [Fact]
@@ -242,14 +207,46 @@ public sealed class RollupConsistencyCommandTests
     {
         var (command, client, _, _, _) = NewRepair();
         IReadOnlyCollection<string>? passed = null;
-        A.CallTo(() => client.RepairRollupsAsync("acme", A<IReadOnlyCollection<string>?>._, true))
-            .Invokes((string _, IReadOnlyCollection<string>? ids, bool _) => passed = ids)
-            .Returns(new RollupRepairReportDto(true, true, Ok(), [], null, null, []));
+        A.CallTo(() => client.PlanRollupRepairAsync("acme", A<IReadOnlyCollection<string>?>._))
+            .Invokes((string _, IReadOnlyCollection<string>? ids) => passed = ids)
+            .Returns(new RollupRepairReportDto(true, true, Ok(), [], null, null));
         command.CommandArgumentValue.ParseLayer(["-id", "r1,r2"]);
 
         await command.Execute();
 
         Assert.Equal(["r1", "r2"], passed);
+    }
+
+    // ── GetRollupRepairStatus ──────────────────────────────────────────────
+
+    [Fact]
+    public async Task Status_PrintsTheStateAndTheFinalReport()
+    {
+        var (command, client, console) = NewStatus();
+        A.CallTo(() => client.GetRollupRepairRequestAsync("acme", "req-1")).Returns(Request("Done", FinalReport()));
+        command.CommandArgumentValue.ParseLayer(["-rid", "req-1"]);
+
+        await command.Execute();
+
+        Assert.Contains(console.Lines, l => l.Contains("req-1") && l.Contains("Done"));
+        Assert.Contains(console.Lines, l => l.Contains("all consistent"));
+    }
+
+    [Fact]
+    public async Task Status_FailOnFailed_ThrowsForAFailedRequestOnly()
+    {
+        var (command, client, _) = NewStatus();
+        A.CallTo(() => client.GetRollupRepairRequestAsync("acme", "req-1"))
+            .Returns(Request("Failed", FinalReport(false, "step")));
+        command.CommandArgumentValue.ParseLayer(["-rid", "req-1", "-ff"]);
+
+        await Assert.ThrowsAsync<ToolException>(() => command.Execute());
+
+        var (running, runningClient, _) = NewStatus();
+        A.CallTo(() => runningClient.GetRollupRepairRequestAsync("acme", "req-1")).Returns(Request("Running"));
+        running.CommandArgumentValue.ParseLayer(["-rid", "req-1", "-ff"]);
+
+        await running.Execute();
     }
 
     // ── Helpers ────────────────────────────────────────────────────────────
@@ -278,6 +275,17 @@ public sealed class RollupConsistencyCommandTests
             PollInterval = TimeSpan.FromMilliseconds(1)
         };
         return (command, client, console, confirmation, logger);
+    }
+
+    private static (GetRollupRepairStatusCommand Command, IStreamDataServicesClient Client, RecordingConsole Console)
+        NewStatus()
+    {
+        var client = A.Fake<IStreamDataServicesClient>();
+        var console = new RecordingConsole();
+        var command = new GetRollupRepairStatusCommand(new RecordingLogger<GetRollupRepairStatusCommand>(),
+            Options.Create(new OctoToolOptions { TenantId = "acme" }), console, client,
+            A.Fake<IAuthenticationService>());
+        return (command, client, console);
     }
 
     private sealed class FakeConfirmation(bool answer) : IConfirmationService

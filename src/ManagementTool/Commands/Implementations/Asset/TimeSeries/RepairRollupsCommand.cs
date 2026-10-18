@@ -11,8 +11,8 @@ namespace Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Asset
 /// <summary>
 ///     Repairs the rollup inconsistencies <c>ValidateRollups</c> finds (AB#6968). Idempotent. A dry run is the default
 ///     and lists the planned steps per rollup; <c>--apply</c> writes, so it is gated on the confirmation like the other
-///     destructive verbs. The recompute ranges of an applied repair run as recompute jobs on the server; <c>--wait</c>
-///     polls them and validates again.
+///     destructive verbs. An applied repair is a <b>request</b> the server executes in the background (nothing runs
+///     inside the call, so an ingress timeout cannot cut it); <c>--wait</c> polls the request until it is Done or Failed.
 /// </summary>
 internal class RepairRollupsCommand : ServiceClientOctoCommand<IStreamDataServicesClient>
 {
@@ -43,13 +43,13 @@ internal class RepairRollupsCommand : ServiceClientOctoCommand<IStreamDataServic
         _applyArg = CommandArgumentValue.AddArgument("a", "apply",
             ["Run the repair (default is a dry run that changes nothing)"], false, 0);
         _waitArg = CommandArgumentValue.AddArgument("w", "wait",
-            ["After --apply: poll the recompute jobs until they finish, then validate again and print the result"],
+            ["After --apply: poll the repair request until it is Done or Failed and print the final report"],
             false, 0);
         _yesArg = CommandArgumentValue.AddArgument("y", "yes", ["Skip confirmation prompt"], false, 0);
         _jsonArg = CommandArgumentValue.AddArgument("j", "json", ["Output the report as raw JSON"], false, 0);
     }
 
-    /// <summary>Time between two polls of the recompute jobs; a property so tests do not wait for real seconds.</summary>
+    /// <summary>Time between two polls of the repair request; a property so tests do not wait for real seconds.</summary>
     internal TimeSpan PollInterval { get; set; } = TimeSpan.FromSeconds(5);
 
     public override CommandDocumentation? GetDocumentation() =>
@@ -73,9 +73,10 @@ internal class RepairRollupsCommand : ServiceClientOctoCommand<IStreamDataServic
                 "DR runbook after a CrateDB restore: ValidateRollups, then RepairRollups (dry run), then RepairRollups --apply --wait.",
                 "Without --apply nothing is written and no confirmation is asked.",
                 "--apply deletes rows above the generation the pointer selects, rewinds watermarks, creates missing generation maps and " +
-                "recomputes ranges. The fast steps run at once; the recompute ranges are enqueued as recompute jobs " +
-                "(see ListRecomputeJobs) and keep running on the server when this command ends.",
-                "--wait polls those jobs (up to 4 hours) and validates again; the command exits non-zero when a step failed, a job failed or the tenant does not validate ok.",
+                "recomputes ranges. The server only accepts a repair request and executes it in the background; it keeps running " +
+                "when this command ends. A second --apply while a repair is active returns the active request.",
+                "--wait polls the request (up to 4 hours) and prints the final report; the command exits non-zero when the repair failed. " +
+                "Without --wait, follow it with GetRollupRepairStatus -rid <requestId>.",
                 "Idempotent: repeating the command is safe.",
                 "The tenant is the tenant of the active context."
             ]);
@@ -110,105 +111,70 @@ internal class RepairRollupsCommand : ServiceClientOctoCommand<IStreamDataServic
         Logger.LogInformation("{Mode} the rollup repair for tenant '{TenantId}' at '{ServiceClientServiceUri}'",
             apply ? "Applying" : "Dry-running", tenantId, ServiceClient.ServiceUri);
 
-        var report = await ServiceClient.RepairRollupsAsync(tenantId, rollupRtIds, !apply);
-
-        if (json)
-        {
-            _consoleService.WriteLine(JsonConvert.SerializeObject(report, Formatting.Indented));
-        }
-        else
-        {
-            RollupConsistencyFormatter.Print(_consoleService, report);
-        }
-
-        ThrowOnFailedStep(report);
-
         if (!apply)
         {
-            if (report.Actions.Count > 0)
+            var plan = await ServiceClient.PlanRollupRepairAsync(tenantId, rollupRtIds);
+            if (json)
             {
-                Logger.LogInformation("Nothing was changed. Run again with --apply to execute these steps.");
+                _consoleService.WriteLine(JsonConvert.SerializeObject(plan, Formatting.Indented));
+            }
+            else
+            {
+                RollupConsistencyFormatter.Print(_consoleService, plan);
+            }
+
+            if (plan.Actions.Count > 0)
+            {
+                Logger.LogInformation("Nothing was changed. Run again with --apply to request these steps.");
             }
 
             return;
         }
 
-        if (report.JobIds.Count == 0)
-        {
-            await ReportFinalStateAsync(tenantId, rollupRtIds, report.After);
-            return;
-        }
-
+        var request = await ServiceClient.EnqueueRollupRepairAsync(tenantId, rollupRtIds);
         Logger.LogInformation(
-            "{Count} recompute job(s) enqueued: {JobIds}. They run in the background; follow them with 'ListRecomputeJobs -id <rollupRtId>'.",
-            report.JobIds.Count, string.Join(", ", report.JobIds));
+            "Rollup repair request '{RequestId}' is {State}; it runs in the background on the server. Follow it with " +
+            "'GetRollupRepairStatus -rid {RequestId}'.", request.RequestId, request.State, request.RequestId);
+        PrintRequest(request, json);
+
         if (!wait)
         {
-            Logger.LogInformation("Run ValidateRollups when the jobs have finished.");
             return;
         }
 
-        await WaitForJobsAsync(tenantId, report);
-        await ReportFinalStateAsync(tenantId, rollupRtIds, null);
+        request = await WaitForRequestAsync(tenantId, request);
+        Logger.LogInformation("Rollup repair request '{RequestId}' ended: {State}", request.RequestId, request.State);
+        PrintRequest(request, json);
+        RollupRepairRequestOutcome.ThrowIfFailed(request);
     }
 
-    private void ThrowOnFailedStep(RollupRepairReportDto report)
+    private void PrintRequest(RollupRepairRequestDto request, bool json)
     {
-        if (!string.IsNullOrEmpty(report.FailedStep))
+        if (json)
         {
-            throw new ToolException($"The rollup repair failed at step: {report.FailedStep}");
+            _consoleService.WriteLine(JsonConvert.SerializeObject(request, Formatting.Indented));
+            return;
         }
+
+        RollupConsistencyFormatter.Print(_consoleService, request);
     }
 
-    private async Task WaitForJobsAsync(string tenantId, RollupRepairReportDto report)
+    private async Task<RollupRepairRequestDto> WaitForRequestAsync(string tenantId, RollupRepairRequestDto request)
     {
-        var jobs = report.Actions.Where(a => a.JobId is not null)
-            .Select(a => (a.RollupRtId, JobId: a.JobId!)).Distinct().ToList();
-        var failed = new List<string>();
-
-        foreach (var (rollupRtId, jobId) in jobs)
+        var deadline = DateTime.UtcNow + PollTimeout;
+        while (!request.IsFinished)
         {
-            Logger.LogInformation("Waiting for recompute job {JobId} of rollup '{RollupRtId}'...", jobId, rollupRtId);
-            var (result, job) = await BackfillRollupCommand.PollUntilTerminalAsync(
-                () => ServiceClient.ListRecomputeJobsForArchiveAsync(tenantId, rollupRtId),
-                jobId, () => DateTime.UtcNow, Task.Delay, PollInterval, PollTimeout);
-
-            switch (result)
+            if (DateTime.UtcNow >= deadline)
             {
-                case BackfillRollupCommand.BackfillPollResult.Terminal when job is not null:
-                    Logger.LogInformation("Recompute job {JobId}: state={State}, rows={Rows}, error={Error}", job.RtId,
-                        job.State, job.RowsProcessed?.ToString() ?? "n/a", job.ErrorReason ?? "none");
-                    if (job.State.Equals("Failed", StringComparison.OrdinalIgnoreCase))
-                    {
-                        failed.Add($"{jobId} ({job.ErrorReason ?? "no reason reported"})");
-                    }
-
-                    break;
-                case BackfillRollupCommand.BackfillPollResult.Vanished:
-                    Logger.LogWarning("Recompute job {JobId} is no longer listed for rollup '{RollupRtId}'.", jobId,
-                        rollupRtId);
-                    break;
-                default:
-                    failed.Add($"{jobId} (still running after {(int)PollTimeout.TotalHours} h)");
-                    break;
+                throw new ToolException(
+                    $"Rollup repair request '{request.RequestId}' is still {request.State} after {(int)PollTimeout.TotalHours} h. " +
+                    $"It keeps running on the server; check it with GetRollupRepairStatus -rid {request.RequestId}.");
             }
+
+            await Task.Delay(PollInterval);
+            request = await ServiceClient.GetRollupRepairRequestAsync(tenantId, request.RequestId);
         }
 
-        if (failed.Count > 0)
-        {
-            throw new ToolException($"{failed.Count} recompute job(s) did not finish: {string.Join("; ", failed)}");
-        }
-    }
-
-    private async Task ReportFinalStateAsync(string tenantId, IReadOnlyCollection<string>? rollupRtIds,
-        RollupConsistencyReportDto? after)
-    {
-        after ??= await ServiceClient.ValidateRollupsAsync(tenantId, rollupRtIds);
-        RollupConsistencyFormatter.Print(_consoleService, after, $"Rollup validation of tenant '{tenantId}' after the repair:");
-        if (!after.IsOk)
-        {
-            throw new ToolException(
-                $"{after.Entries.Count(e => !e.IsOk)} rollup(s) are still inconsistent after the repair.");
-        }
+        return request;
     }
 }

@@ -53,15 +53,40 @@ internal static class RollupConsistencyFormatter
             var range = action.RangeFromUtc is null && action.RangeToUtc is null
                 ? string.Empty
                 : $"  [{action.RangeFromUtc:O}, {action.RangeToUtc:O})";
-            var job = action.JobId is null ? string.Empty : $"  job={action.JobId}";
             var error = string.IsNullOrEmpty(action.Error) ? string.Empty : $"  error={action.Error}";
             console.WriteLine(
-                $"  {action.RollupRtId}  {action.Kind}  {action.Status}{range}{job}{error}  {action.Description}");
+                $"  {action.RollupRtId}  {action.Kind}  {action.Status}{range}{error}  {action.Description}");
         }
 
         if (!string.IsNullOrEmpty(report.FailedStep))
         {
             console.WriteLine($"Failed step: {report.FailedStep}");
+        }
+    }
+
+    public static void Print(IConsoleService console, RollupRepairRequestDto request)
+    {
+        console.WriteLine(
+            $"Rollup repair request {request.RequestId}: {request.State} (requested {request.RequestedAtUtc:O}" +
+            (request.FinishedAtUtc is { } finished ? $", finished {finished:O})" : ")"));
+
+        if (request.Report is { } report)
+        {
+            Print(console, report);
+            if (report.After is { } after)
+            {
+                Print(console, after, "Rollup validation after the repair:");
+            }
+
+            return;
+        }
+
+        console.WriteLine(request.PlannedActions.Count == 0
+            ? "  Planned steps: none."
+            : "  Planned steps:");
+        foreach (var action in request.PlannedActions)
+        {
+            console.WriteLine($"  {action.RollupRtId}  {action.Kind}  {action.Description}");
         }
     }
 
@@ -109,5 +134,21 @@ internal static class RollupIdList
         }
 
         return ids;
+    }
+}
+
+/// <summary>Maps the end state of a rollup repair request to the exit code of the commands (AB#6968).</summary>
+internal static class RollupRepairRequestOutcome
+{
+    public static void ThrowIfFailed(RollupRepairRequestDto request)
+    {
+        if (!request.State.Equals("Failed", StringComparison.OrdinalIgnoreCase) &&
+            request.Report is not { IsOk: false })
+        {
+            return;
+        }
+
+        var step = string.IsNullOrEmpty(request.Report?.FailedStep) ? string.Empty : $" at step: {request.Report!.FailedStep}";
+        throw new ToolException($"Rollup repair request '{request.RequestId}' failed{step}.");
     }
 }
