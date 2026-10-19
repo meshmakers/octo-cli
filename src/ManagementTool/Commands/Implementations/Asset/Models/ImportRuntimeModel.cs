@@ -26,7 +26,11 @@ internal class ImportRuntimeModel : JobWithWaitOctoCommand
 
         _fileArg = CommandArgumentValue.AddArgument("f", "file", ["File to import"], true, 1);
         _replaceArg = CommandArgumentValue.AddArgument("r", "replace",
-            ["When defined, existing entities are replaced."], false, 0);
+            [
+                "When defined, existing entities are replaced (upsert).",
+                "Without it entities are only inserted: an entity that exists only as an archived (deleted) document " +
+                "with the same rtId is replaced and active again, an active one fails."
+            ], false, 0);
     }
 
     public override async Task PreValidate()
