@@ -91,6 +91,37 @@ asset repository `streamdata/rollups/validate|repair`).
 - **NotChecked:** a rollup the validator could not check is never printed as OK. A blocking gap (NoLiveTable, SourceMissing; `isBlocking`) is listed in `Not checked (N):` with `[Cause] reason`, the summary says `N NOT CHECKED`, and `-ff` exits -5 (it follows the report's `IsOk`). A never-activated rollup (NeverActivated, informational) has no data: it is listed separately as `Not checked (informational, N):` / `not checked (info)`, the summary adds `N not checked (info)`, and it neither fails the report nor `-ff`. `RepairRollups` (dry run and applied) prints the rollups it skipped under `Skipped, not repaired because they could not be checked:`.
 - Output goes through `RollupConsistencyFormatter` (only report fields are printed). Tests: `RollupConsistencyCommandTests`.
 
+## GraphQl: run a GraphQL query against any tenant (AB#7027)
+
+`octo-cli -c GraphQl -tid <tenant> -q "<query>"` (`Asset/GraphQl/GraphQlCommand.cs`) sends one GraphQL query or mutation to
+`tenants/<tenant>/GraphQL` and writes the response JSON, unmodified, to standard output. It replaces the scripts that read the
+token out of `contexts.json` and call the route with curl or Python: the token is chosen by the SDK
+(`IAssetServicesClient.SendGraphQlAsync`, see octo-sdk CLAUDE.md) with the same rule as every other tenant-addressed command
+(AB#6836): a token for the addressed tenant is used as is, a token of another tenant (the usual case: a root-tenant context,
+`-tid` a child) is exchanged for a token of that tenant, cached per tenant in the context entry, and the context token is
+**never** sent as a fallback.
+
+- **Arguments:** `-tid/--tenantId` (default: the tenant of the context; lower-cased), the document from `-q/--query <text>`,
+  `-f/--file <path>` or standard input (`-si/--stdin`, and also when nothing else is given and input is piped; only one source),
+  `-vars/--variables <json object | @file>`, `-on/--operationName`. Works with `--context <name>` like every command.
+- **Output for scripts:** standard output carries the answer and nothing else. The banner, context lines and all log output
+  go to standard error for this command: `MachineReadableOutput` (pre-scan of the raw command line in `Program.Main`, like the
+  context selection) switches the console log target to `StdErr`; its list `CommandNames` is the place to register another
+  command with this property. The body is written as the service sent it plus a final line break if it had none, so
+  `octo-cli ... | jq` and `ConvertFrom-Json` work. The other commands print JSON through `IConsoleService`/the logger on standard
+  output with banner and log lines mixed in; only `GraphQl` is clean.
+- **Exit codes:** 0 success. GraphQL errors (non-empty `errors`, HTTP 200 or 400) print the body to standard error, nothing to
+  standard output, exit `-5`. A tenant where the operator is not provisioned, an exchange denial or a 403: the AB#6836 message
+  (tenant, cause, step `ProvisionCurrentUser -ttid <tenant>`), exit `-4`, no request is sent for a denied exchange.
+  Missing/ambiguous document or invalid variables: exit `-5`. Transport/5xx: `-3`.
+- **No token exposure:** the command logs the service URI and the tenant only; no token, header or request body is logged at any
+  level, and exception texts do not contain token content (canary-token tests).
+- **Tests:** `GraphQlCommandTests` (arguments, sources, stdout/stderr, exit behaviour, fake client), `GraphQlCommandPathTests`
+  (real command, `AuthenticationService`, `AssetServicesClient`; loopback listener proves the tenant token, not the context
+  token, reaches `/tenants/<t>/GraphQL`; canary context token appears in no output, log or exception; denials send nothing),
+  `MachineReadableOutputTests`.
+- The command is added to the `octo` skill command reference by AB#6840, not here.
+
 ## Build Configurations
 
 - **Debug/Release**: Standard configurations

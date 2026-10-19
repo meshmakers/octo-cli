@@ -7,6 +7,7 @@ using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Ai;
 using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Asset.Blueprints;
 using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Asset.CkModelLibraries;
 using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Asset.FixupScripts;
+using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Asset.GraphQl;
 using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Asset.Secrets;
 using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Asset.Models;
 using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Asset.PlatformFiles;
@@ -59,7 +60,20 @@ internal static class Program
         var logger = LogManager.GetCurrentClassLogger();
         try
         {
+            // AB#7027: a command that scripts pipe keeps standard output for its answer; logs go to standard error.
+            var machineReadable = MachineReadableOutput.IsRequested(Environment.GetCommandLineArgs());
+            if (machineReadable)
+            {
+                MachineReadableOutput.RouteLogsToStandardError();
+            }
+
             var servicesProvider = BuildDi();
+            if (machineReadable)
+            {
+                // Building the container may have loaded the logging configuration again.
+                MachineReadableOutput.RouteLogsToStandardError();
+            }
+
             using (servicesProvider as IDisposable)
             {
                 var runner = servicesProvider.GetRequiredService<Runner>();
@@ -154,6 +168,7 @@ internal static class Program
         });
 
         services.AddSingleton<IConfirmationService, ConfirmationService>();
+        services.AddSingleton<IStandardStreams, StandardStreams>();
         services.AddSingleton<IConsoleService, ConsoleService>();
         services.AddSingleton<IEnvironmentService, EnvironmentService>();
         services.AddSingleton<IParserService, ParserService>();
@@ -282,6 +297,8 @@ internal static class Program
         services.AddTransient<ICommand, ImportFromCatalogCommand>();
         services.AddTransient<ICommand, FixAllCommand>();
         services.AddTransient<ICommand, RefreshCatalogsCommand>();
+
+        services.AddTransient<ICommand, GraphQlCommand>();
 
         services.AddTransient<ICommand, ListBlueprints>();
         services.AddTransient<ICommand, RefreshBlueprintCatalogs>();

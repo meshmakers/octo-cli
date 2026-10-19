@@ -73,7 +73,7 @@ internal sealed class StubContextManager(ContextEntry? entry, string? name = "ch
 }
 
 /// <summary>An in-process HTTP endpoint that records method, path, query and the Authorization header.</summary>
-internal sealed class WireService : IDisposable
+public sealed class WireService : IDisposable
 {
     private readonly HttpListener _listener = new();
 
@@ -94,6 +94,7 @@ internal sealed class WireService : IDisposable
     public string Body { get; set; } = """{"items":[],"modelsNeedingActionCount":0}""";
     public List<string> Requests { get; } = [];
     public List<string> Authorization { get; } = [];
+    public List<string> Bodies { get; } = [];
 
     public void Dispose() => _listener.Abort();
 
@@ -111,8 +112,15 @@ internal sealed class WireService : IDisposable
                 return;
             }
 
+            string requestBody;
+            using (var reader = new StreamReader(context.Request.InputStream, Encoding.UTF8))
+            {
+                requestBody = await reader.ReadToEndAsync();
+            }
+
             lock (Requests)
             {
+                Bodies.Add(requestBody);
                 Requests.Add($"{context.Request.HttpMethod} {context.Request.Url?.PathAndQuery}");
                 var header = context.Request.Headers["Authorization"];
                 if (header != null)
