@@ -32,7 +32,7 @@ internal class GraphQlCommand : ServiceClientOctoCommand<IAssetServicesClient>
     public GraphQlCommand(ILogger<GraphQlCommand> logger, IOptions<OctoToolOptions> options,
         IAssetServicesClient assetServicesClient, IAuthenticationService authenticationService,
         IStandardStreams streams)
-        : base(logger, Constants.AssetRepositoryServicesGroup, CommandName,
+        : base(logger, Constants.AssetRepositoryServicesGroup, "GraphQl", // literal on purpose: the command-reference generator needs a string literal here
             "Runs a GraphQL query or mutation against a tenant and prints the response JSON to standard output. " +
             "Authenticates with a token for that tenant.",
             options, assetServicesClient, authenticationService)
