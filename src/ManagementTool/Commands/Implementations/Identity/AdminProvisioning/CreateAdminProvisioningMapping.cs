@@ -50,6 +50,7 @@ internal class CreateAdminProvisioningMapping : ServiceClientOctoCommand<IIdenti
             Notes:
             [
                 "All admin provisioning commands must be run from the **system tenant context**.",
+                "A mapping is unique per source tenant and source user. Creating a second one fails with HTTP 409 (`ExternalTenantUserMappingAlreadyExists`) and a non-zero exit code; use `UpdateExternalTenantUserMapping` to change the roles of the existing mapping.",
             ]
         );
 
