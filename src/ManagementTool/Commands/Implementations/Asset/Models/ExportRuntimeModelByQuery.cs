@@ -45,6 +45,11 @@ internal class ExportRuntimeModelByQuery : JobOctoCommand
                     new CodeSampleArgument(_queryIdArg, "68e296bc1f73f259bbb10399"),
                 ],
                     description: "Export the results of a stored query (the RtId of a System/SimpleRtQuery entity)"),
+            ],
+            Notes:
+            [
+                "The export runs with the data permissions of the caller: the job uses the identity and roles of the user who started it, so the file contains only what that user may read. A caller without identity gets 401 and no job is started.",
+                "Only the initiating subject may download the result (any other subject gets 403), and the download needs the tenant role TenantManagement - even for the initiator, otherwise the download fails with 403.",
             ]
         );
 
