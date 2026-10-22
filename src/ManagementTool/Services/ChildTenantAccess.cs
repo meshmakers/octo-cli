@@ -20,8 +20,9 @@ public interface IChildTenantAccess
 {
     /// <summary>
     ///     Returns an access token issued for <paramref name="childTenantId" />. For a client-credentials session (no
-    ///     refresh token) with <c>OCTO_CLI_CLIENT_ID</c> / <c>OCTO_CLI_CLIENT_SECRET</c> set it requests a client-credentials
-    ///     token for the child - the client's mirror there, e.g. the creator of a scratch tenant. For a user session the
+    ///     refresh token) with <c>OCTO_CLI_CLIENT_ID</c> and a secret set it requests a client-credentials token for the
+    ///     child - the client's mirror there, e.g. the creator of a scratch tenant. The secret is
+    ///     <c>OCTO_CLI_CHILD_CLIENT_SECRET</c> (the mirror's own secret) when set, else <c>OCTO_CLI_CLIENT_SECRET</c>. For a user session the
     ///     token of the context is exchanged for the child (RFC 8693). The context's own token is never used as a fallback.
     /// </summary>
     /// <exception cref="ToolException">No token can be obtained; the message names the cause.</exception>
@@ -45,7 +46,10 @@ public sealed class ChildTenantAccess(
         var authentication = authenticationOptions.Value;
         var isServiceSession = string.IsNullOrEmpty(authentication.RefreshToken);
         var clientId = _environment(Constants.EnvVarClientId);
-        var clientSecret = _environment(Constants.EnvVarClientSecret);
+        // The mirror's OWN secret when given; the inherited parent secret only without it (it stops working in the child
+        // once the inherited copy is removed, AB#5061).
+        var childSecret = _environment(Constants.EnvVarChildClientSecret);
+        var clientSecret = string.IsNullOrEmpty(childSecret) ? _environment(Constants.EnvVarClientSecret) : childSecret;
 
         if (isServiceSession && !string.IsNullOrEmpty(clientId) && !string.IsNullOrEmpty(clientSecret))
         {
@@ -83,8 +87,9 @@ public sealed class ChildTenantAccess(
 
         throw new ToolException(
             $"No credentials to act in tenant '{childTenantId}'. Set {Constants.EnvVarClientId} and " +
-            $"{Constants.EnvVarClientSecret} (the client that created the scratch tenant) and run LogInClientCredentials " +
-            "for the parent context, or sign in as a user who is administrator of that tenant.");
+            $"{Constants.EnvVarClientSecret} (the client that created the scratch tenant; {Constants.EnvVarChildClientSecret} " +
+            "for the secret of its mirror in the child, if it differs) and run LogInClientCredentials for the parent " +
+            "context, or sign in as a user who is administrator of that tenant.");
     }
 }
 

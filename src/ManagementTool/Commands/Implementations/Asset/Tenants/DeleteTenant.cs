@@ -63,8 +63,10 @@ internal class DeleteTenant : ServiceClientOctoCommand<IAssetServicesClient>
                 "being deleted with UseContext or pass --context <name> - or let --disable-features do it.",
                 "--disable-features (AB#7192) switches off every enabled capability for you and deletes the tenant afterwards. " +
                 "The capability endpoints belong to the tenant's own administrator, so the command uses YOUR token for the tenant " +
-                "being deleted: with a client-credentials session (OCTO_CLI_CLIENT_ID / OCTO_CLI_CLIENT_SECRET set) the client's " +
-                "mirror in that tenant - the creator of a scratch tenant (Create --scratch) is its administrator; with a user " +
+                "being deleted: with a client-credentials session (OCTO_CLI_CLIENT_ID and a secret set) the client's " +
+                "mirror in that tenant - the creator of a scratch tenant (Create --scratch) is its administrator - authenticates with " +
+                "OCTO_CLI_CHILD_CLIENT_SECRET (the secret of the mirror in the child) when set, else with OCTO_CLI_CLIENT_SECRET, " +
+                "which only works while the child still accepts the inherited parent secret; with a user " +
                 "session the user's token is exchanged for the tenant and the user must be its administrator. It requires -y, " +
                 "prints the capabilities it switched off, and never deletes archives: when Stream Data stays enabled because " +
                 "archives are still activated, the command reports them, does NOT delete the tenant and exits with an error " +

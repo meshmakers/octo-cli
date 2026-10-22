@@ -256,6 +256,63 @@ public sealed class ScratchTenantCommandTests : IDisposable
     }
 
     [Fact]
+    public async Task ChildToken_WithTheMirrorsOwnSecret_UsesIt_NotTheInheritedParentSecret()
+    {
+        var authenticator = A.Fake<IAuthenticatorClient>();
+        A.CallTo(() => authenticator.RequestClientCredentialsTokenForTenantAsync("scratch1", ApiScopes.OctoApiFullAccess,
+                DefaultScopes.None, "agent-client", "the-mirror-secret"))
+            .Returns(new AuthenticationData { AccessToken = "child-own-secret-token" });
+        var env = ClientEnv();
+        env[Constants.EnvVarChildClientSecret] = "the-mirror-secret";
+        var access = NewAccess(authenticator, null, new OctoToolAuthenticationOptions { AccessToken = "parent-token" }, env);
+
+        var token = await access.GetAccessTokenAsync("scratch1");
+
+        Assert.Equal("child-own-secret-token", token);
+        A.CallTo(() => authenticator.RequestClientCredentialsTokenForTenantAsync(A<string>._, A<ApiScopes>._,
+            A<DefaultScopes>._, A<string>._, "the-secret")).MustNotHaveHappened();
+    }
+
+    [Fact]
+    public async Task ChildToken_WithoutTheChildSecret_FallsBackToTheInheritedParentSecret()
+    {
+        var authenticator = A.Fake<IAuthenticatorClient>();
+        A.CallTo(() => authenticator.RequestClientCredentialsTokenForTenantAsync("scratch1", ApiScopes.OctoApiFullAccess,
+                DefaultScopes.None, "agent-client", "the-secret"))
+            .Returns(new AuthenticationData { AccessToken = "child-inherited-token" });
+        var access = NewAccess(authenticator, null, new OctoToolAuthenticationOptions { AccessToken = "parent-token" },
+            ClientEnv());
+
+        Assert.Equal("child-inherited-token", await access.GetAccessTokenAsync("scratch1"));
+    }
+
+    [Fact]
+    public async Task ChildToken_AnEmptyChildSecret_IsTreatedAsNotSet()
+    {
+        var authenticator = A.Fake<IAuthenticatorClient>();
+        A.CallTo(() => authenticator.RequestClientCredentialsTokenForTenantAsync("scratch1", ApiScopes.OctoApiFullAccess,
+                DefaultScopes.None, "agent-client", "the-secret"))
+            .Returns(new AuthenticationData { AccessToken = "child-inherited-token" });
+        var env = ClientEnv();
+        env[Constants.EnvVarChildClientSecret] = "";
+        var access = NewAccess(authenticator, null, new OctoToolAuthenticationOptions { AccessToken = "parent-token" }, env);
+
+        Assert.Equal("child-inherited-token", await access.GetAccessTokenAsync("scratch1"));
+    }
+
+    [Fact]
+    public async Task ChildToken_TheChildSecretAlone_WithoutClientId_StillFailsWithTheRemedy()
+    {
+        var env = new Dictionary<string, string?> { [Constants.EnvVarChildClientSecret] = "the-mirror-secret" };
+        var access = NewAccess(A.Fake<IAuthenticatorClient>(), null,
+            new OctoToolAuthenticationOptions { AccessToken = "parent-token" }, env);
+
+        var exception = await Assert.ThrowsAsync<ToolException>(() => access.GetAccessTokenAsync("scratch1"));
+
+        Assert.Contains(Constants.EnvVarChildClientSecret, exception.Message);
+    }
+
+    [Fact]
     public async Task ChildToken_UserSession_ExchangesTheContextToken_NeverTheClientEnvironment()
     {
         var authenticator = A.Fake<IAuthenticatorClient>();

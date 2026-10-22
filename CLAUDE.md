@@ -424,6 +424,7 @@ Environment variables are prefixed with `OCTO_`:
 | `OCTO_CLI_CONTEXT` | Context used for this invocation, like `--context` but for a whole subshell. The argument wins when both are set. |
 | `OCTO_CLI_HOME` | Parent directory of the `.octo-cli` folder. Give parallel jobs different values to get fully separate `contexts.json` files. Trimmed before use — untrimmed whitespace would silently resolve to a different directory rather than fail. |
 | `OCTO_CLI_CLIENT_ID` / `OCTO_CLI_CLIENT_SECRET` | Credentials for `LogInClientCredentials` and for automatic token renewal. |
+| `OCTO_CLI_CHILD_CLIENT_SECRET` | Optional (AB#7192). Secret of the client's **mirror** in a child tenant, used by `Delete --disable-features` for the child token. Without it `OCTO_CLI_CLIENT_SECRET` is tried in the child, which only works while the child accepts the inherited parent secret (AB#5061). |
 
 ## Command Categories
 
@@ -1189,7 +1190,8 @@ An agent that creates throw-away child tenants with a client-credentials client 
 - **`Delete --disable-features` (`-df`, requires `-y`)** switches off every capability the tenant has enabled - AI Services, Communication, Reporting,
   Stream Data, in that order - with *the caller's token for that child tenant*, prints what it disabled, then deletes the tenant. The capability
   endpoints belong to the tenant's own administrator (a parent token is refused there), so `ChildTenantAccess` gets the child token: a
-  client-credentials session with `OCTO_CLI_CLIENT_ID` / `OCTO_CLI_CLIENT_SECRET` requests `client_credentials` with `acr_values=tenant:<child>`
+  client-credentials session with `OCTO_CLI_CLIENT_ID` and `OCTO_CLI_CHILD_CLIENT_SECRET` (the mirror's own secret; else `OCTO_CLI_CLIENT_SECRET`, the inherited parent
+  secret, which stops working once the child no longer accepts it) requests `client_credentials` with `acr_values=tenant:<child>`
   (`IAuthenticatorClient.RequestClientCredentialsTokenForTenantAsync`); a user session exchanges its token (RFC 8693). The context's own token is never
   the fallback. It never deletes archives: when Stream Data stays enabled because archives are activated, the command lists them, does **not**
   delete the tenant and fails (`DisableArchive` keeps the data, `DeleteArchive` removes the archive). The orchestration is the SDK's
