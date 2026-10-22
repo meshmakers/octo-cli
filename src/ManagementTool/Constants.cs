@@ -11,6 +11,13 @@ internal static class Constants
     public const string EnvVarClientSecret = "OCTO_CLI_CLIENT_SECRET";
 
     /// <summary>
+    ///     Secret of the client's <b>mirror</b> in a child tenant (AB#7192), used by <c>Delete --disable-features</c> to get
+    ///     the child token. Without it the secret of <see cref="EnvVarClientSecret" /> is tried in the child, which only
+    ///     works while the child still accepts the inherited parent secret (AB#5061).
+    /// </summary>
+    public const string EnvVarChildClientSecret = "OCTO_CLI_CHILD_CLIENT_SECRET";
+
+    /// <summary>
     ///     Selects the context for a single invocation, like the --context argument but for a whole
     ///     subshell. The argument wins when both are given.
     /// </summary>

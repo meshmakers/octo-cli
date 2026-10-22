@@ -203,6 +203,10 @@ public class AuthenticationServiceTests
             return Task.FromResult(ClientCredentialsResult);
         }
 
+        public Task<AuthenticationData> RequestClientCredentialsTokenForTenantAsync(string tenantId,
+            ApiScopes apiScopes, DefaultScopes defaultScopes, string clientId, string clientSecret) =>
+            throw new NotImplementedException();
+
         public Task<EnsureAuthenticatedData> EnsureAuthenticatedAsync(string refreshToken, string accessToken) =>
             throw new NotImplementedException();
 

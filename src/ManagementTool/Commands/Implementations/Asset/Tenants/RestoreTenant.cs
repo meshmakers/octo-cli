@@ -63,6 +63,10 @@ internal class RestoreTenant : JobWithWaitOctoCommand
             Notes:
             [
                 "--restore-archive-data restores archives to their backed-up state; it is a no-op on a plain '*.tar.gz' backup.",
+                "Restoring into a scratch tenant (AB#7192): there is no --scratch flag on Restore. Create the tenant with Create --scratch, " +
+                "log in to it with the client's mirror (LogInClientCredentials --context <child>) and restore into it with that child token; " +
+                "the scratch record lives outside the tenant database and survives the restore, so the creator stays administrator. A plain " +
+                "restore writes or changes no scratch record.",
                 "The backup is uploaded in parts of 50 MiB (change with --part-size-mib), so a backup of several GB passes the body limit of the ingress; an interrupted upload resumes from the server's offset.",
                 "When the upload is refused, the command reports the HTTP status, the part number and the offset of the failed part, and no restore job is started.",
                 "The target tenant's archive schemas must match those in the backup; mismatched archives are skipped and reported.",

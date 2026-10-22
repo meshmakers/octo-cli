@@ -263,6 +263,9 @@ internal static class Program
         services.AddSingleton<ITenantTokenStore, ContextTenantTokenStore>();
         services.AddSingleton<ITenantTokenProvider, TenantTokenProvider>();
         services.AddSingleton<IAuthenticationService, AuthenticationService>();
+        // AB#7192: the token and the capability clients of a child tenant (Delete --disable-features).
+        services.AddSingleton<IChildTenantAccess, ChildTenantAccess>();
+        services.AddSingleton<IChildTenantFeaturesFactory, ChildTenantFeaturesFactory>();
         services.AddSingleton<ICommunicationServicesClient, CommunicationServicesClient>();
         services.AddSingleton<IStreamDataServicesClient, StreamDataServicesClient>();
         services.AddSingleton<IReportingServicesClient, ReportingServicesClient>();
