@@ -13,6 +13,7 @@ internal class CreateTenant : ServiceClientOctoCommand<IAssetServicesClient>
     private readonly IArgument _databaseArg;
     private readonly IArgument _tenantIdArg;
     private readonly IArgument _noProvisionArg;
+    private readonly IArgument _scratchArg;
 
     public CreateTenant(ILogger<CreateTenant> logger, IOptions<OctoToolOptions> options,
         IAssetServicesClient assetServicesClient, IIdentityServicesClient identityServicesClient,
@@ -29,6 +30,9 @@ internal class CreateTenant : ServiceClientOctoCommand<IAssetServicesClient>
             1);
         _noProvisionArg = CommandArgumentValue.AddArgument("np", "no-provision",
             ["Skip admin provisioning of the current user"], false, 0);
+        _scratchArg = CommandArgumentValue.AddArgument("sc", "scratch",
+            ["Create a scratch tenant: the client-credentials client that runs this command becomes administrator " +
+             "of the new tenant (no human login needed)"], false, 0);
     }
 
     public override CommandDocumentation? GetDocumentation() =>
@@ -40,6 +44,26 @@ internal class CreateTenant : ServiceClientOctoCommand<IAssetServicesClient>
                     new CodeSampleArgument(_databaseArg, "newtenant_db"),
                 ],
                     description: "Basic usage"),
+                new CodeSample(arguments: [
+                    new CodeSampleArgument(_tenantIdArg, "scratch1"),
+                    new CodeSampleArgument(_databaseArg, "scratch1_db"),
+                    new CodeSampleArgument(_scratchArg),
+                ],
+                    description: "Scratch tenant for an agent (client-credentials login of the parent tenant)"),
+            ],
+            Notes:
+            [
+                "--scratch (AB#7192) is for agents and automation that log in with a client (LogInClientCredentials): the tenant " +
+                "records the creating client, and that client's mirror in the new tenant becomes administrator (TenantOwners) of it. " +
+                "The agent then gets a token for the child (client_credentials, acr_values tenant:<child> - octo-cli does this for " +
+                "Delete --disable-features), works with the existing verbs, switches the capabilities off and deletes the tenant, " +
+                "without any human login. The grant survives an identity restart and is revoked by removing the client from " +
+                "TenantOwners (RemoveClientFromGroup).",
+                "Accepted only for a client-credentials token of the direct parent with the role TenantManagement (HTTP 403 for a user " +
+                "token or another tenant). The client has to be flagged AutoProvisionInChildTenants (AddClientCredentialsClient -apic) - " +
+                "otherwise it has no mirror in the child and gets nothing. --scratch skips the provisioning of the current user (a " +
+                "service token has no user). GetTenants shows isScratch, scratchCreatorClientId and scratchAccessRevoked.",
+                "Without --scratch nothing changes: the current user becomes administrator unless --no-provision is given.",
             ]
         );
 
@@ -47,13 +71,22 @@ internal class CreateTenant : ServiceClientOctoCommand<IAssetServicesClient>
     {
         var tenantId = CommandArgumentValue.GetArgumentScalarValue<string>(_tenantIdArg).ToLower();
         var databaseName = CommandArgumentValue.GetArgumentScalarValue<string>(_databaseArg).ToLower();
-        var skipProvisioning = CommandArgumentValue.IsArgumentUsed(_noProvisionArg);
+        var scratch = CommandArgumentValue.IsArgumentUsed(_scratchArg);
+        // A scratch tenant is created by a service token: there is no user to provision, the creator's mirror is the admin.
+        var skipProvisioning = scratch || CommandArgumentValue.IsArgumentUsed(_noProvisionArg);
 
         Logger.LogInformation(
-            "Creating tenant \'{TenantId}\' (database \'{DatabaseName}\') at \'{ServiceClientServiceUri}\'", tenantId,
-            databaseName, ServiceClient.ServiceUri);
+            "Creating {Kind} tenant \'{TenantId}\' (database \'{DatabaseName}\') at \'{ServiceClientServiceUri}\'",
+            scratch ? "scratch" : "a", tenantId, databaseName, ServiceClient.ServiceUri);
 
-        await ServiceClient.CreateTenantAsync(tenantId, databaseName);
+        if (scratch)
+        {
+            await ServiceClient.CreateTenantAsync(tenantId, databaseName, scratch: true);
+        }
+        else
+        {
+            await ServiceClient.CreateTenantAsync(tenantId, databaseName);
+        }
 
         Logger.LogInformation(
             "Tenant \'{TenantId}\' (database \'{DatabaseName}\') at \'{ServiceClientServiceUri}\' created", tenantId,
@@ -72,6 +105,12 @@ internal class CreateTenant : ServiceClientOctoCommand<IAssetServicesClient>
 
             Logger.LogInformation(
                 "Current user provisioned as admin in tenant '{TenantId}'", tenantId);
+        }
+        else if (scratch)
+        {
+            Logger.LogInformation(
+                "Scratch tenant: the client that created it becomes administrator of tenant '{TenantId}' once identity has " +
+                "set the tenant up (the client has to be flagged AutoProvisionInChildTenants)", tenantId);
         }
         else
         {

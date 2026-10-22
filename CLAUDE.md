@@ -1171,3 +1171,27 @@ help string, or a base() description in any command class is the **single**
 step needed to update the public docs site. No manual edits in
 `octo-documentation` — handwritten pages there are limited to `intro.md`
 and `common-workflows.md`.
+
+## Scratch tenants: an agent works in and cleans up what it creates (AB#7192)
+
+An agent that creates throw-away child tenants with a client-credentials client no longer needs a human device-code login per tenant.
+
+- **`Create --scratch` (`-sc`)** creates the tenant as a scratch tenant (`scratch=true` to the asset repository, `ScratchTenantMarker` in the system tenant
+  configuration): the creating client's **mirror** in the child becomes administrator (`TenantOwners`). The current user is not provisioned (a service
+  token has no user). The service accepts it only for a client-credentials token of the direct parent with `TenantManagement`; the client must be
+  flagged `AutoProvisionInChildTenants` (`AddClientCredentialsClient -apic`), or it has no mirror there and gets nothing. **`Restore --scratch`** does
+  the same for a restored tenant (only for a system-tenant service token; under `ServiceTokenEnforcement=Enforce` restore into a tenant created with
+  `Create --scratch` using the child token instead - the marker survives the restore). `GetTenants` shows `isScratch`, `scratchCreatorClientId`,
+  `scratchCreatedAtUtc`, `scratchAccessRevoked`.
+- **Working in the child:** a context for the child tenant plus `LogInClientCredentials` with `OCTO_CLI_CLIENT_ID` / `OCTO_CLI_CLIENT_SECRET` of the
+  mirror (its own secret from `RotateMirrorSecret`, or - while AB#5061 keeps the inherited secret - the parent client's secret) gives the usual
+  child token; all existing verbs and the MCP tools then work in the tenant.
+- **`Delete --disable-features` (`-df`, requires `-y`)** switches off every capability the tenant has enabled - AI Services, Communication, Reporting,
+  Stream Data, in that order - with *the caller's token for that child tenant*, prints what it disabled, then deletes the tenant. The capability
+  endpoints belong to the tenant's own administrator (a parent token is refused there), so `ChildTenantAccess` gets the child token: a
+  client-credentials session with `OCTO_CLI_CLIENT_ID` / `OCTO_CLI_CLIENT_SECRET` requests `client_credentials` with `acr_values=tenant:<child>`
+  (`IAuthenticatorClient.RequestClientCredentialsTokenForTenantAsync`); a user session exchanges its token (RFC 8693). The context's own token is never
+  the fallback. It never deletes archives: when Stream Data stays enabled because archives are activated, the command lists them, does **not**
+  delete the tenant and fails (`DisableArchive` keeps the data, `DeleteArchive` removes the archive). The orchestration is the SDK's
+  `TenantFeatureDisabler`, shared with the MCP tool `delete_tenant` (`disableFeatures`).
+- Tests: `ScratchTenantCommandTests` (Create / Restore flag, Delete with and without `--disable-features`, order, archives, child token for service and user sessions).

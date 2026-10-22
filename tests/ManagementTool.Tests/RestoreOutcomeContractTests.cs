@@ -88,7 +88,7 @@ public sealed class RestoreOutcomeContractTests : IDisposable
             A.Fake<IBotServiceClientAccessToken>());
         var bot = A.Fake<IBotServicesClient>();
         A.CallTo(() => bot.RestoreRepositoryWithTusAsync(A<string>._, A<string>._, A<string>._, A<string?>._,
-                A<bool>._, A<Action<double>?>._, A<CancellationToken>._))
+                A<bool>._, A<bool>._, A<Action<double>?>._, A<CancellationToken>._))
             .Returns(new JobResponseDto("job-1"));
         A.CallTo(() => bot.GetImportJobStatus(A<string>._)).ReturnsLazily((string id) => real.GetImportJobStatus(id));
 
