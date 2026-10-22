@@ -103,7 +103,7 @@ public sealed class RestoreOutcomeTests : IDisposable
     {
         var bot = A.Fake<IBotServicesClient>();
         A.CallTo(() => bot.RestoreRepositoryWithTusAsync(A<string>._, A<string>._, A<string>._, A<string?>._,
-                A<bool>._, A<bool>._, A<Action<double>?>._, A<CancellationToken>._))
+                A<bool>._, A<Action<double>?>._, A<CancellationToken>._))
             .Returns(new JobResponseDto("job-1"));
         A.CallTo(() => bot.GetImportJobStatus("job-1")).Returns(finishedJob);
         var logger = new RecordingLogger<RestoreTenant>();

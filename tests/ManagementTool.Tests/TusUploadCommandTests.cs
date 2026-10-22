@@ -53,7 +53,7 @@ public sealed class TusUploadCommandTests : IDisposable
         var (command, bot, botOptions) = NewRestore();
         long partSizeAtUpload = 0;
         A.CallTo(() => bot.RestoreRepositoryWithTusAsync(A<string>._, A<string>._, A<string>._, A<string?>._,
-                A<bool>._, A<bool>._, A<Action<double>?>._, A<CancellationToken>._))
+                A<bool>._, A<Action<double>?>._, A<CancellationToken>._))
             .Invokes(() => partSizeAtUpload = botOptions.Value.TusPartSizeBytes)
             .Returns(new JobResponseDto("job-1"));
         command.CommandArgumentValue.ParseLayer(["-tid", "acme", "-db", "db", "-f", _file, "-ps", "20"]);
@@ -99,7 +99,7 @@ public sealed class TusUploadCommandTests : IDisposable
     {
         var (command, bot, _) = NewRestore();
         A.CallTo(() => bot.RestoreRepositoryWithTusAsync(A<string>._, A<string>._, A<string>._, A<string?>._,
-                A<bool>._, A<bool>._, A<Action<double>?>._, A<CancellationToken>._))
+                A<bool>._, A<Action<double>?>._, A<CancellationToken>._))
             .Throws(new TusUploadException("Upload of part 3 of 70 (offset 104857600) was refused: 413.",
                 HttpStatusCode.RequestEntityTooLarge, 3, 70, 104857600, 52428800));
         command.CommandArgumentValue.ParseLayer(["-tid", "acme", "-db", "db", "-f", _file, "-w"]);
@@ -132,8 +132,8 @@ public sealed class TusUploadCommandTests : IDisposable
     {
         var (command, bot, _, logger) = NewRestoreWithLogger();
         A.CallTo(() => bot.RestoreRepositoryWithTusAsync(A<string>._, A<string>._, A<string>._, A<string?>._,
-                A<bool>._, A<bool>._, A<Action<double>?>._, A<CancellationToken>._))
-            .Invokes((string _, string _, string _, string? _, bool _, bool _, Action<double>? progress, CancellationToken _) =>
+                A<bool>._, A<Action<double>?>._, A<CancellationToken>._))
+            .Invokes((string _, string _, string _, string? _, bool _, Action<double>? progress, CancellationToken _) =>
             {
                 progress?.Invoke(0.5);
                 progress?.Invoke(1);
@@ -222,7 +222,7 @@ public sealed class TusUploadCommandTests : IDisposable
     {
         var bot = A.Fake<IBotServicesClient>();
         A.CallTo(() => bot.RestoreRepositoryWithTusAsync(A<string>._, A<string>._, A<string>._, A<string?>._,
-                A<bool>._, A<bool>._, A<Action<double>?>._, A<CancellationToken>._))
+                A<bool>._, A<Action<double>?>._, A<CancellationToken>._))
             .Returns(new JobResponseDto("job-1"));
         A.CallTo(() => bot.StartImportArchiveDataWithTusAsync(A<string>._, A<string>._, A<string>._,
                 A<ArchiveImportMode>._, A<Action<double>?>._, A<CancellationToken>._))

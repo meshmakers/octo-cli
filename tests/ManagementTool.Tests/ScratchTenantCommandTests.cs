@@ -68,31 +68,6 @@ public sealed class ScratchTenantCommandTests : IDisposable
         A.CallTo(() => identity.ProvisionCurrentUser("plain1")).MustHaveHappenedOnceExactly();
     }
 
-    // ---- Restore --scratch ------------------------------------------------
-
-    [Theory]
-    [InlineData(true)]
-    [InlineData(false)]
-    public async Task Restore_PassesTheScratchFlagOnlyWhenGiven(bool scratch)
-    {
-        var bot = A.Fake<IBotServicesClient>();
-        A.CallTo(() => bot.RestoreRepositoryWithTusAsync(A<string>._, A<string>._, A<string>._, A<string?>._,
-                A<bool>._, A<bool>._, A<Action<double>?>._, A<CancellationToken>._))
-            .Returns(new JobResponseDto("job-1"));
-        var command = new RestoreTenant(NullLogger<RestoreTenant>.Instance,
-            Options.Create(new OctoToolOptions { TenantId = "octosystem" }), bot, A.Fake<IAuthenticationService>(),
-            Options.Create(new BotServiceClientOptions()));
-        command.CommandArgumentValue.ParseLayer(scratch
-            ? ["-tid", "acme", "-db", "db", "-f", _file, "-sc"]
-            : ["-tid", "acme", "-db", "db", "-f", _file]);
-
-        await command.Execute();
-
-        A.CallTo(() => bot.RestoreRepositoryWithTusAsync("acme", "db", _file, A<string?>._, false, scratch,
-                A<Action<double>?>._, A<CancellationToken>._))
-            .MustHaveHappenedOnceExactly();
-    }
-
     // ---- Delete --disable-features ----------------------------------------
 
     private sealed class DeleteFixture
