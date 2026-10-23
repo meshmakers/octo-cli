@@ -39,6 +39,14 @@ would break an installed model with `409 CK_UPGRADE_BLOCKED` (SDK: `CkUpgradeBlo
   the requested models whose tree contains a blocking update are dropped and reported, the set is resolved again and the rest is imported;
   when no model can be left out, or the service refuses anyway, it fails with `ToolException` ("never forces") and imports nothing.
   A blocker can disappear after another update was imported, so `FixAll` may have to be run twice (update `Registration` first).
+- **Joint import of mutually exact-pinned models (AB#7376)**: `ImportFromCatalog -m A,B,C` (comma-separated, like `UpdateClientRoles -rids`)
+  sends one `ResolveDependenciesBatch` with all roots and one `ImportFromCatalogBatch`; the service judges the list as one post-state, so
+  exact pins of replaced versions stop blocking. The service imports ids in request order and concatenates the trees of the roots, so
+  `JointImportPlanner.OrderByDependencies` orders the set in the CLI: a model follows every other model of the set whose name appears in
+  its dependency tree (stable, resolver order for ties). A blocked import prints a ready-to-run joint command
+  (`JointImportPlanner.BuildJointCommand`: requested models + every `suggestedDependentUpdate` of the blockers not yet in the set);
+  `--force` keeps its meaning for the whole set. `FixAll` adds blocked rows with a compatible catalog update to the candidate set; the
+  existing drop loop leaves out only what is still blocked in the joint set. Tests: `JointImportCommandTests` (octo-mesh-energy group of six).
 - Tests: `tests/ManagementTool.Tests/CkUpgradeGuardImportCommandTests.cs`.
 
 ## Large uploads: Restore and ImportArchiveData (AB#6970, Bug AB#6786)
