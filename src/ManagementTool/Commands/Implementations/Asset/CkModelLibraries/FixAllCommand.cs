@@ -18,7 +18,8 @@ internal class FixAllCommand : JobWithWaitOctoCommand
         IAssetServicesClient assetServicesClient, IBotServicesClient botServicesClient,
         IAuthenticationService authenticationService, IConfirmationService confirmationService)
         : base(logger, Constants.AssetRepositoryServicesGroup, "FixAll",
-            "Imports all CK models that need update or fix. Updates that would break an installed model are skipped " +
+            "Imports all CK models that need update or fix. Updates that are blocked only by each other (exact pins) " +
+            "are imported together in one guarded set. Updates that would break an installed model even then are skipped " +
             "and reported (FixAll never forces them; use ImportFromCatalog --force deliberately). " +
             "Use -w to wait, -y to skip confirmation.",
             options, botServicesClient, authenticationService)
@@ -59,10 +60,17 @@ internal class FixAllCommand : JobWithWaitOctoCommand
             .Where(i => i.NeedsAction && !i.IsServiceManaged && i.IsCompatible && i.CatalogName != null && i.FullModelId != null)
             .ToList();
 
-        // Tenant upgrade guard (AB#6870): a blocked row has HasUpdate but not NeedsAction. It is never imported by
-        // FixAll - report it with the reason and the proven next step.
+        // Tenant upgrade guard (AB#6870): a blocked row has HasUpdate but not NeedsAction. Models that pin each other
+        // exactly block each other one by one but not as a group (AB#7376): blocked rows with a compatible catalog
+        // update join the candidate set and are judged together. What stays blocked in the joint set is dropped below
+        // and reported. FixAll never forces.
         var blockedModels = status.Items.Where(i => i.IsBlocked && !i.IsServiceManaged).ToList();
-        ReportSkipped(blockedModels.Select(m => (m.Name, m.CatalogVersion, (IReadOnlyList<CkUpgradeBlockerDto>)m.Blockers)));
+        var jointRows = blockedModels
+            .Where(i => i.HasUpdate && i.IsCompatible && i.CatalogName != null && i.FullModelId != null)
+            .ToList();
+        ReportSkipped(blockedModels.Except(jointRows)
+            .Select(m => (m.Name, m.CatalogVersion, (IReadOnlyList<CkUpgradeBlockerDto>)m.Blockers)));
+        actionModels = actionModels.Concat(jointRows).ToList();
 
         if (actionModels.Count == 0)
         {
@@ -115,10 +123,12 @@ internal class FixAllCommand : JobWithWaitOctoCommand
             return;
         }
 
-        Logger.LogInformation("Models to import ({Count}): {Models}", depResult.ModelsToImport.Count, string.Join(", ", depResult.ModelsToImport));
+        // Dependency order (AB#7376): the service imports in the order it receives the ids.
+        var modelsToImport = JointImportPlanner.OrderByDependencies(depResult);
+        Logger.LogInformation("Models to import ({Count}): {Models}", modelsToImport.Count, string.Join(", ", modelsToImport));
 
         if (!CommandArgumentValue.IsArgumentUsed(_yesArg))
-            _confirmationService.Confirm($"Import {depResult.ModelsToImport.Count} model(s)");
+            _confirmationService.Confirm($"Import {modelsToImport.Count} model(s)");
 
         var catalogName = requests[0].CatalogName;
         BatchImportResponseDto importResult;
@@ -129,7 +139,7 @@ internal class FixAllCommand : JobWithWaitOctoCommand
             importResult = await _assetServicesClient.ImportFromCatalogBatchAsync(tenantId,
                 new ImportFromCatalogBatchRequestDto
                 {
-                    CatalogName = catalogName, ModelIds = depResult.ModelsToImport, ForceBreakingUpdate = false
+                    CatalogName = catalogName, ModelIds = modelsToImport, ForceBreakingUpdate = false
                 });
         }
         catch (CkUpgradeBlockedException blocked)

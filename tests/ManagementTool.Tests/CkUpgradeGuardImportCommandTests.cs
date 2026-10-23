@@ -157,10 +157,21 @@ public sealed class CkUpgradeGuardImportCommandTests
         {
             Items = [Row("Basic", "2.4.0", "2.5.0", blocked: true), Row("Other", "1.0.0", "1.1.0", blocked: false)]
         });
-        Resolves(asset, new BatchDependencyResolutionResponseDto
-        {
-            ModelsToImport = ["Other-1.1.0"], DependencyTrees = [Tree("Other-1.1.0")]
-        });
+        // AB#7376: the blocked row joins the candidate set; it stays blocked in the joint set and is dropped again.
+        A.CallTo(() => asset.ResolveDependenciesBatchAsync(A<string>._,
+                A<List<ImportFromCatalogRequestDto>>.That.Matches(r => r.Count == 2)))
+            .Returns(new BatchDependencyResolutionResponseDto
+            {
+                ModelsToImport = ["Basic-2.5.0", "Other-1.1.0"],
+                DependencyTrees = [Tree("Basic-2.5.0"), Tree("Other-1.1.0")],
+                IsBlocked = true, Blockers = [Blocker("Basic-2.5.0", "Basic-2.4.0")]
+            });
+        A.CallTo(() => asset.ResolveDependenciesBatchAsync(A<string>._,
+                A<List<ImportFromCatalogRequestDto>>.That.Matches(r => r.Count == 1)))
+            .Returns(new BatchDependencyResolutionResponseDto
+            {
+                ModelsToImport = ["Other-1.1.0"], DependencyTrees = [Tree("Other-1.1.0")]
+            });
         var logger = new RecordingLogger<FixAllCommand>();
         var command = NewFixAll(asset, logger);
         command.CommandArgumentValue.ParseLayer(["-y"]);
@@ -181,20 +192,23 @@ public sealed class CkUpgradeGuardImportCommandTests
     }
 
     [Fact]
-    public async Task FixAll_OnlyBlockedModels_ImportsNothing_AndDoesNotResolve()
+    public async Task FixAll_OnlyBlockedModels_StillBlockedAsASet_ImportsNothing()
     {
         var asset = AssetClient();
         A.CallTo(() => asset.GetLibraryStatusAsync(A<string>._)).Returns(new CkModelLibraryStatusResponseDto
         {
             Items = [Row("Basic", "2.4.0", "2.5.0", blocked: true)]
         });
+        Resolves(asset, new BatchDependencyResolutionResponseDto
+        {
+            ModelsToImport = ["Basic-2.5.0"], DependencyTrees = [Tree("Basic-2.5.0")],
+            IsBlocked = true, Blockers = [Blocker("Basic-2.5.0", "Basic-2.4.0")]
+        });
         var command = NewFixAll(asset, new RecordingLogger<FixAllCommand>());
         command.CommandArgumentValue.ParseLayer(["-y"]);
 
         await command.Execute();
 
-        A.CallTo(() => asset.ResolveDependenciesBatchAsync(A<string>._, A<List<ImportFromCatalogRequestDto>>._))
-            .MustNotHaveHappened();
         A.CallTo(() => asset.ImportFromCatalogBatchAsync(A<string>._, A<ImportFromCatalogBatchRequestDto>._))
             .MustNotHaveHappened();
     }
