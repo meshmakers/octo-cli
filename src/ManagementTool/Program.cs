@@ -170,7 +170,10 @@ internal static class Program
         services.AddSingleton<IConfirmationService, ConfirmationService>();
         services.AddSingleton<IStandardStreams, StandardStreams>();
         services.AddSingleton<IConsoleService, ConsoleService>();
-        services.AddSingleton<IEnvironmentService, EnvironmentService>();
+        // The parser's top layer cannot hand control back to a command layer, so --context is moved in
+        // front of the command's own options (AB#7414).
+        services.AddSingleton<IEnvironmentService>(_ =>
+            new ContextHoistingEnvironmentService(new EnvironmentService()));
         services.AddSingleton<IParserService, ParserService>();
         services.AddSingleton<ICommandParser, OctoCommandParser>();
 
