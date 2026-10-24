@@ -441,7 +441,7 @@ Environment variables are prefixed with `OCTO_`:
 | Identity | users, roles, clients (+ mirror commands: GetClientMirrors, ProvisionClientInExistingTenants, ProvisionClientInTenant, UnprovisionClientFromTenant, SetClientAutoProvision, ApplyClientOverlay, CleanClientOverlays), identityProviders, groups, emailDomainGroupRules, externalTenantUserMappings, adminProvisioning, apiResources, apiScopes | Identity Services |
 | Asset | tenants, models, blueprints (ListBlueprints, RefreshBlueprintCatalogs, InstallBlueprint, GetBlueprintHistory, PreviewBlueprintUpdate, UpdateBlueprint, ListBlueprintInstallations, UninstallBlueprint), timeSeries (EnableStreamData, DisableStreamData, ActivateArchive, DisableArchive, EnableArchive, RetryArchiveActivation, DeleteArchive, FreezeRollupArchive, UnfreezeRollupArchive, RewindRollupWatermark, ListRollupsForArchive, RecomputeArchive, BackfillRollup, ListRecomputeJobs, ValidateRollups, RepairRollups, GetRollupRepairStatus, AddComputedColumn, RemoveComputedColumn, UpdateComputedColumnFormula) | Asset Repository |
 | Bots | Dump, Restore, ExportArchiveData, ImportArchiveData, RunFixupScripts | Bot Services |
-| Communication | enable/disable, adapters (incl. RotateAdapterServiceAccountSecret), SwitchServiceAccountsToImpersonation, pipelines (incl. MovePipelines for bulk reassignment to a different adapter), triggers, pools, adapter pool queue (GetAdapterPoolQueue, CancelQueuedExecution), dataFlows, workloads (GetWorkloadsByChart, UpdateWorkloadChartVersion, DeployWorkload, UndeployWorkload) | Communication Controller |
+| Communication | enable/disable, adapters (incl. RotateAdapterServiceAccountSecret), SwitchServiceAccountsToImpersonation, pipelines (incl. MovePipelines for bulk reassignment to a different adapter), triggers, pools, adapter pool queue (GetAdapterPoolQueue, CancelQueuedExecution), dataFlows, workloads (GetWorkloadsByChart, UpdateWorkloadChartVersion, UpdateWorkloadResources, DeployWorkload, UndeployWorkload) | Communication Controller |
 | Reporting | enable/disable | Report Services |
 | AI Services | EnableAi, DisableAi, RedeemAiTicket (anonymous — bastion-side), GetAiCredentialsStatus, RevokeAiCredentials | AI Services |
 | DevOps | certificates | Local operations |
@@ -729,6 +729,14 @@ octo-cli -c DeleteAdminProvisioningMapping -ttid <targetTenantId> -mid <mappingI
 octo-cli -c GetWorkloadsByChart -cn octo-mesh-adapter
 # Set ChartVersion on a workload. Does NOT trigger a deploy.
 octo-cli -c UpdateWorkloadChartVersion -id <workloadRtId> -cv 1.2.3
+# Show / set / clear the typed CPU and memory settings of an adapter or application
+# (System.Communication 4.10.0, AB#7429). Does NOT deploy. A flag without a value clears it.
+# Reads and writes through the tenant GraphQL endpoint (the controller has no endpoint for them),
+# checks quantities and request <= limit locally first. GetAdapter shows them under "resources".
+# Precedence at deploy: chart default < these settings < explicit valuesYaml / values[].
+octo-cli -c UpdateWorkloadResources -id <workloadRtId>
+octo-cli -c UpdateWorkloadResources -id <workloadRtId> -mr 512Mi -ml 1Gi -cr 250m
+octo-cli -c UpdateWorkloadResources -id <workloadRtId> -ml
 # Trigger deploy of the workload through its parent pool.
 octo-cli -c DeployWorkload -id <workloadRtId>
 # Undeploy (destructive — confirmation prompt; -y to skip).

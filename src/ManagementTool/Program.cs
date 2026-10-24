@@ -497,6 +497,7 @@ internal static class Program
         // Communication - Workloads (Epic 3054 #4053): CI/CD chart rollout commands
         services.AddTransient<ICommand, GetWorkloadsByChartCommand>();
         services.AddTransient<ICommand, UpdateWorkloadChartVersionCommand>();
+        services.AddTransient<ICommand, UpdateWorkloadResourcesCommand>();
         services.AddTransient<ICommand, DeployWorkloadCommand>();
         services.AddTransient<ICommand, UndeployWorkloadCommand>();
         services.AddTransient<ICommand, MovePipelinesToAdapterCommand>();
