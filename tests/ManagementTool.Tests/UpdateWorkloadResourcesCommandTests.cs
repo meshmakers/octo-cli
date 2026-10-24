@@ -243,6 +243,20 @@ public sealed class UpdateWorkloadResourcesCommandTests
     }
 
     [Fact]
+    public async Task MutationWithoutUpdatedItem_IsReported_NotShownAsSuccess()
+    {
+        GivenAdapter();
+        A.CallTo(() => _client.SendGraphQlAsync(A<string>._, A<string>.That.StartsWith("mutation"), A<string?>._,
+                A<string?>._, A<CancellationToken>._))
+            .Returns(new GraphQlRawResponse("{\"data\":{\"runtime\":{\"systemCommunicationAdapters\":{\"update\":[]}}}}",
+                HttpStatusCode.OK));
+
+        var ex = await Assert.ThrowsAsync<ToolException>(() => Run("-mr", "512Mi"));
+
+        Assert.Contains("did not return the updated", ex.Message);
+    }
+
+    [Fact]
     public async Task MissingTenant_IsReported()
     {
         var command = Create(tenant: null);

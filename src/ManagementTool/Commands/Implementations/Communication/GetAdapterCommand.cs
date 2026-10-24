@@ -14,6 +14,7 @@ namespace Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Commu
 internal class GetAdapterCommand : ServiceClientOctoCommand<ICommunicationServicesClient>
 {
     private readonly IAssetServicesClient _assetServicesClient;
+    private readonly IAuthenticationService _authenticationService;
     private readonly IConsoleService _consoleService;
     private readonly IArgument _idArg;
     private readonly IArgument _jsonArg;
@@ -29,6 +30,7 @@ internal class GetAdapterCommand : ServiceClientOctoCommand<ICommunicationServic
     {
         _consoleService = consoleService;
         _assetServicesClient = assetServicesClient;
+        _authenticationService = authenticationService;
         _idArg = CommandArgumentValue.AddArgument("id", "identifier", ["The adapter runtime ID"], true, 1);
         _jsonArg = CommandArgumentValue.AddArgument("j", "json", ["Output as raw JSON"], false);
         _showSecretsArg = CommandArgumentValue.AddArgument("ss", "show-secrets",
@@ -60,6 +62,13 @@ internal class GetAdapterCommand : ServiceClientOctoCommand<ICommunicationServic
                 "- Credentials in the adapter configuration and in the pipeline configurations (members named like password, secret, apiKey, accessToken, privateKey, connectionString, ...) are masked by default, because the output of this command ends up in scripts, CI logs and AI-agent transcripts (AB#6286). `--show-secrets` (`-ss`) prints them in clear text; use it only interactively when you really need the value.",
             ]
         );
+
+    public override async Task PreValidate()
+    {
+        await base.PreValidate();
+        // The asset client has its own access-token instance; the resources lookup needs it authenticated too.
+        await _authenticationService.EnsureAuthenticated(_assetServicesClient.AccessToken);
+    }
 
     public override async Task Execute()
     {
