@@ -1,4 +1,5 @@
 using FakeItEasy;
+using Meshmakers.Octo.Sdk.ServiceClient.AssetRepositoryServices.System;
 using Meshmakers.Common.Shared.Services;
 using Meshmakers.Octo.Communication.Contracts.DataTransferObjects;
 using Meshmakers.Octo.ConstructionKit.Contracts;
@@ -48,7 +49,7 @@ public sealed class GetAdapterSecretMaskingTests
 
         var command = new GetAdapterCommand(new RecordingLogger<GetAdapterCommand>(),
             Options.Create(new OctoToolOptions { TenantId = "acme" }), console, client,
-            A.Fake<IAuthenticationService>());
+            A.Fake<IAuthenticationService>(), A.Fake<IAssetServicesClient>());
         command.CommandArgumentValue.ParseLayer(["-id", AdapterId, ..args]);
         command.Execute().GetAwaiter().GetResult();
         return console.Lines;
