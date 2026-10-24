@@ -53,7 +53,7 @@ public static class ContextOverrideResolver
     ///     the full term matches — abbreviations such as <c>--contex</c> do not, and neither does a
     ///     longer term such as <c>--contextfoo</c>.
     /// </summary>
-    private static bool IsContextTerm(string term)
+    internal static bool IsContextTerm(string term)
     {
         return term.Equals($"--{Constants.ContextArgumentTerm}", StringComparison.OrdinalIgnoreCase)
                || term.Equals($"-{Constants.ContextArgumentTerm}", StringComparison.OrdinalIgnoreCase)

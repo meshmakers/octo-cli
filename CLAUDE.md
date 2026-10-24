@@ -214,11 +214,18 @@ Behaviour worth knowing:
 
 - **It is a top-level argument, not a command argument.** It is declared by `OctoCommandParser`
   (`src/ManagementTool/OctoCommandParser.cs`) on the parser's top layer, so it works before or
-  after `-c <command>` and applies to *every* command. Accepted spellings are `--context`,
+  after `-c <command>` — also between the command's own options — and applies to *every* command. Accepted spellings are `--context`,
   `-context` and `/context`; **no short form** exists, deliberately, so the term cannot collide
   with an argument a future command declares. `CommandReferenceGenerator` only reads command
   classes, so this argument does not appear on any generated command-reference page — it is
   visible in `octo-cli -h all`.
+- **Position independence is done by hoisting (AB#7414).** The parser's top layer cannot hand control
+  back to a command layer: an argument the command does not know ends the command layer, so
+  `-c FixAll --context x -w` used to fail with "-w is an unknown parameter". `ContextHoistingEnvironmentService`
+  (registered as `IEnvironmentService` in `Program`) feeds the parser the line with every
+  `--context <name>` pair moved in front by `ContextArgumentHoister`; nothing else is reordered.
+  `ContextOptionOrderTests` runs the real parser with the context before, between and after flags
+  and valued options. A new top-level argument needs the same treatment.
 - **It resolves before the DI container is built.** `Program.BuildDi` fills `OctoToolOptions` and
   every service-client options object from the context, and the service clients are constructed
   while the command list is enumerated — all of that happens *before* the command line is parsed.
