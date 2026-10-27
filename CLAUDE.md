@@ -1158,6 +1158,7 @@ internal class FooCommand : ServiceClientOctoCommand<IFooClient>
 - `CodeSampleArgument(IArgument, string)` for arguments with values; `CodeSampleArgument(IArgument)` for flags. Constructor enforces the right shape against the argument's `MandatoryValuesCount`.
 - `ExpectedOutput` is documentation-only — `--help` does not render it (consistent with `kubectl`-style CLIs). `Samples` and `Notes`, in contrast, are rendered by `octo-cli -c <verb> --help` (see [Help Options](#help-options)), so keep both terse enough to read in a terminal.
 - Cross-references to non-command pages (concept docs, related sections) belong on handwritten `index.md` landing pages per command-reference section in `octo-documentation`, not on individual command pages — keeps generator output focused on the command itself.
+- A note may start with a Markdown heading (`"### Title\n\nText"`); it renders as a subsection of `## Notes` and Docusaurus derives the anchor from the heading text. `ImportRt` uses this for `### Replaced create` (anchor `replaced-create`, linked from the CK methods docs).
 - Skip the override entirely when the auto-canonical example suffices and there are no notes to add — keeps the class clean.
 
 ### Where output goes

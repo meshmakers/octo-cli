@@ -53,6 +53,18 @@ internal class ImportRuntimeModel : JobWithWaitOctoCommand
                     new CodeSampleArgument(_replaceArg),
                 ],
                     description: "Basic usage"),
+            ],
+            Notes:
+            [
+                "### Replaced create\n\n" +
+                "An import cannot create an entity of a type whose static CK method declares replacesGenericCreate " +
+                "(or of a type derived from it): only the method may create it, exactly as the generic create of the " +
+                "API is refused. If the file contains a new entity of such a type, the whole import fails before " +
+                "anything is written with message 137 (reason GENERIC_CREATE_REPLACED_BY_METHOD), which names the " +
+                "type, the method and the rtId of every refused entity. This applies with and without -r.",
+                "Entities whose rtId already exists in the tenant are updated as before (with -r). Files and tenants " +
+                "without such types behave as before. To bring such entities into a tenant, restore a backup of the " +
+                "tenant or create them by calling the method.",
             ]
         );
 
