@@ -176,6 +176,24 @@ public class MarkdownRendererTests
     }
 
     [Fact]
+    public void Renders_a_note_that_starts_with_a_heading_as_a_subsection_of_notes()
+    {
+        var cmd = new CommandDescriptor(
+            Group: null,
+            Verb: "Foo",
+            Description: "Does foo.",
+            Args: Array.Empty<ArgumentDescriptor>())
+        {
+            Notes = new[] { "### Replaced create\n\nCreate is refused for method-replaced types." }
+        };
+
+        var md = MarkdownRenderer.Render(cmd);
+
+        // Docusaurus derives the anchor "replaced-create" from the heading text.
+        Assert.Contains("## Notes\n\n### Replaced create\n\nCreate is refused for method-replaced types.\n", md);
+    }
+
+    [Fact]
     public void Omits_notes_section_when_command_has_no_notes()
     {
         var cmd = new CommandDescriptor(
