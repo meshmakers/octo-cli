@@ -99,6 +99,20 @@ asset repository `streamdata/rollups/validate|repair`).
 - **NotChecked:** a rollup the validator could not check is never printed as OK. A blocking gap (NoLiveTable, SourceMissing; `isBlocking`) is listed in `Not checked (N):` with `[Cause] reason`, the summary says `N NOT CHECKED`, and `-ff` exits -5 (it follows the report's `IsOk`). A never-activated rollup (NeverActivated, informational) has no data: it is listed separately as `Not checked (informational, N):` / `not checked (info)`, the summary adds `N not checked (info)`, and it neither fails the report nor `-ff`. `RepairRollups` (dry run and applied) prints the rollups it skipped under `Skipped, not repaired because they could not be checked:`.
 - Output goes through `RollupConsistencyFormatter` (only report fields are printed). Tests: `RollupConsistencyCommandTests`.
 
+## Revoke sessions: RevokeUserSessions / RevokeShadowUserSessions (AB#7899)
+
+Identity commands on the tenant of the context (identity PR #210, SDK `IIdentityServicesClient.RevokeUserSessions` /
+`RevokeShadowUserSessions`):
+
+- `octo-cli -c RevokeUserSessions -un <userName> [-y]` — `POST {tenant}/v1/users/{userName}/revokeSessions`: rotates the
+  security stamp, revokes refresh tokens and authorizations, removes the browser sessions. Asks for confirmation unless `-y`.
+- `octo-cli -c RevokeShadowUserSessions [-a|--apply] [-y]` — the same for every cross-tenant shadow user (`xt_*`). **Dry run
+  without `--apply`** (`dryRun=true`: counts and the first 100 user names, nothing changes, no question asked); with `--apply`
+  it asks for confirmation (unless `-y`) and revokes.
+- Needs `UserManagement` in that tenant. One tenant per call: for the rollout run it once per tenant with a context of that
+  tenant. Issued access tokens stay valid until they expire.
+- Tests: `RevokeSessionsCommandTests`.
+
 ## GraphQl: run a GraphQL query against any tenant (AB#7027)
 
 `octo-cli -c GraphQl -tid <tenant> -q "<query>"` (`Asset/GraphQl/GraphQlCommand.cs`) sends one GraphQL query or mutation to
