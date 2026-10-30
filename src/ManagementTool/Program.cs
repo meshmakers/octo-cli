@@ -402,6 +402,8 @@ internal static class Program
         services.AddTransient<ICommand, UpdateUser>();
         services.AddTransient<ICommand, DeleteUser>();
         services.AddTransient<ICommand, ResetPassword>();
+        services.AddTransient<ICommand, RevokeUserSessions>();
+        services.AddTransient<ICommand, RevokeShadowUserSessions>();
         services.AddTransient<ICommand, AddUserToRole>();
         services.AddTransient<ICommand, RemoveUserFromRole>();
 
