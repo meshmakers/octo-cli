@@ -20,7 +20,7 @@ internal class RevokeShadowUserSessions : ServiceClientOctoCommand<IIdentityServ
         IIdentityServicesClient identityServicesClient, IAuthenticationService authenticationService,
         IConfirmationService confirmationService)
         : base(logger, Constants.IdentityServicesGroup, "RevokeShadowUserSessions",
-            "Revokes all sessions and tokens of the cross-tenant shadow users (xt_*) of the tenant. Dry run (counts only) unless --apply is given.",
+            "Revokes all sessions and tokens of the cross-tenant shadow users (xt_*) of the tenant (refresh tokens, authorizations, browser sessions; rotates the security stamps). Issued access tokens stay valid until they expire. Dry run (counts only) unless --apply is given.",
             options, identityServicesClient, authenticationService)
     {
         _confirmationService = confirmationService;
@@ -44,7 +44,7 @@ internal class RevokeShadowUserSessions : ServiceClientOctoCommand<IIdentityServ
 
         if (apply && !CommandArgumentValue.IsArgumentUsed(_yesArg) &&
             !_confirmationService.Confirm(
-                "Revoke all sessions and tokens of every cross-tenant shadow user (xt_*) of this tenant?"))
+                $"Revoke all sessions and tokens of every cross-tenant shadow user (xt_*) of tenant '{Options.Value.TenantId}' at '{ServiceClient.ServiceUri}'?"))
         {
             throw ToolException.OperationCancelledByUser();
         }

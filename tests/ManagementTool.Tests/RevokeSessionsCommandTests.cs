@@ -60,7 +60,7 @@ public class RevokeSessionsCommandTests
 
         await command.Execute();
 
-        A.CallTo(() => _confirmation.Confirm(A<string>._)).MustHaveHappenedOnceExactly();
+        A.CallTo(() => _confirmation.Confirm(A<string>.That.Contains("'customer'"))).MustHaveHappenedOnceExactly();
         A.CallTo(() => _client.RevokeShadowUserSessions(false)).MustHaveHappenedOnceExactly();
     }
 
@@ -100,6 +100,7 @@ public class RevokeSessionsCommandTests
         await command.Execute();
 
         A.CallTo(() => _client.RevokeUserSessions("Alice")).MustHaveHappenedOnceExactly();
+        A.CallTo(() => _confirmation.Confirm(A<string>.That.Contains("tenant 'customer'"))).MustHaveHappenedOnceExactly();
         Assert.Contains(logger.Entries, e => e.Message.Contains("4 token(s)") && e.Message.Contains("2 browser session(s)"));
     }
 

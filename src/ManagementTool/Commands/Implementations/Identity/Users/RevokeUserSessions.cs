@@ -42,7 +42,7 @@ internal class RevokeUserSessions : ServiceClientOctoCommand<IIdentityServicesCl
 
         if (!CommandArgumentValue.IsArgumentUsed(_yesArg) &&
             !_confirmationService.Confirm(
-                $"Revoke all sessions and tokens of user '{name}'? The user has to sign in again."))
+                $"Revoke all sessions and tokens of user '{name}' in tenant '{Options.Value.TenantId}' at '{ServiceClient.ServiceUri}'? The user has to sign in again."))
         {
             throw ToolException.OperationCancelledByUser();
         }
