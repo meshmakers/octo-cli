@@ -64,6 +64,31 @@ public sealed class BlueprintBlankingCommandTests
         Assert.Null(request.ConfirmedBlankings);
     }
 
+    // AB#7997: the columns an update added to activated archives are reported, a failed one as an error.
+    [Fact]
+    public async Task UpdateBlueprint_ReportsTheArchiveColumnsAdded()
+    {
+        var (client, _) = NewApplyClient(new BlueprintUpdateResultDto
+        {
+            Success = false,
+            ArchiveColumnsAdded =
+            [
+                new BlueprintArchiveColumnAdditionDto { ArchiveRtId = RtId1, ArchiveWellKnownName = "battery", Column = "DischargingPower" },
+                new BlueprintArchiveColumnAdditionDto { ArchiveRtId = RtId1, Column = "DischargePower", IsComputed = true, BackfillJobRtId = RtId2 },
+                new BlueprintArchiveColumnAdditionDto { ArchiveRtId = RtId1, Column = "Late", Error = "CrateDB is away" },
+            ],
+        });
+        var logger = new RecordingLogger<UpdateBlueprint>();
+        var command = NewUpdate(client, logger);
+        command.CommandArgumentValue.ParseLayer(["-tv", "EnergyIQ-1.1.0"]);
+
+        await command.Execute();
+
+        Assert.Contains(logger.Entries, e => e.Level == LogLevel.Information && e.Message.Contains("Column 'DischargingPower' added") && e.Message.Contains("'battery'"));
+        Assert.Contains(logger.Entries, e => e.Message.Contains("Computed column 'DischargePower'") && e.Message.Contains(RtId2));
+        Assert.Contains(logger.Entries, e => e.Level == LogLevel.Error && e.Message.Contains("'Late'") && e.Message.Contains("CrateDB is away"));
+    }
+
     [Fact]
     public async Task UpdateBlueprint_RepeatedConfirmBlanking_SendsEveryPair()
     {

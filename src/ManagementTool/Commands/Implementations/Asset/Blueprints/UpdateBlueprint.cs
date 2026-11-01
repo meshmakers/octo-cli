@@ -173,6 +173,34 @@ internal class UpdateBlueprint : ServiceClientOctoCommand<IAssetServicesClient>
         ReportBlanking(result.BlankedAttributes, dryRun, allowBlanking ? [] : confirmations);
         BlueprintBlanking.ReportTenantOwned(
             Logger, dryRun, result.TenantOwnedSkipped, result.TenantOwnedStaysDeleted);
+        ReportArchiveColumns(result.ArchiveColumnsAdded);
+    }
+
+    /// <summary>AB#7997: the columns the update added to activated archives, and those it could not add.</summary>
+    private void ReportArchiveColumns(IReadOnlyCollection<BlueprintArchiveColumnAdditionDto> additions)
+    {
+        foreach (var addition in additions)
+        {
+            var archive = string.IsNullOrEmpty(addition.ArchiveWellKnownName)
+                ? addition.ArchiveRtId
+                : $"{addition.ArchiveRtId} ('{addition.ArchiveWellKnownName}')";
+            if (addition.Error != null)
+            {
+                Logger.LogError("Column '{Column}' could not be added to archive {Archive}: {Error}. Apply the update again to retry.",
+                    addition.Column, archive, addition.Error);
+            }
+            else if (addition.IsComputed)
+            {
+                Logger.LogInformation(
+                    "Computed column '{Column}' added to archive {Archive}; its backfill runs as job {JobId} (follow it with ListRecomputeJobs)",
+                    addition.Column, archive, addition.BackfillJobRtId ?? "-");
+            }
+            else
+            {
+                Logger.LogInformation("Column '{Column}' added to archive {Archive}; existing rows read null for it",
+                    addition.Column, archive);
+            }
+        }
     }
 
     private List<BlueprintBlankingConfirmationDto> ParseConfirmations()
