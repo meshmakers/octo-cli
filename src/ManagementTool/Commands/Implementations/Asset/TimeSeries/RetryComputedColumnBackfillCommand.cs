@@ -54,8 +54,16 @@ public class RetryComputedColumnBackfillCommand : ServiceClientOctoCommand<IStre
 
         if (CommandArgumentValue.IsArgumentUsed(_waitArg))
         {
+            if (job is null)
+            {
+                // Without the job id the newest job of the column could be an older run of it.
+                throw new ToolException(
+                    $"The asset repository returned no job for the retry of '{name}', so -w cannot follow it. " +
+                    $"Check the backfill with ListRecomputeJobs -id {archiveRtId}.");
+            }
+
             await ComputedColumnBackfillWaiter.WaitAsync(ServiceClient, Logger, Options.Value.TenantId, archiveRtId, name,
-                PollInterval, job?.RtId);
+                PollInterval, job.RtId);
         }
     }
 }

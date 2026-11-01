@@ -62,6 +62,20 @@ public sealed class ComputedColumnBackfillCommandTests
     }
 
     [Fact]
+    public async Task Retry_WithWait_WithoutAJobId_RefusesToGuessTheJob()
+    {
+        var client = A.Fake<IStreamDataServicesClient>();
+        A.CallTo(() => client.RetryComputedColumnBackfillAsync("acme", Archive, "ExportPower"))
+            .Returns((RollupRecomputeJobInfoDto?)null);
+        var command = new RetryComputedColumnBackfillCommand(new RecordingLogger<RetryComputedColumnBackfillCommand>(),
+            Tenant(), client, A.Fake<IAuthenticationService>()) { PollInterval = TimeSpan.FromMilliseconds(1) };
+        command.CommandArgumentValue.ParseLayer(["-id", Archive, "-n", "ExportPower", "-w"]);
+
+        await Assert.ThrowsAsync<ToolException>(() => command.Execute());
+        A.CallTo(() => client.ListRecomputeJobsForArchiveAsync(A<string>._, A<string>._)).MustNotHaveHappened();
+    }
+
+    [Fact]
     public async Task Add_WithWait_FailedJob_ExitsNonZero_AndNamesTheRetryCommand()
     {
         var client = A.Fake<IStreamDataServicesClient>();
