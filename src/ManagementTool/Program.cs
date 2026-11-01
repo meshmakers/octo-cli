@@ -169,6 +169,8 @@ internal static class Program
 
         services.AddSingleton<IConfirmationService, ConfirmationService>();
         services.AddSingleton<IStandardStreams, StandardStreams>();
+        services.AddSingleton<ISecretConsole, SecretConsole>();
+        services.AddSingleton<SecretInput>();
         services.AddSingleton<IConsoleService, ConsoleService>();
         // The parser's top layer cannot hand control back to a command layer, so --context is moved in
         // front of the command's own options (AB#7414).

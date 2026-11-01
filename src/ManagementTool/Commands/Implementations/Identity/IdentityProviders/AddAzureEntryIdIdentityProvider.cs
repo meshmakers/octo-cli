@@ -12,6 +12,8 @@ internal class AddAzureEntryIdIdentityProvider : ServiceClientOctoCommand<IIdent
     private readonly IArgument _allowSelfRegistration;
     private readonly IArgument _clientId;
     private readonly IArgument _clientSecret;
+    private readonly IArgument _clientSecretStdin;
+    private readonly SecretInput _secretInput;
     private readonly IArgument _defaultGroupRtId;
     private readonly IArgument _enabled;
     private readonly IArgument _name;
@@ -19,11 +21,13 @@ internal class AddAzureEntryIdIdentityProvider : ServiceClientOctoCommand<IIdent
 
     public AddAzureEntryIdIdentityProvider(ILogger<AddAzureEntryIdIdentityProvider> logger,
         IOptions<OctoToolOptions> options,
-        IIdentityServicesClient identityServicesClient, IAuthenticationService authenticationService)
+        IIdentityServicesClient identityServicesClient, IAuthenticationService authenticationService,
+        SecretInput secretInput)
         : base(logger, Constants.IdentityServicesGroup, "AddAzureEntryIdIdentityProvider",
             "Adds a new identity provider for Microsoft Azure Entra ID.", options, identityServicesClient,
             authenticationService)
     {
+        _secretInput = secretInput;
         _name = CommandArgumentValue.AddArgument("n", "name", ["Name of identity provider, must be unique"],
             true,
             1);
@@ -36,7 +40,12 @@ internal class AddAzureEntryIdIdentityProvider : ServiceClientOctoCommand<IIdent
         _clientId = CommandArgumentValue.AddArgument("cid", "clientId",
             ["ServiceClient ID, provided by provider"], true, 1);
         _clientSecret = CommandArgumentValue.AddArgument("cs", "clientSecret",
-            ["ServiceClient secret, provided by provider"], true, 1);
+            [
+                "Deprecated: client secret, provided by the provider. A value on the command line ends up in the shell history and the process list.",
+                $"Omit it to be prompted (hidden input), or use --client-secret-stdin or the environment variable {Constants.EnvVarIdentityProviderClientSecret}."
+            ], false, 1);
+        _clientSecretStdin = CommandArgumentValue.AddArgument("css", "client-secret-stdin",
+            ["Read the client secret from standard input (one value; a trailing line break is removed)"], false, 0);
         _allowSelfRegistration = CommandArgumentValue.AddArgument("asr", "allowSelfRegistration",
             ["Allow self registration (default: true)"], false, 1);
         _defaultGroupRtId = CommandArgumentValue.AddArgument("dgid", "defaultGroupRtId",
@@ -51,18 +60,25 @@ internal class AddAzureEntryIdIdentityProvider : ServiceClientOctoCommand<IIdent
                     new CodeSampleArgument(_name, "Azure AD"),
                     new CodeSampleArgument(_tenantId, "your-tenant-id"),
                     new CodeSampleArgument(_clientId, "your-client-id"),
-                    new CodeSampleArgument(_clientSecret, "your-client-secret"),
+                    new CodeSampleArgument(_clientSecretStdin),
                     new CodeSampleArgument(_enabled, "true"),
                     new CodeSampleArgument(_allowSelfRegistration, "true"),
                     new CodeSampleArgument(_defaultGroupRtId, "<default-group-rtid>"),
                 ],
-                    description: "Basic usage"),
+                    description: "Basic usage; the client secret is piped in on standard input"),
+            ],
+            Notes:
+            [
+                $"The client secret is read from a hidden prompt, from standard input (--client-secret-stdin) or from the environment variable {Constants.EnvVarIdentityProviderClientSecret}, so it does not end up in the shell history or the process list. -cs still works in this release but logs a deprecation warning and will be removed.",
             ]
         );
 
     public override async Task Execute()
     {
         var name = CommandArgumentValue.GetArgumentScalarValue<string>(_name);
+        var clientSecret = _secretInput.Resolve(CommandArgumentValue,
+            new SecretSpec("client secret", _clientSecret, _clientSecretStdin,
+                Constants.EnvVarIdentityProviderClientSecret, Required: true, ConfirmPrompt: true), Logger)!;
 
         Logger.LogInformation(
             "Creating Microsoft Azure Entry ID identity provider \'{Name}\' at \'{ServiceClientServiceUri}\'", name,
@@ -74,7 +90,7 @@ internal class AddAzureEntryIdIdentityProvider : ServiceClientOctoCommand<IIdent
             IsEnabled = CommandArgumentValue.GetArgumentScalarValue<bool>(_enabled),
             TenantId = CommandArgumentValue.GetArgumentScalarValue<string>(_tenantId),
             ClientId = CommandArgumentValue.GetArgumentScalarValue<string>(_clientId),
-            ClientSecret = CommandArgumentValue.GetArgumentScalarValue<string>(_clientSecret)
+            ClientSecret = clientSecret
         };
 
         if (CommandArgumentValue.IsArgumentUsed(_allowSelfRegistration))

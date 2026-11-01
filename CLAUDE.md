@@ -126,6 +126,42 @@ AB#8008 (the identity service refuses the old reset URL form with 400; an older 
 no password in a log line). The test found that the SDK's `UpdateApiSecret*` sent `POST` (the create endpoint) instead of `PUT`,
 so `UpdateApiSecretClient` / `UpdateApiSecretApiResource` created an additional secret; fixed in the SDK with AB#8008.
 
+## Passwords and secrets never on the command line (AB#8044)
+
+A value on the command line ends up in the shell history and in the process list (`ps`), where every user of the machine and
+every process monitor can read it. The commands that take a password or secret therefore read it through
+`Services/SecretInput` (`ISecretConsole` = console + environment, faked in tests by `FakeSecretConsole`). Sources, first match
+wins:
+
+1. the old argument (`-p`, `-s`, `-cs`) - **deprecated, still works in this release**, logs a warning naming the alternatives,
+   never the value; it is no longer mandatory in the parser;
+2. the stdin flag (`--password-stdin` / `-ps`, `--secret-stdin` / `-ss`, `--client-secret-stdin` / `-css`): standard input to its
+   end, one trailing line break removed; empty input is an error; together with the old argument it is refused;
+3. the environment variable;
+4. a hidden prompt (no echo, prompt on stderr) - only for a **required** secret and only when standard input is a terminal; a
+   secret that is set (new password, new client secret, identity-provider secret) is asked twice. Redirected input without a
+   source fails and names the stdin flag and the variable.
+
+| Command | Old argument | Stdin flag | Environment variable | Prompt |
+|---|---|---|---|---|
+| `ResetPassword` | `-p` | `--password-stdin` | `OCTO_CLI_NEW_PASSWORD` | yes, twice |
+| `Setup` | `-p` | `--password-stdin` | `OCTO_CLI_NEW_PASSWORD` | yes, twice |
+| `CreateUser` | `-p` | `--password-stdin` | `OCTO_CLI_NEW_PASSWORD` | no (password optional: without a source the user has none) |
+| `AddClientCredentialsClient`, `AddDeviceCodeClient` | `-s` | `--secret-stdin` | `OCTO_CLI_NEW_CLIENT_SECRET` | yes, twice |
+| `AddOAuthIdentityProvider`, `AddAzureEntryIdIdentityProvider` | `-cs` | `--client-secret-stdin` | `OCTO_CLI_IDP_CLIENT_SECRET` | yes, twice |
+| `UpdateIdentityProvider` | `-cs` | `--client-secret-stdin` | `OCTO_CLI_IDP_CLIENT_SECRET` | no (without a source the stored secret is kept) |
+| `LogInClientCredentials` | `-s` | `--secret-stdin` | `OCTO_CLI_CLIENT_SECRET` (as before) | yes, once |
+| `RedeemAiTicket` | `-at`, `-rt` | - (two values) | `OCTO_CLI_AI_ACCESS_TOKEN`, `OCTO_CLI_AI_REFRESH_TOKEN` | no (all four values absent = dev fakes, as before) |
+
+- `ResetPassword` asks for confirmation **before** it reads the password; with `--password-stdin` standard input is a pipe, so
+  `ConfirmationService` cannot ask and `-y` is needed.
+- Not changed: `Update/DeleteApiSecret*` `-s` take the stored secret **hash** as an identifier (not the secret; logged masked,
+  AB#6692); `Create*ApiSecret*` generate the secret. `ContextManager`/`contexts.json` tokens are not arguments.
+- Generator constraint: `CommandReferenceGenerator` reads argument help only from collection literals (`["…", $"…{Constants.X}"]`)
+  and resolves `Constants.*` only inside interpolations, so the help texts are written inline, not built by a helper.
+- Tests: `SecretInputTests` (order, trimming, conflicts, prompt, redirected input), `SecretArgumentCommandTests` (every command
+  above: stdin, environment, prompt, deprecated argument with warning and without the value in any log line).
+
 ## GraphQl: run a GraphQL query against any tenant (AB#7027)
 
 `octo-cli -c GraphQl -tid <tenant> -q "<query>"` (`Asset/GraphQl/GraphQlCommand.cs`) sends one GraphQL query or mutation to
@@ -241,8 +277,8 @@ The CLI supports multiple authentication methods:
      only prompted when the refresh token is missing or expired.
 
 2. **Client Credentials Flow** (non-interactive — pipelines, cron jobs, headless servers, container entrypoints, batch scripts, bots, etc.):
-   - Operator creates a per-tenant client once: `octo-cli -c AddClientCredentialsClient -id <id> -n "<name>" -s <secret>`
-   - Caller exports `OCTO_CLI_CLIENT_ID` and `OCTO_CLI_CLIENT_SECRET` (or passes `-id`/`-s`), then runs `octo-cli -c LogInClientCredentials`
+   - Operator creates a per-tenant client once: `octo-cli -c AddClientCredentialsClient -id <id> -n "<name>"` (asks for the secret; `--secret-stdin` or `OCTO_CLI_NEW_CLIENT_SECRET` in scripts)
+   - Caller exports `OCTO_CLI_CLIENT_ID` and `OCTO_CLI_CLIENT_SECRET` (or passes `-id` and pipes the secret in with `--secret-stdin`; `-s` is deprecated), then runs `octo-cli -c LogInClientCredentials`
    - Tenant comes from the effective context (no `-tid` arg on the login command). Switch contexts with `UseContext`, or target another tenant for one invocation with `--context <name>`.
    - No refresh token is issued. While the env vars remain set, `EnsureAuthenticated` automatically re-acquires the token when it expires; otherwise re-run `LogInClientCredentials`.
    - Token stored in the effective context's `Authentication` block, same path as device flow.
@@ -466,6 +502,10 @@ Environment variables are prefixed with `OCTO_`:
 | `OCTO_CLI_CONTEXT` | Context used for this invocation, like `--context` but for a whole subshell. The argument wins when both are set. |
 | `OCTO_CLI_HOME` | Parent directory of the `.octo-cli` folder. Give parallel jobs different values to get fully separate `contexts.json` files. Trimmed before use — untrimmed whitespace would silently resolve to a different directory rather than fail. |
 | `OCTO_CLI_CLIENT_ID` / `OCTO_CLI_CLIENT_SECRET` | Credentials for `LogInClientCredentials` and for automatic token renewal. |
+| `OCTO_CLI_NEW_PASSWORD` | Password a command sets (`ResetPassword`, `CreateUser`, `Setup`, AB#8044). |
+| `OCTO_CLI_NEW_CLIENT_SECRET` | Secret of a client a command creates (`AddClientCredentialsClient`, `AddDeviceCodeClient`). Deliberately not `OCTO_CLI_CLIENT_SECRET`, which is the secret octo-cli itself logs in with. |
+| `OCTO_CLI_IDP_CLIENT_SECRET` | Client secret of an identity provider (`AddOAuthIdentityProvider`, `AddAzureEntryIdIdentityProvider`, `UpdateIdentityProvider`). |
+| `OCTO_CLI_AI_ACCESS_TOKEN` / `OCTO_CLI_AI_REFRESH_TOKEN` | Anthropic tokens for `RedeemAiTicket`. |
 | `OCTO_CLI_CHILD_CLIENT_SECRET` | Optional (AB#7192). Secret of the client's **mirror** in a child tenant, used by `Delete --disable-features` for the child token. Without it `OCTO_CLI_CLIENT_SECRET` is tried in the child, which only works while the child accepts the inherited parent secret (AB#5061). |
 
 ## Command Categories
@@ -615,7 +655,7 @@ octo-cli -c Config -isu https://localhost:5003/ -asu https://localhost:5001/ -ti
 octo-cli identityProviders get
 
 # Add Azure Entra ID provider
-octo-cli identityProviders addAzureEntraId -n "Azure AD" -c <clientId> -s <secret> -t <tenantId>
+octo-cli -c AddAzureEntryIdIdentityProvider -n "Azure AD" -e true -t <tenantId> -cid <clientId>   # asks for the client secret
 
 # List users
 octo-cli users get
@@ -808,7 +848,7 @@ octo-cli -c SwitchServiceAccountsToImpersonation -a -y -rdf true # apply, no pro
 
 # Multi-tenant ClientCredentials mirroring (Epic 3054, #4047)
 # Create a flagged client in octosystem — gets auto-provisioned into every new sub-tenant.
-octo-cli -c AddClientCredentialsClient -id ci-deploy -n "CI Deploy" -s <secret> -apic
+vault kv get -field=secret <path> | octo-cli -c AddClientCredentialsClient -id ci-deploy -n "CI Deploy" --secret-stdin -apic
 # List the sub-tenants a client has been mirrored into.
 octo-cli -c GetClientMirrors -id ci-deploy
 # Backfill: provision the flagged client into every existing sub-tenant (idempotent).
@@ -843,7 +883,7 @@ octo-cli -c CleanClientOverlays -n local-dev -y         # strip only overlay:loc
 octo-cli -c AddOctoTenantIdentityProvider -n "ParentTenant" -e true -ptid <parentTenantId>
 
 # Identity providers with self-registration and default group
-octo-cli -c AddAzureEntryIdIdentityProvider -n "Azure" -e true -t <tenantId> -cid <clientId> -cs <secret> -asr false -dgid <groupRtId>
+octo-cli -c AddAzureEntryIdIdentityProvider -n "Azure" -e true -t <tenantId> -cid <clientId> -asr false -dgid <groupRtId>   # asks for the client secret
 
 # AI Services — tenant lifecycle (run after EnableCommunication)
 octo-cli -c EnableAi
@@ -856,11 +896,11 @@ octo-cli -c DisableAi
 #   operator then redeems the code together with the freshly minted Anthropic
 #   tokens — anonymously, no OctoMesh user session required. The code is the auth
 #   artefact; it can be redeemed exactly once and expires after a few minutes.
+#   The tokens come from the environment (the -at / -rt arguments are deprecated, AB#8044).
+read -rs OCTO_CLI_AI_ACCESS_TOKEN && read -rs OCTO_CLI_AI_REFRESH_TOKEN && export OCTO_CLI_AI_ACCESS_TOKEN OCTO_CLI_AI_REFRESH_TOKEN
 octo-cli -c RedeemAiTicket \
   -tid meshtest \
   -tc TWUL9NMV7LU8 \
-  -at sk-ant-oat01-... \
-  -rt sk-ant-ort01-... \
   -aex 2027-01-01T00:00:00Z \
   -rex 2027-12-31T00:00:00Z
 

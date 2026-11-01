@@ -14,7 +14,8 @@ namespace Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Ai;
 ///     anonymously: no OctoMesh user session is needed, and <see cref="PreValidate" />
 ///     deliberately skips the bearer flow the rest of the CLI uses.
 ///
-///     For developer-machine smoke testing the four token-related args (<c>-at -rt -aex
+///     For developer-machine smoke testing the four token-related values (tokens from
+///     <c>OCTO_CLI_AI_ACCESS_TOKEN</c> / <c>OCTO_CLI_AI_REFRESH_TOKEN</c>, deprecated <c>-at -rt</c>; <c>-aex
 ///     -rex</c>) are optional. When omitted the CLI substitutes a fake-token pair with a
 ///     far-future expiry — useful because the locally-spawned claude CLI ignores the
 ///     workspace <c>.credentials.json</c> in favour of the user's host keychain, so the
@@ -36,23 +37,33 @@ internal class RedeemAiTicketCommand : ServiceClientOctoCommand<IAiServicesClien
     private readonly IArgument _refreshExpiresAtArg;
 
     private readonly string? _aiServiceUrl;
+    private readonly ISecretConsole _secretConsole;
 
     public RedeemAiTicketCommand(ILogger<RedeemAiTicketCommand> logger, IOptions<OctoToolOptions> options,
-        IAiServicesClient aiServicesClient, IAuthenticationService authenticationService)
+        IAiServicesClient aiServicesClient, IAuthenticationService authenticationService,
+        ISecretConsole secretConsole)
         : base(logger, Constants.AiServicesGroup, "RedeemAiTicket",
             "Redeems a one-time AI credential ticket and persists the Anthropic subscription tokens on the AI Adapter. " +
             "Runs anonymously — the ticket code authenticates the call, no OctoMesh login required. " +
-            "Token-related args (-at -rt -aex -rex) are optional for developer smoke tests; missing values default to a fake pair with a far-future expiry.",
+            $"The tokens come from the environment variables {Constants.EnvVarAiAccessToken} / {Constants.EnvVarAiRefreshToken} (the -at / -rt arguments are deprecated). " +
+            "Token-related values are optional for developer smoke tests; missing values default to a fake pair with a far-future expiry.",
             options, aiServicesClient, authenticationService)
     {
+        _secretConsole = secretConsole;
         _tenantArg = CommandArgumentValue.AddArgument("tid", "tenantId",
             ["Tenant the ticket was issued for"], true, 1);
         _codeArg = CommandArgumentValue.AddArgument("tc", "ticketCode",
             ["One-time code from the admin's Refinery Studio modal"], true, 1);
         _accessTokenArg = CommandArgumentValue.AddArgument("at", "accessToken",
-            ["Plaintext Anthropic access token. Optional — defaults to a fake for dev."], false, 1);
+            [
+                "Deprecated: plaintext Anthropic access token. A value on the command line ends up in the shell history and the process list.",
+                $"Use the environment variable {Constants.EnvVarAiAccessToken} instead. Optional — defaults to a fake for dev."
+            ], false, 1);
         _refreshTokenArg = CommandArgumentValue.AddArgument("rt", "refreshToken",
-            ["Plaintext Anthropic refresh token. Optional — defaults to a fake for dev."], false, 1);
+            [
+                "Deprecated: plaintext Anthropic refresh token. A value on the command line ends up in the shell history and the process list.",
+                $"Use the environment variable {Constants.EnvVarAiRefreshToken} instead. Optional — defaults to a fake for dev."
+            ], false, 1);
         _accessExpiresAtArg = CommandArgumentValue.AddArgument("aex", "accessExpiresAt",
             ["UTC expiry of the access token (ISO-8601). Optional — defaults to 2099 for dev."], false, 1);
         _refreshExpiresAtArg = CommandArgumentValue.AddArgument("rex", "refreshExpiresAt",
@@ -107,8 +118,8 @@ internal class RedeemAiTicketCommand : ServiceClientOctoCommand<IAiServicesClien
             // mystery 401 from Anthropic the first time the worker tried to call the
             // API. Better to scream now.
             Logger.LogWarning(
-                "DEV MODE: redeeming ticket '{TicketCode}' with FAKE Anthropic tokens. Pass -at / -rt / -aex / -rex for real tokens.",
-                code);
+                "DEV MODE: redeeming ticket '{TicketCode}' with FAKE Anthropic tokens. Set {AccessTokenVariable} / {RefreshTokenVariable} and pass -aex / -rex for real tokens.",
+                code, Constants.EnvVarAiAccessToken, Constants.EnvVarAiRefreshToken);
         }
 
         // Log code + expiries only — never the token plaintext. A tail of the log
@@ -128,8 +139,10 @@ internal class RedeemAiTicketCommand : ServiceClientOctoCommand<IAiServicesClien
     private (string AccessToken, string RefreshToken, string AccessExpiresAt, string RefreshExpiresAt, bool UsedDevDefaults)
         ResolveTokenArgsOrDefaults()
     {
-        var hasAccess = CommandArgumentValue.IsArgumentUsed(_accessTokenArg);
-        var hasRefresh = CommandArgumentValue.IsArgumentUsed(_refreshTokenArg);
+        var accessToken = ResolveToken(_accessTokenArg, Constants.EnvVarAiAccessToken, "access token");
+        var refreshToken = ResolveToken(_refreshTokenArg, Constants.EnvVarAiRefreshToken, "refresh token");
+        var hasAccess = accessToken != null;
+        var hasRefresh = refreshToken != null;
         var hasAccessExp = CommandArgumentValue.IsArgumentUsed(_accessExpiresAtArg);
         var hasRefreshExp = CommandArgumentValue.IsArgumentUsed(_refreshExpiresAtArg);
 
@@ -145,14 +158,33 @@ internal class RedeemAiTicketCommand : ServiceClientOctoCommand<IAiServicesClien
         if (!hasAccess || !hasRefresh || !hasAccessExp || !hasRefreshExp)
         {
             throw new ToolException(
-                "Partial token args. Supply all of -at -rt -aex -rex together, or none to fall back to the dev fakes.");
+                $"Partial token values. Supply both tokens ({Constants.EnvVarAiAccessToken}, {Constants.EnvVarAiRefreshToken}) and -aex -rex together, or none to fall back to the dev fakes.");
         }
 
         return (
-            CommandArgumentValue.GetArgumentScalarValue<string>(_accessTokenArg),
-            CommandArgumentValue.GetArgumentScalarValue<string>(_refreshTokenArg),
+            accessToken!,
+            refreshToken!,
             CommandArgumentValue.GetArgumentScalarValue<string>(_accessExpiresAtArg),
             CommandArgumentValue.GetArgumentScalarValue<string>(_refreshExpiresAtArg),
             false);
+    }
+
+    /// <summary>
+    ///     AB#8044: a token from the deprecated argument (with a warning, never the value) or from the environment variable;
+    ///     null when neither is set.
+    /// </summary>
+    private string? ResolveToken(IArgument argument, string environmentVariable, string name)
+    {
+        if (CommandArgumentValue.IsArgumentUsed(argument))
+        {
+            Logger.LogWarning(
+                "-{ShortTerm} (--{LongTerm}) is deprecated: the {Name} ends up in the shell history and the process list. "
+                + "Use the environment variable {EnvironmentVariable} instead. The argument will be removed in a later release.",
+                argument.ShortTerm, argument.LongTerm, name, environmentVariable);
+            return CommandArgumentValue.GetArgumentScalarValue<string>(argument);
+        }
+
+        var value = _secretConsole.GetEnvironmentVariable(environmentVariable);
+        return string.IsNullOrEmpty(value) ? null : value;
     }
 }
