@@ -38,6 +38,13 @@ public abstract class ServiceClientOctoCommand<TServiceClientType>(
         $"parent tenant '{Options.Value.TenantId ?? "<none>"}' " +
         $"at '{ServiceClient.ServiceUri.GetLeftPart(UriPartial.Authority)}'";
 
+    /// <summary>
+    ///     Re-applies a valid access token to the service client, refreshing it when it expires soon. Long-running
+    ///     commands that poll (e.g. <c>-w</c> on the computed-column commands, AB#8002) call it before every
+    ///     request: the token checked in <see cref="PreValidate"/> can expire while they wait.
+    /// </summary>
+    protected Task EnsureAuthenticatedAsync() => authenticationService.EnsureAuthenticated(ServiceClient.AccessToken);
+
     public override async Task PreValidate()
     {
         logger.LogInformation("Service URI: {ServiceClientServiceUri}", ServiceClient.ServiceUri);

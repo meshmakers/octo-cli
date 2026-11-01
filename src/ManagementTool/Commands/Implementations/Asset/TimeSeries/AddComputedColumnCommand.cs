@@ -67,7 +67,7 @@ public class AddComputedColumnCommand : ServiceClientOctoCommand<IStreamDataServ
         if (CommandArgumentValue.IsArgumentUsed(_waitArg))
         {
             await ComputedColumnBackfillWaiter.WaitAsync(ServiceClient, Logger, Options.Value.TenantId, archiveRtId, name,
-                PollInterval);
+                PollInterval, EnsureAuthenticatedAsync);
         }
     }
 }

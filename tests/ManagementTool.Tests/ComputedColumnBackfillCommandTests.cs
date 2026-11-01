@@ -76,6 +76,26 @@ public sealed class ComputedColumnBackfillCommandTests
     }
 
     [Fact]
+    public async Task Wait_ReEnsuresAuthentication_BeforeEveryPoll()
+    {
+        // test-2, 2026-11-01: a 750k-row backfill outlived the access token; the wait stopped with a 401/403.
+        var client = A.Fake<IStreamDataServicesClient>();
+        var auth = A.Fake<IAuthenticationService>();
+        A.CallTo(() => client.RetryComputedColumnBackfillAsync("acme", Archive, "ExportPower")).Returns(Job("j2", "Pending"));
+        A.CallTo(() => client.ListRecomputeJobsForArchiveAsync("acme", Archive)).ReturnsNextFromSequence(
+            new[] { Job("j2", "Running", 1) }, new[] { Job("j2", "Running", 2) }, new[] { Job("j2", "Completed", 3) });
+        var command = new RetryComputedColumnBackfillCommand(new RecordingLogger<RetryComputedColumnBackfillCommand>(),
+            Tenant(), client, auth) { PollInterval = TimeSpan.FromMilliseconds(1) };
+        command.CommandArgumentValue.ParseLayer(["-id", Archive, "-n", "ExportPower", "-w"]);
+
+        await command.Execute();
+
+        // Three polls, three refresh checks (PreValidate is not part of Execute).
+        A.CallTo(() => auth.EnsureAuthenticated(A<Meshmakers.Octo.Sdk.ServiceClient.IServiceClientAccessToken>._))
+            .MustHaveHappened(3, Times.Exactly);
+    }
+
+    [Fact]
     public async Task Add_WithWait_FailedJob_ExitsNonZero_AndNamesTheRetryCommand()
     {
         var client = A.Fake<IStreamDataServicesClient>();

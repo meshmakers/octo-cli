@@ -57,7 +57,7 @@ public class UpdateComputedColumnFormulaCommand : ServiceClientOctoCommand<IStre
         if (CommandArgumentValue.IsArgumentUsed(_waitArg))
         {
             await ComputedColumnBackfillWaiter.WaitAsync(ServiceClient, Logger, Options.Value.TenantId, archiveRtId, name,
-                PollInterval);
+                PollInterval, EnsureAuthenticatedAsync);
         }
     }
 }
