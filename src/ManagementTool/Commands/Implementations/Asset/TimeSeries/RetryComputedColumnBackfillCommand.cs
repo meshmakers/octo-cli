@@ -63,7 +63,7 @@ public class RetryComputedColumnBackfillCommand : ServiceClientOctoCommand<IStre
             }
 
             await ComputedColumnBackfillWaiter.WaitAsync(ServiceClient, Logger, Options.Value.TenantId, archiveRtId, name,
-                PollInterval, job.RtId);
+                PollInterval, EnsureAuthenticatedAsync, job.RtId);
         }
     }
 }

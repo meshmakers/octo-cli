@@ -11,12 +11,18 @@ namespace Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Asset
 internal static class ComputedColumnBackfillWaiter
 {
     /// <summary>Waits for the newest backfill job of <paramref name="column"/>; throws when it failed.</summary>
+    /// <remarks>
+    /// <paramref name="ensureAuthenticated"/> runs before every poll: a backfill of a large archive takes longer
+    /// than an access token lives (test-2, 2026-11-01: the wait stopped with "Access to the requested resource is
+    /// not allowed" after ~9 minutes while the backfill went on).
+    /// </remarks>
     public static async Task WaitAsync(IStreamDataServicesClient client, ILogger logger, string tenantId,
-        string archiveRtId, string column, TimeSpan pollInterval, string? jobRtId = null)
+        string archiveRtId, string column, TimeSpan pollInterval, Func<Task> ensureAuthenticated, string? jobRtId = null)
     {
         string? lastLine = null;
         while (true)
         {
+            await ensureAuthenticated();
             var jobs = await client.ListRecomputeJobsForArchiveAsync(tenantId, archiveRtId);
             var job = jobRtId is not null
                 ? jobs.FirstOrDefault(j => j.RtId == jobRtId)
