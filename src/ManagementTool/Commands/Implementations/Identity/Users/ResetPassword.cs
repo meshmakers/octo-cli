@@ -38,6 +38,10 @@ internal class ResetPassword : ServiceClientOctoCommand<IIdentityServicesClient>
                     new CodeSampleArgument(_passwordArg, "NewPassword456"),
                 ],
                     description: "Basic usage"),
+            ],
+            Notes:
+            [
+                "The new password is sent in the request body, never in the request URL. Requires an identity service of the later 3.5.x update or newer; it refuses the URL form older octo-cli versions used, and an older identity service does not accept the body form (400).",
             ]
         );
 
