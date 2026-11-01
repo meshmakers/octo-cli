@@ -41,6 +41,10 @@ internal class UpdateApiSecretClient : ServiceClientOctoCommand<IIdentityService
                     new CodeSampleArgument(_expirationArg, "2026-12-31"),
                 ],
                     description: "Basic usage"),
+            ],
+            Notes:
+            [
+                "-s is the stored hash as GetApiSecretsClient lists it. It is sent in the request body, never in the request URL. Requires an identity service of the later 3.5.x update or newer (an older one answers 405).",
             ]
         );
 

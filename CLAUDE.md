@@ -113,6 +113,19 @@ Identity commands on the tenant of the context (identity PR #210, SDK `IIdentity
   tenant. Issued access tokens stay valid until they expire.
 - Tests: `RevokeSessionsCommandTests`.
 
+## Credentials in the request body: ResetPassword, Delete/UpdateApiSecret* (AB#8008)
+
+`ResetPassword` and `DeleteApiSecretClient` / `DeleteApiSecretApiResource` / `UpdateApiSecretClient` / `UpdateApiSecretApiResource`
+go through the SDK `IIdentityServicesClient`, which since AB#8008 sends the new password (`POST users/ResetPassword`, body
+`{ userName, password }`) and the stored secret hash (`POST apiSecrets/{client|apiResource}/{id}/delete` and `.../lookup`, body
+`{ valueEncrypted }`) only in the JSON body - never in the URL, where request logs, traces and proxy access logs capture it. No
+command code changed; the behaviour comes with the SDK package. **Compatibility:** these commands need an identity service with
+AB#8008 (the identity service refuses the old reset URL form with 400; an older identity service answers the new forms with 400 /
+405). Ship octo-cli after the identity release. The command notes (`GetDocumentation().Notes`) say so. Tests:
+`CredentialsInRequestBodyTests` (real command + real SDK client against a local listener: method, URL without the value, body;
+no password in a log line). The test found that the SDK's `UpdateApiSecret*` sent `POST` (the create endpoint) instead of `PUT`,
+so `UpdateApiSecretClient` / `UpdateApiSecretApiResource` created an additional secret; fixed in the SDK with AB#8008.
+
 ## GraphQl: run a GraphQL query against any tenant (AB#7027)
 
 `octo-cli -c GraphQl -tid <tenant> -q "<query>"` (`Asset/GraphQl/GraphQlCommand.cs`) sends one GraphQL query or mutation to
