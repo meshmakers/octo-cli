@@ -1,3 +1,5 @@
+using System.Net;
+using Meshmakers.Octo.Sdk.ServiceClient;
 using Meshmakers.Octo.Sdk.ServiceClient.AssetRepositoryServices.StreamData;
 using Microsoft.Extensions.Logging;
 
@@ -10,6 +12,12 @@ namespace Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Asset
 /// </summary>
 internal static class ComputedColumnBackfillWaiter
 {
+    /// <summary>How long the asset repository may answer 502/503/504 in a row before the wait gives up.</summary>
+    internal static TimeSpan TransientTolerance { get; set; } = TimeSpan.FromMinutes(5);
+
+    private static bool IsTransient(HttpStatusCode status) =>
+        status is HttpStatusCode.BadGateway or HttpStatusCode.ServiceUnavailable or HttpStatusCode.GatewayTimeout;
+
     /// <summary>Waits for the newest backfill job of <paramref name="column"/>; throws when it failed.</summary>
     /// <remarks>
     /// <paramref name="ensureAuthenticated"/> runs before every poll: a backfill of a large archive takes longer
@@ -20,10 +28,35 @@ internal static class ComputedColumnBackfillWaiter
         string archiveRtId, string column, TimeSpan pollInterval, Func<Task> ensureAuthenticated, string? jobRtId = null)
     {
         string? lastLine = null;
+        DateTime? unavailableSince = null;
         while (true)
         {
             await ensureAuthenticated();
-            var jobs = await client.ListRecomputeJobsForArchiveAsync(tenantId, archiveRtId);
+            IReadOnlyList<RollupRecomputeJobInfoDto> jobs;
+            try
+            {
+                jobs = await client.ListRecomputeJobsForArchiveAsync(tenantId, archiveRtId);
+                unavailableSince = null;
+            }
+            catch (ServiceClientResultException ex) when (IsTransient(ex.HttpStatusCode))
+            {
+                // A rollout of the asset repository answers 502/503/504 for a while; the backfill job is handed back
+                // and resumed by the new pod, so keep waiting (test-2, 2026-11-01: -w stopped on a 503 mid-rollout).
+                unavailableSince ??= DateTime.UtcNow;
+                if (DateTime.UtcNow - unavailableSince > TransientTolerance)
+                {
+                    throw new ToolException(
+                        $"The asset repository has been unavailable for more than {TransientTolerance.TotalMinutes:0} minutes " +
+                        $"({(int)ex.HttpStatusCode}). The backfill of '{column}' goes on in the background; " +
+                        $"check it later with ListRecomputeJobs -id {archiveRtId}.", ex);
+                }
+
+                logger.LogWarning("Asset repository unavailable ({Status}), probably a rollout; still waiting for '{Column}'.",
+                    (int)ex.HttpStatusCode, column);
+                await Task.Delay(pollInterval);
+                continue;
+            }
+
             var job = jobRtId is not null
                 ? jobs.FirstOrDefault(j => j.RtId == jobRtId)
                 : jobs.FirstOrDefault(j => string.Equals(j.ComputedColumnName, column, StringComparison.Ordinal));
