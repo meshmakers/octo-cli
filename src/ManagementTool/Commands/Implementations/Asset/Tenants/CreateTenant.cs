@@ -101,10 +101,9 @@ internal class CreateTenant : ServiceClientOctoCommand<IAssetServicesClient>
                 "Provisioning current user as admin in tenant '{TenantId}' via identity service at '{IdentityServiceUri}'",
                 tenantId, _identityServicesClient.ServiceUri);
 
-            await _identityServicesClient.ProvisionCurrentUser(tenantId);
+            var mapping = await _identityServicesClient.ProvisionCurrentUser(tenantId);
 
-            Logger.LogInformation(
-                "Current user provisioned as admin in tenant '{TenantId}'", tenantId);
+            Implementations.Identity.AdminProvisioning.ProvisionCurrentUser.LogProvisioned(Logger, tenantId, mapping);
         }
         else if (scratch)
         {
