@@ -65,6 +65,8 @@ internal class ImportRuntimeModel : JobWithWaitOctoCommand
                 "Entities whose rtId already exists in the tenant are updated as before (with -r). Files and tenants " +
                 "without such types behave as before. To bring such entities into a tenant, restore a backup of the " +
                 "tenant or create them by calling the method.",
+                "### Hidden and MethodOnly attributes\n\nAn import cannot set an attribute whose CK assignment declares `access: Hidden` or `access: MethodOnly` (also as a member of a record): only a CK method may write it. If the file contains such a value, the whole import fails before anything is written with message 139, which names the type, the attribute path and the rtId of every refused value. `ReadOnly` attributes can be imported. This applies with and without -r, to YAML and JSON files. See [Export and import](../../../../constructionKits/ckLanguage2/accessModifiers.md#export-and-import).",
+                "### Users\n\nSince System.Identity 2.28.0 an import cannot create or update users (System.Identity/User): UserName and Email are MethodOnly, so a file that contains a user fails as a whole with message 139. An export still contains the users (without password and two-factor material); leave them out of the export or remove them from the file. To copy a tenant with its users, restore a dump of the tenant; to move single users, create them again with CreateUser. See [Moving Users to Another Tenant](../../../../identityService/users-and-roles.md#moving-users-to-another-tenant).",
             ]
         );
 
