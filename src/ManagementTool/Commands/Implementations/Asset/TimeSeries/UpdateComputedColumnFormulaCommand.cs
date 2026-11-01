@@ -10,13 +10,14 @@ public class UpdateComputedColumnFormulaCommand : ServiceClientOctoCommand<IStre
 {
     private readonly IArgument _archiveRtIdArg;
     private readonly IArgument _nameArg;
+    private readonly IArgument _waitArg;
     private readonly IArgument _formulaArg;
 
     public UpdateComputedColumnFormulaCommand(ILogger<UpdateComputedColumnFormulaCommand> logger,
         IOptions<OctoToolOptions> options, IStreamDataServicesClient serviceClient,
         IAuthenticationService authenticationService) : base(logger, Constants.AssetRepositoryServicesGroup,
         "UpdateComputedColumnFormula",
-        "Changes the formula of an existing computed column on an active archive. Readers keep the previous values while the new formula is backfilled, then switch atomically. Rejected if another computed column references this one. (AB#4189)",
+        "Changes the formula of an existing computed column on an active archive. Readers keep the previous values while the asset repository backfills the new formula as a background job, then switch atomically; a failed job reverts to the previous formula. Returns once the job is queued (follow it with ListRecomputeJobs, or pass -w). Rejected if another computed column references this one, or while a backfill of the column is still running. (AB#4189, AB#8002)",
         options, serviceClient, authenticationService)
     {
         _archiveRtIdArg = CommandArgumentValue.AddArgument("id", "identifier",
@@ -25,7 +26,12 @@ public class UpdateComputedColumnFormulaCommand : ServiceClientOctoCommand<IStre
             ["Name of the computed column to re-formulate"], true, 1);
         _formulaArg = CommandArgumentValue.AddArgument("f", "formula",
             ["The new mXparser formula"], true, 1);
+        _waitArg = CommandArgumentValue.AddArgument("w", "wait",
+            ["Wait until the background backfill job has finished; exits non-zero when it fails"], false, 0);
     }
+
+    /// <summary>Interval between two status polls with <c>-w</c>. Internal for tests.</summary>
+    internal TimeSpan PollInterval { get; set; } = TimeSpan.FromSeconds(5);
 
     public override async Task Execute()
     {
@@ -45,7 +51,13 @@ public class UpdateComputedColumnFormulaCommand : ServiceClientOctoCommand<IStre
 
         await ServiceClient.UpdateComputedColumnFormulaAsync(Options.Value.TenantId, archiveRtId, name, formula);
 
-        Logger.LogInformation("Computed column '{Name}' re-formulated and backfilled on archive '{ArchiveRtId}'.",
+        Logger.LogInformation("Formula change of computed column '{Name}' on archive '{ArchiveRtId}' queued; its backfill runs in the background.",
             name, archiveRtId);
+
+        if (CommandArgumentValue.IsArgumentUsed(_waitArg))
+        {
+            await ComputedColumnBackfillWaiter.WaitAsync(ServiceClient, Logger, Options.Value.TenantId, archiveRtId, name,
+                PollInterval);
+        }
     }
 }

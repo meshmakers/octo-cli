@@ -1,0 +1,54 @@
+using Meshmakers.Octo.Sdk.ServiceClient.AssetRepositoryServices.StreamData;
+using Microsoft.Extensions.Logging;
+
+namespace Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Asset.TimeSeries;
+
+/// <summary>
+/// Follows the background backfill job of a computed column until it ends (AB#8002). The server queues
+/// the backfill and returns at once; this polls the archive's recompute jobs (short requests, so no HTTP
+/// timeout can hit) and reports progress until the newest job of the column is Completed or Failed.
+/// </summary>
+internal static class ComputedColumnBackfillWaiter
+{
+    /// <summary>Waits for the newest backfill job of <paramref name="column"/>; throws when it failed.</summary>
+    public static async Task WaitAsync(IStreamDataServicesClient client, ILogger logger, string tenantId,
+        string archiveRtId, string column, TimeSpan pollInterval, string? jobRtId = null)
+    {
+        string? lastLine = null;
+        while (true)
+        {
+            var jobs = await client.ListRecomputeJobsForArchiveAsync(tenantId, archiveRtId);
+            var job = jobRtId is not null
+                ? jobs.FirstOrDefault(j => j.RtId == jobRtId)
+                : jobs.FirstOrDefault(j => string.Equals(j.ComputedColumnName, column, StringComparison.Ordinal));
+
+            if (job is null)
+            {
+                throw new ToolException(
+                    $"No backfill job found for computed column '{column}' on archive '{archiveRtId}'. " +
+                    "The asset repository may be older than AB#8002 (it backfilled inside the call).");
+            }
+
+            var line = $"Backfill of '{column}': {job.State}, rows={job.RowsProcessed?.ToString() ?? "0"}";
+            if (line != lastLine)
+            {
+                logger.LogInformation("{Progress}", line);
+                lastLine = line;
+            }
+
+            switch (job.State)
+            {
+                case "Completed":
+                    logger.LogInformation("Computed column '{Column}' on archive '{ArchiveRtId}' is backfilled ({Rows} rows, {Duration} ms).",
+                        column, archiveRtId, job.RowsProcessed, job.DurationMs);
+                    return;
+                case "Failed":
+                    throw new ToolException(
+                        $"Backfill of computed column '{column}' failed: {job.ErrorReason ?? "no reason given"}. " +
+                        $"Retry it with RetryComputedColumnBackfill -id {archiveRtId} -n {column}.");
+            }
+
+            await Task.Delay(pollInterval);
+        }
+    }
+}

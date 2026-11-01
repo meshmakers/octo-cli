@@ -10,6 +10,7 @@ public class AddComputedColumnCommand : ServiceClientOctoCommand<IStreamDataServ
 {
     private readonly IArgument _archiveRtIdArg;
     private readonly IArgument _nameArg;
+    private readonly IArgument _waitArg;
     private readonly IArgument _formulaArg;
     private readonly IArgument _resultTypeArg;
     private readonly IArgument _indexedArg;
@@ -18,7 +19,7 @@ public class AddComputedColumnCommand : ServiceClientOctoCommand<IStreamDataServ
         IOptions<OctoToolOptions> options, IStreamDataServicesClient serviceClient,
         IAuthenticationService authenticationService) : base(logger, Constants.AssetRepositoryServicesGroup,
         "AddComputedColumn",
-        "Adds a computed column to an Activated raw or time-range archive and backfills it. The column becomes visible atomically when the backfill completes. (AB#4189)",
+        "Adds a computed column to an Activated raw or time-range archive. The asset repository backfills the existing rows as a background job and returns at once; the column becomes visible atomically when the job completes (follow it with ListRecomputeJobs, or pass -w). A failed backfill is retried with RetryComputedColumnBackfill. (AB#4189, AB#8002)",
         options, serviceClient, authenticationService)
     {
         _archiveRtIdArg = CommandArgumentValue.AddArgument("id", "identifier",
@@ -31,7 +32,12 @@ public class AddComputedColumnCommand : ServiceClientOctoCommand<IStreamDataServ
             ["Declared result type the formula is cast back to: Boolean | Int | Int64 | Double | DateTime"], true, 1);
         _indexedArg = CommandArgumentValue.AddArgument("x", "indexed",
             ["Whether to index the physical column ('true'/'false'). Defaults to true"], false, 1);
+        _waitArg = CommandArgumentValue.AddArgument("w", "wait",
+            ["Wait until the background backfill job has finished; exits non-zero when it fails"], false, 0);
     }
+
+    /// <summary>Interval between two status polls with <c>-w</c>. Internal for tests.</summary>
+    internal TimeSpan PollInterval { get; set; } = TimeSpan.FromSeconds(5);
 
     public override async Task Execute()
     {
@@ -55,7 +61,13 @@ public class AddComputedColumnCommand : ServiceClientOctoCommand<IStreamDataServ
 
         await ServiceClient.AddComputedColumnAsync(Options.Value.TenantId, archiveRtId, name, formula, resultType, indexed);
 
-        Logger.LogInformation("Computed column '{Name}' added and backfilled on archive '{ArchiveRtId}'.",
+        Logger.LogInformation("Computed column '{Name}' added to archive '{ArchiveRtId}'; its backfill runs in the background.",
             name, archiveRtId);
+
+        if (CommandArgumentValue.IsArgumentUsed(_waitArg))
+        {
+            await ComputedColumnBackfillWaiter.WaitAsync(ServiceClient, Logger, Options.Value.TenantId, archiveRtId, name,
+                PollInterval);
+        }
     }
 }

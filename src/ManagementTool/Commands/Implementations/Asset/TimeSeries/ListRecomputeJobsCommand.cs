@@ -46,9 +46,10 @@ public class ListRecomputeJobsCommand : ServiceClientOctoCommand<IStreamDataServ
         foreach (var j in jobs)
         {
             Logger.LogInformation(
-                "  {RtId} — {State}, rows={Rows}, windows={Windows}, started={Started}, lastProgress={LastProgress}, " +
+                "  {RtId} — {Kind}{State}, rows={Rows}, windows={Windows}, started={Started}, lastProgress={LastProgress}, " +
                 "finished={Finished}, duration={Duration}ms, error={Error}",
                 j.RtId,
+                j.ComputedColumnName is { } column ? $"backfill of computed column '{column}', " : string.Empty,
                 j.State,
                 j.RowsProcessed?.ToString() ?? "pending",
                 j.WindowsProcessed?.ToString() ?? "pending",
