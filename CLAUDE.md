@@ -473,7 +473,7 @@ Environment variables are prefixed with `OCTO_`:
 | Category | Commands | Service |
 |----------|----------|---------|
 | Identity | users, roles, clients (+ mirror commands: GetClientMirrors, ProvisionClientInExistingTenants, ProvisionClientInTenant, UnprovisionClientFromTenant, SetClientAutoProvision, ApplyClientOverlay, CleanClientOverlays), identityProviders, groups, emailDomainGroupRules, externalTenantUserMappings, adminProvisioning, apiResources, apiScopes | Identity Services |
-| Asset | tenants, models, blueprints (ListBlueprints, RefreshBlueprintCatalogs, InstallBlueprint, GetBlueprintHistory, PreviewBlueprintUpdate, UpdateBlueprint, ListBlueprintInstallations, UninstallBlueprint), timeSeries (EnableStreamData, DisableStreamData, ActivateArchive, DisableArchive, EnableArchive, RetryArchiveActivation, DeleteArchive, FreezeRollupArchive, UnfreezeRollupArchive, RewindRollupWatermark, ListRollupsForArchive, RecomputeArchive, BackfillRollup, ListRecomputeJobs, ValidateRollups, RepairRollups, GetRollupRepairStatus, AddComputedColumn, RemoveComputedColumn, UpdateComputedColumnFormula) | Asset Repository |
+| Asset | tenants, models, blueprints (ListBlueprints, RefreshBlueprintCatalogs, InstallBlueprint, GetBlueprintHistory, PreviewBlueprintUpdate, UpdateBlueprint, ListBlueprintInstallations, UninstallBlueprint), timeSeries (EnableStreamData, DisableStreamData, ActivateArchive, DisableArchive, EnableArchive, RetryArchiveActivation, DeleteArchive, FreezeRollupArchive, UnfreezeRollupArchive, RewindRollupWatermark, ListRollupsForArchive, RecomputeArchive, BackfillRollup, ListRecomputeJobs, ValidateRollups, RepairRollups, GetRollupRepairStatus, AddArchiveColumn, AddComputedColumn, RemoveComputedColumn, UpdateComputedColumnFormula) | Asset Repository |
 | Bots | Dump, Restore, ExportArchiveData, ImportArchiveData, RunFixupScripts | Bot Services |
 | Communication | enable/disable, adapters (incl. RotateAdapterServiceAccountSecret), SwitchServiceAccountsToImpersonation, pipelines (incl. MovePipelines for bulk reassignment to a different adapter), triggers, pools, adapter pool queue (GetAdapterPoolQueue, CancelQueuedExecution), dataFlows, workloads (GetWorkloadsByChart, UpdateWorkloadChartVersion, UpdateWorkloadResources, DeployWorkload, UndeployWorkload) | Communication Controller |
 | Reporting | enable/disable | Report Services |
@@ -714,6 +714,11 @@ octo-cli -c ListRecomputeJobs -id <rollupRtId>                 # recent recomput
 # immediately (never cancelled by a client HTTP timeout; survives an asset-repo restart).
 octo-cli -c BackfillRollup -id <rollupRtId>                    # queue whole-history backfill, return job id
 octo-cli -c BackfillRollup -id <rollupRtId> -w                # queue, then poll the job until it completes
+
+# Ingested column (AB#7997) — add an attribute column to an Activated archive; history kept, existing rows read null
+octo-cli -c AddArchiveColumn -id <archiveRtId> -p DischargingPower          # -x true to index it; idempotent
+# A blueprint update / ImportRt whose seed adds columns to an Activated archive adds them the same way
+# (computed ones via the backfill job) and lists them in the update result (archiveColumnsAdded).
 
 # Computed columns (AB#4189) — add a formula-derived column to a live archive and backfill it
 octo-cli -c AddComputedColumn -id <archiveRtId> -n powerFactor -f "activePower / apparentPower" -r Double
