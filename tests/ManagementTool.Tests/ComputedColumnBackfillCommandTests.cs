@@ -96,6 +96,47 @@ public sealed class ComputedColumnBackfillCommandTests
     }
 
     [Fact]
+    public async Task Wait_RidesOutARollout_503_AndFinishes()
+    {
+        var client = A.Fake<IStreamDataServicesClient>();
+        A.CallTo(() => client.RetryComputedColumnBackfillAsync("acme", Archive, "ExportPower")).Returns(Job("j2", "Pending"));
+        var calls = 0;
+        A.CallTo(() => client.ListRecomputeJobsForArchiveAsync("acme", Archive)).ReturnsLazily(() =>
+            ++calls switch
+            {
+                1 => Task.FromResult<IReadOnlyList<RollupRecomputeJobInfoDto>>(new[] { Job("j2", "Running", 1) }),
+                2 or 3 => throw new Meshmakers.Octo.Sdk.ServiceClient.ServiceClientResultException(
+                    "503 Service Temporarily Unavailable", System.Net.HttpStatusCode.ServiceUnavailable),
+                _ => Task.FromResult<IReadOnlyList<RollupRecomputeJobInfoDto>>(new[] { Job("j2", "Completed", 9) }),
+            });
+        var logger = new RecordingLogger<RetryComputedColumnBackfillCommand>();
+        var command = new RetryComputedColumnBackfillCommand(logger, Tenant(), client, A.Fake<IAuthenticationService>())
+        {
+            PollInterval = TimeSpan.FromMilliseconds(1),
+        };
+        command.CommandArgumentValue.ParseLayer(["-id", Archive, "-n", "ExportPower", "-w"]);
+
+        await command.Execute();
+
+        Assert.Contains(logger.Entries, e => e.Message.Contains("probably a rollout"));
+        Assert.Contains(logger.Entries, e => e.Message.Contains("is backfilled (9 rows"));
+    }
+
+    [Fact]
+    public async Task Wait_NonTransientError_StillFails()
+    {
+        var client = A.Fake<IStreamDataServicesClient>();
+        A.CallTo(() => client.RetryComputedColumnBackfillAsync("acme", Archive, "ExportPower")).Returns(Job("j2", "Pending"));
+        A.CallTo(() => client.ListRecomputeJobsForArchiveAsync("acme", Archive)).Throws(
+            new Meshmakers.Octo.Sdk.ServiceClient.ServiceClientResultException("bad", System.Net.HttpStatusCode.BadRequest));
+        var command = new RetryComputedColumnBackfillCommand(new RecordingLogger<RetryComputedColumnBackfillCommand>(),
+            Tenant(), client, A.Fake<IAuthenticationService>()) { PollInterval = TimeSpan.FromMilliseconds(1) };
+        command.CommandArgumentValue.ParseLayer(["-id", Archive, "-n", "ExportPower", "-w"]);
+
+        await Assert.ThrowsAsync<Meshmakers.Octo.Sdk.ServiceClient.ServiceClientResultException>(() => command.Execute());
+    }
+
+    [Fact]
     public async Task Add_WithWait_FailedJob_ExitsNonZero_AndNamesTheRetryCommand()
     {
         var client = A.Fake<IStreamDataServicesClient>();
