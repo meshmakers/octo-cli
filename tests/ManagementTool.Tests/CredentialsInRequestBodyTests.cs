@@ -23,7 +23,7 @@ public sealed class CredentialsInRequestBodyTests : IDisposable
     private readonly string _password = "pw-" + Guid.NewGuid().ToString("N");
     private readonly string _storedHash = Convert.ToBase64String(Guid.NewGuid().ToByteArray());
 
-    private readonly HttpListener _listener = new();
+    private readonly HttpListener _listener;
     private readonly string _baseUri;
     private readonly List<(string Method, string PathAndQuery, string Body)> _requests = [];
     private readonly IOptions<OctoToolOptions> _options = Options.Create(new OctoToolOptions { TenantId = "acme" });
@@ -31,30 +31,35 @@ public sealed class CredentialsInRequestBodyTests : IDisposable
 
     public CredentialsInRequestBodyTests()
     {
-        var started = false;
-        var uri = "";
-        for (var port = 47000 + Random.Shared.Next(0, 2000); !started; port++)
-        {
-            try
-            {
-                uri = $"http://127.0.0.1:{port}/";
-                _listener.Prefixes.Clear();
-                _listener.Prefixes.Add(uri);
-                _listener.Start();
-                started = true;
-            }
-            catch (HttpListenerException)
-            {
-                // port taken, try the next one
-            }
-        }
-
-        _baseUri = uri;
+        // A failed Start() disposes the listener, so every attempt gets a fresh one; attempts are bounded and the last
+        // failure is rethrown instead of looping on a closed listener.
+        (_listener, _baseUri) = StartListener();
         A.CallTo(() => _confirm.Confirm(A<string>._)).Returns(true);
         _ = Task.Run(Serve);
     }
 
     public void Dispose() => _listener.Close();
+
+    private static (HttpListener Listener, string BaseUri) StartListener()
+    {
+        const int attempts = 20;
+        for (var attempt = 1; ; attempt++)
+        {
+            var uri = $"http://127.0.0.1:{47000 + Random.Shared.Next(0, 2000)}/";
+            var listener = new HttpListener();
+            listener.Prefixes.Add(uri);
+            try
+            {
+                listener.Start();
+                return (listener, uri);
+            }
+            catch (HttpListenerException) when (attempt < attempts)
+            {
+                // port taken: try another one with a new listener
+                listener.Close();
+            }
+        }
+    }
 
     private async Task Serve()
     {
