@@ -76,6 +76,8 @@ internal class ExportRuntimeModelByDeepGraph : JobOctoCommand
             [
                 "The export runs with the data permissions of the caller: the job uses the identity and roles of the user who started it, so the file contains only what that user may read (a deep graph export also omits associations that point to entities the user may not read). A caller without identity gets 401 and no job is started.",
                 "Only the initiating subject may download the result (any other subject gets 403), and the download needs the tenant role TenantManagement - even for the initiator, otherwise the download fails with 403.",
+                "Attributes whose CK assignment declares `access: Hidden` are never exported (also not as a member of a record). `MethodOnly` values are exported, but an import refuses them (message 139), see [Export and import](../../../../constructionKits/ckLanguage2/accessModifiers.md#export-and-import).",
+                "Users (System.Identity/User) are exported without password and two-factor material, but since System.Identity 2.28.0 ImportRt refuses them (UserName and Email are MethodOnly). Leave them out of an export that is meant for ImportRt; see [Moving Users to Another Tenant](../../../../identityService/users-and-roles.md#moving-users-to-another-tenant).",
             ]
         );
 
