@@ -527,6 +527,7 @@ internal static class Program
         services.AddTransient<ICommand, AddComputedColumnCommand>();
         services.AddTransient<ICommand, RemoveComputedColumnCommand>();
         services.AddTransient<ICommand, UpdateComputedColumnFormulaCommand>();
+        services.AddTransient<ICommand, RetryComputedColumnBackfillCommand>();
 
         services.AddTransient<ICommand, EnableReportingCommand>();
         services.AddTransient<ICommand, DisableReportingCommand>();
