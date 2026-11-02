@@ -1292,3 +1292,12 @@ An agent that creates throw-away child tenants with a client-credentials client 
   delete the tenant and fails (`DisableArchive` keeps the data, `DeleteArchive` removes the archive). The orchestration is the SDK's
   `TenantFeatureDisabler`, shared with the MCP tool `delete_tenant` (`disableFeatures`).
 - Tests: `ScratchTenantCommandTests` (Create flag, Delete with and without `--disable-features`, order, archives, child token for service and user sessions).
+
+## 403 names the missing role (AB#8094)
+
+`Runner` answers a `403` (`ServiceClientResultException`, exit code `-3`) with the `message` of the identity API body
+(`{"message": "...requires the role 'SecretManagement'..."}`, AB#5861) printed verbatim; `ForbiddenResponseMessage` reads it once from
+the exception text (the SDK keeps the body there). A 403 without body or without a usable `message` (the cross-tenant case) keeps the
+generic text with the `ProvisionCurrentUser` hint. The notes of the ApiSecret write commands and `AddClientCredentialsClient` state that
+writes need the tenant role `SecretManagement` (`TenantManagement`/`UserManagement` only while the cluster runs `SecretManagementRoleEnforcement=Warn`);
+the command reference page is generated from them. Tests: `ForbiddenRoleMessageTests`.

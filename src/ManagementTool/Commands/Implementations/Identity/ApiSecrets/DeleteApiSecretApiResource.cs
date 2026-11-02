@@ -43,6 +43,7 @@ internal class DeleteApiSecretApiResource : ServiceClientOctoCommand<IIdentitySe
             ],
             Notes:
             [
+                "Writing API secrets needs the tenant role `SecretManagement`. `TenantManagement` or `UserManagement` are only enough while the identity cluster runs with `SecretManagementRoleEnforcement=Warn`. A refused call (HTTP 403) prints the message of the identity service, which names the missing role.",
                 "-s is the stored hash as GetApiSecretsApiResource lists it. It is sent in the request body, never in the request URL. Requires an identity service of the later 3.5.x update or newer (an older one answers 405).",
             ]
         );
