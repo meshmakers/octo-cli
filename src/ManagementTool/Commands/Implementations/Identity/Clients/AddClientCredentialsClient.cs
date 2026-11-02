@@ -64,7 +64,7 @@ internal class AddClientCredentialsClient : ServiceClientOctoCommand<IIdentitySe
             ],
             Notes:
             [
-                "Creating a client with a secret needs the tenant role `SecretManagement`. `TenantManagement` or `UserManagement` are only enough while the identity cluster runs with `SecretManagementRoleEnforcement=Warn`. A refused call (HTTP 403) prints the message of the identity service, which names the missing role.",
+                "Creating a client with a secret needs the tenant role `SecretManagement`. `TenantManagement` or `UserManagement` are only enough while the identity cluster runs with `SecretManagementRoleEnforcement=Warn`. A refused call (HTTP 403) prints the message of the identity service, which names the missing role; without a message the generic access-denied text is shown.",
                 $"The client secret is read from a hidden prompt, from standard input (--secret-stdin) or from the environment variable {Constants.EnvVarNewClientSecret}, so it does not end up in the shell history or the process list. -s still works in this release but logs a deprecation warning and will be removed. {Constants.EnvVarClientSecret} is not read here: it is the secret octo-cli itself logs in with.",
             ]
         );

@@ -31,9 +31,10 @@ internal static class ForbiddenResponseMessage
             if (document.RootElement.ValueKind == JsonValueKind.Object &&
                 document.RootElement.TryGetProperty("message", out var element) &&
                 element.ValueKind == JsonValueKind.String &&
-                !string.IsNullOrWhiteSpace(element.GetString()))
+                element.GetString() is { } reason &&
+                !string.IsNullOrWhiteSpace(reason))
             {
-                message = element.GetString()!;
+                message = reason;
                 return true;
             }
         }

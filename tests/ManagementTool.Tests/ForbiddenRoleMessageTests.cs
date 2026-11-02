@@ -33,7 +33,8 @@ public sealed class ForbiddenRoleMessageTests : IDisposable
     {
         var started = false;
         var uri = "";
-        for (var port = 43000 + Random.Shared.Next(0, 2000); !started; port++)
+        var firstPort = 43000 + Random.Shared.Next(0, 2000);
+        for (var port = firstPort; !started; port++)
         {
             try
             {
@@ -43,9 +44,9 @@ public sealed class ForbiddenRoleMessageTests : IDisposable
                 _listener.Start();
                 started = true;
             }
-            catch (HttpListenerException)
+            catch (HttpListenerException) when (port < firstPort + 100)
             {
-                // port taken, try the next one
+                // port taken, try the next one (bounded: any other startup failure surfaces after 100 attempts)
             }
         }
 
