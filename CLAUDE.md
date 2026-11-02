@@ -702,6 +702,11 @@ octo-cli -c PreviewBlueprintUpdate -tv MyBlueprint-2.0.0 -fob       # --failOnBl
 octo-cli -c UpdateBlueprint -tv MyBlueprint-2.0.0 -f                # --force (= --forceBreakingUpdate): proceed although installed models break
 octo-cli -c InstallBlueprint -b MyBlueprint-2.0.0 -fbu              # --forceBreakingUpdate (InstallBlueprint -f already means re-apply)
 
+# Blueprint archives (AB#7991): InstallBlueprint and UpdateBlueprint log what happened to the archives of the seed (BlueprintArchiveActivationReport):
+# a summary ("3 Activated, 1 SkippedStreamDataDisabled ...; 1 rollup backfill(s) queued"), the backfill job id per new rollup (follow with ListRecomputeJobs),
+# a warning per skipped archive and per service warning, an error per failed archive. InstallBlueprint also prints the JSON result with archiveActivations.
+# Tenant without stream data: the install succeeds, the archives are left out and a warning says so; re-apply with -f after EnableStreamData.
+
 # Blueprints — blanking protection (AB#6316, server AB#6315). A seed with an empty/omitted attribute would
 # clear a tenant value; the service keeps it unless confirmed. Summaries only, never values.
 octo-cli -c PreviewBlueprintUpdate -tv MyBlueprint-2.0.0            # JSON on stdout; blanking table + hint as warnings (log)

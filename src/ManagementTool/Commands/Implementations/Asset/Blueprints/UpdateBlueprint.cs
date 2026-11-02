@@ -97,6 +97,7 @@ internal class UpdateBlueprint : ServiceClientOctoCommand<IAssetServicesClient>
                 "A --confirm-blanking pair that is not a blanking candidate is reported and ignored.",
                 "Tenant-owned seed entities (rtBlueprintLocked: false) are never rewritten; the command lists those left untouched and those the tenant deleted that stay deleted (key, type, rtId, no values).",
                 "The blanking Reason is printed as the service reports it: SeedEmpty, SeedOmitted, or ResetToDefault.",
+                "Archives the update adds are activated and new rollups are backfilled; the output lists each archive (activated, skipped with a reason, failed) and the backfill job ids. Archives that already existed are never touched.",
                 "Against services older than the blanking protection (AB#6315) the update behaves as before and no blanking list is reported.",
                 "Tenant upgrade guard: the CK models the target blueprint installs or raises are judged as one set against the installed models. A set that would break an installed model is refused with CK_UPGRADE_BLOCKED before the first change (blockers are listed, nothing is changed); --force overrides it and needs the data model management role.",
                 "With --dry-run the blockers are listed and nothing is written, whether or not --force is given.",
@@ -174,6 +175,7 @@ internal class UpdateBlueprint : ServiceClientOctoCommand<IAssetServicesClient>
         BlueprintBlanking.ReportTenantOwned(
             Logger, dryRun, result.TenantOwnedSkipped, result.TenantOwnedStaysDeleted);
         ReportArchiveColumns(result.ArchiveColumnsAdded);
+        BlueprintArchiveActivationReport.Log(Logger, result.ArchiveActivations, result.Warnings);
     }
 
     /// <summary>AB#7997: the columns the update added to activated archives, and those it could not add.</summary>

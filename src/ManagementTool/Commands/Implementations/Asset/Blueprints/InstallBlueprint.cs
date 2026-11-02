@@ -63,7 +63,8 @@ internal class InstallBlueprint : ServiceClientOctoCommand<IAssetServicesClient>
             [
                 "The tenant upgrade guard judges the CK models the blueprint installs or raises as one set against the installed models (same rules and output as ImportFromCatalog).",
                 "--force re-applies the seed data of an already installed version; it does not override the guard. Use --forceBreakingUpdate for that.",
-                "A refused install changes nothing: no CK model, no installation record, no seed data."
+                "A refused install changes nothing: no CK model, no installation record, no seed data.",
+                "Archives the seed creates are activated and new rollups are backfilled; the output lists each archive (activated, skipped with a reason, failed) and the backfill job ids. On a tenant without stream data the install succeeds, the archives are left out and a warning says so."
             ]);
 
     public override async Task Execute()
@@ -108,6 +109,8 @@ internal class InstallBlueprint : ServiceClientOctoCommand<IAssetServicesClient>
         Logger.LogInformation(
             "Blueprint '{BlueprintId}' applied to tenant '{TenantId}' (mode={Mode}, seedFiles={SeedFiles})",
             result.BlueprintId, result.TenantId, result.ApplicationMode, result.SeedDataFilesApplied);
+
+        BlueprintArchiveActivationReport.Log(Logger, result.ArchiveActivations, result.Warnings);
 
         var resultString = JsonConvert.SerializeObject(result, Formatting.Indented);
         _consoleService.WriteLine(resultString);
