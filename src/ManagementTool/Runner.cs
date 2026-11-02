@@ -74,6 +74,14 @@ internal class Runner
         }
         catch (ServiceClientResultException ex) when (ex.HttpStatusCode == System.Net.HttpStatusCode.Forbidden)
         {
+            if (ForbiddenResponseMessage.TryGet(ex, out var reason))
+            {
+                // AB#8094: the identity service names the missing role (e.g. 'SecretManagement'); the hint below
+                // would point the administrator in the wrong direction.
+                _logger.LogError("{Message}", reason);
+                return -3;
+            }
+
             _logger.LogError("{Message}", ex.Message);
             _logger.LogError(
                 "Access denied (HTTP 403). If the context addresses a tenant other than the one you signed in on, your " +
