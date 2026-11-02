@@ -13,17 +13,21 @@ internal class UpdateIdentityProvider : ServiceClientOctoCommand<IIdentityServic
     private readonly IArgument _allowSelfRegistration;
     private readonly IArgument _clientId;
     private readonly IArgument _clientSecret;
+    private readonly IArgument _clientSecretStdin;
+    private readonly SecretInput _secretInput;
     private readonly IArgument _defaultGroupRtId;
     private readonly IArgument _enabled;
     private readonly IArgument _name;
     private readonly IArgument _rtId;
 
     public UpdateIdentityProvider(ILogger<UpdateIdentityProvider> logger, IOptions<OctoToolOptions> options,
-        IIdentityServicesClient identityServicesClient, IAuthenticationService authenticationService)
+        IIdentityServicesClient identityServicesClient, IAuthenticationService authenticationService,
+        SecretInput secretInput)
         : base(logger, Constants.IdentityServicesGroup, "UpdateIdentityProvider", "Updates an identity provider.",
             options, identityServicesClient,
             authenticationService)
     {
+        _secretInput = secretInput;
         _rtId = CommandArgumentValue.AddArgument("id", "identifier",
             ["ID of identity provider, must be unique"], true,
             1);
@@ -36,8 +40,12 @@ internal class UpdateIdentityProvider : ServiceClientOctoCommand<IIdentityServic
         _clientId = CommandArgumentValue.AddArgument("cid", "clientId",
             ["ServiceClient ID, provided by provider"], false, 1);
         _clientSecret = CommandArgumentValue.AddArgument("cs", "clientSecret",
-            ["New client secret, provided by provider. Omit to keep the stored secret (it is write-only and never returned)"],
-            false, 1);
+            [
+                "Deprecated: new client secret, provided by the provider; omit every secret source to keep the stored secret. A value on the command line ends up in the shell history and the process list.",
+                $"Use --client-secret-stdin or the environment variable {Constants.EnvVarIdentityProviderClientSecret} instead."
+            ], false, 1);
+        _clientSecretStdin = CommandArgumentValue.AddArgument("css", "client-secret-stdin",
+            ["Read the client secret from standard input (one value; a trailing line break is removed)"], false, 0);
         _allowSelfRegistration = CommandArgumentValue.AddArgument("asr", "allowSelfRegistration",
             ["Allow self registration (default: true)"], false, 1);
         _defaultGroupRtId = CommandArgumentValue.AddArgument("dgid", "defaultGroupRtId",
@@ -61,14 +69,14 @@ internal class UpdateIdentityProvider : ServiceClientOctoCommand<IIdentityServic
                     new CodeSampleArgument(_name, "Updated Name"),
                     new CodeSampleArgument(_enabled, "true"),
                     new CodeSampleArgument(_clientId, "new-client-id"),
-                    new CodeSampleArgument(_clientSecret, "new-client-secret"),
+                    new CodeSampleArgument(_clientSecretStdin),
                 ],
-                    description: "For OAuth-based providers, you can also update client credentials"),
+                    description: "For OAuth-based providers, you can also update client credentials (the new secret is piped in on standard input)"),
             ],
             Notes:
             [
                 "The client secret is write-only: GetIdentityProviders shows clientSecretIsSet, never the value.",
-                "Omit -cs to keep the stored client secret; pass a new value to rotate it. It cannot be cleared.",
+                $"A new client secret rotates the stored one; it is read from standard input (--client-secret-stdin) or from the environment variable {Constants.EnvVarIdentityProviderClientSecret}. Without either the stored secret is kept (there is no prompt). It cannot be cleared. -cs still works in this release but logs a deprecation warning, because a value on the command line ends up in the shell history and the process list.",
             ]
         );
 
@@ -95,9 +103,9 @@ internal class UpdateIdentityProvider : ServiceClientOctoCommand<IIdentityServic
         // AB#5543: the client secret is write-only. GET never returns it (clientSecretIsSet instead), and PUT
         // treats null / "" as "keep the stored secret" — so only a newly supplied value is sent, never the
         // existing DTO's ClientSecret.
-        var clientSecret = CommandArgumentValue.IsArgumentUsed(_clientSecret)
-            ? CommandArgumentValue.GetArgumentScalarValueOrDefault<string>(_clientSecret)
-            : null;
+        var clientSecret = _secretInput.Resolve(CommandArgumentValue,
+            new SecretSpec("client secret", _clientSecret, _clientSecretStdin,
+                Constants.EnvVarIdentityProviderClientSecret, Required: false, ConfirmPrompt: false), Logger);
         if (string.IsNullOrEmpty(clientSecret))
         {
             clientSecret = null;

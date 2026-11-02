@@ -578,7 +578,8 @@ public sealed class SecretCommandsTests
         A.CallTo(() => identity.UpdateIdentityProvider(A<OctoObjectId>._, A<IdentityProviderDto>._))
             .Invokes((OctoObjectId _, IdentityProviderDto dto) => sent = dto);
         var command = new UpdateIdentityProvider(new RecordingLogger<UpdateIdentityProvider>(),
-            Options.Create(new OctoToolOptions { TenantId = "acme" }), identity, A.Fake<IAuthenticationService>());
+            Options.Create(new OctoToolOptions { TenantId = "acme" }), identity, A.Fake<IAuthenticationService>(),
+            FakeSecretConsole.Empty());
         command.CommandArgumentValue.ParseLayer(["-id", ProviderId, "-n", "New", "-e", "true"]);
 
         await command.Execute();
@@ -601,7 +602,8 @@ public sealed class SecretCommandsTests
         A.CallTo(() => identity.UpdateIdentityProvider(A<OctoObjectId>._, A<IdentityProviderDto>._))
             .Invokes((OctoObjectId _, IdentityProviderDto dto) => sent = dto);
         var command = new UpdateIdentityProvider(new RecordingLogger<UpdateIdentityProvider>(),
-            Options.Create(new OctoToolOptions { TenantId = "acme" }), identity, A.Fake<IAuthenticationService>());
+            Options.Create(new OctoToolOptions { TenantId = "acme" }), identity, A.Fake<IAuthenticationService>(),
+            FakeSecretConsole.Empty());
         command.CommandArgumentValue.ParseLayer(["-id", ProviderId, "-n", "New", "-e", "true"]);
 
         await command.Execute();
@@ -621,7 +623,8 @@ public sealed class SecretCommandsTests
         A.CallTo(() => identity.UpdateIdentityProvider(A<OctoObjectId>._, A<IdentityProviderDto>._))
             .Invokes((OctoObjectId _, IdentityProviderDto dto) => sent = dto);
         var command = new UpdateIdentityProvider(new RecordingLogger<UpdateIdentityProvider>(),
-            Options.Create(new OctoToolOptions { TenantId = "acme" }), identity, A.Fake<IAuthenticationService>());
+            Options.Create(new OctoToolOptions { TenantId = "acme" }), identity, A.Fake<IAuthenticationService>(),
+            FakeSecretConsole.Empty());
         command.CommandArgumentValue.ParseLayer(["-id", ProviderId, "-n", "New", "-e", "true", "-cs", "rotated-test-secret"]);
 
         await command.Execute();

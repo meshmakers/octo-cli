@@ -107,7 +107,8 @@ public sealed class CredentialsInRequestBodyTests : IDisposable
     public async Task ResetPassword_SendsThePasswordInTheBody_NotInTheUrl_AndLogsItNowhere()
     {
         var logger = new RecordingLogger<ResetPassword>();
-        var command = new ResetPassword(logger, _options, CreateClient(), A.Fake<IAuthenticationService>(), _confirm);
+        var command = new ResetPassword(logger, _options, CreateClient(), A.Fake<IAuthenticationService>(), _confirm,
+            FakeSecretConsole.Empty());
         command.CommandArgumentValue.ParseLayer(["-un", "alice", "-p", _password, "-y"]);
 
         await command.Execute();

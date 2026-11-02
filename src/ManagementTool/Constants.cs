@@ -18,6 +18,30 @@ internal static class Constants
     public const string EnvVarChildClientSecret = "OCTO_CLI_CHILD_CLIENT_SECRET";
 
     /// <summary>
+    ///     The password a command sets (AB#8044): <c>ResetPassword</c>, <c>CreateUser</c>, <c>Setup</c>. For automation; read
+    ///     after <c>--password-stdin</c> and before the hidden prompt.
+    /// </summary>
+    public const string EnvVarNewPassword = "OCTO_CLI_NEW_PASSWORD";
+
+    /// <summary>
+    ///     The secret of a client a command creates (AB#8044): <c>AddClientCredentialsClient</c>, <c>AddDeviceCodeClient</c>.
+    ///     Deliberately not <see cref="EnvVarClientSecret" />, which is the secret octo-cli itself logs in with.
+    /// </summary>
+    public const string EnvVarNewClientSecret = "OCTO_CLI_NEW_CLIENT_SECRET";
+
+    /// <summary>
+    ///     The client secret of an identity provider a command adds or updates (AB#8044): <c>AddOAuthIdentityProvider</c>,
+    ///     <c>AddAzureEntryIdIdentityProvider</c>, <c>UpdateIdentityProvider</c>.
+    /// </summary>
+    public const string EnvVarIdentityProviderClientSecret = "OCTO_CLI_IDP_CLIENT_SECRET";
+
+    /// <summary>The Anthropic access token <c>RedeemAiTicket</c> hands over (AB#8044).</summary>
+    public const string EnvVarAiAccessToken = "OCTO_CLI_AI_ACCESS_TOKEN";
+
+    /// <summary>The Anthropic refresh token <c>RedeemAiTicket</c> hands over (AB#8044).</summary>
+    public const string EnvVarAiRefreshToken = "OCTO_CLI_AI_REFRESH_TOKEN";
+
+    /// <summary>
     ///     Selects the context for a single invocation, like the --context argument but for a whole
     ///     subshell. The argument wins when both are given.
     /// </summary>
