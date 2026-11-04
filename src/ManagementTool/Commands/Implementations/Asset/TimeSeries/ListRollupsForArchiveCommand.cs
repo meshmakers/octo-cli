@@ -1,3 +1,4 @@
+using System.Globalization;
 using Meshmakers.Common.CommandLineParser;
 using Meshmakers.Octo.Frontend.ManagementTool.Services;
 using Meshmakers.Octo.Sdk.ServiceClient.AssetRepositoryServices.StreamData;
@@ -14,12 +15,31 @@ public class ListRollupsForArchiveCommand : ServiceClientOctoCommand<IStreamData
         IOptions<OctoToolOptions> options, IStreamDataServicesClient serviceClient,
         IAuthenticationService authenticationService) : base(logger, Constants.AssetRepositoryServicesGroup,
         "ListRollupsForArchive",
-        "Lists every rollup archive attached to the given source CkArchive — runtime id, status, schedule, watermark, freeze state.",
+        "Lists every rollup archive attached to the given source CkArchive — runtime id, status, schedule, watermark, freeze state, reference time zone and day start.",
         options, serviceClient, authenticationService)
     {
         _archiveRtIdArg = CommandArgumentValue.AddArgument("id", "identifier",
             ["Runtime id of the source CkArchive entity"], true, 1);
     }
+
+    public override CommandDocumentation? GetDocumentation() =>
+        new(
+            Samples:
+            [
+                new CodeSample(arguments: [new CodeSampleArgument(_archiveRtIdArg, "6700000000000000000000b1")],
+                    description: "List the rollups of a source archive",
+                    expectedOutput:
+                    "  6700000000000000000000a1 (gasday) — Activated, bucket=86400000ms, lag=60000ms, watermark=<unset>, " +
+                    "frozenUntil=<not frozen>, aggs=1, timeZone=Europe/Vienna, dayStart=06:00")
+            ],
+            Notes:
+            [
+                "timeZone is the rollup's reference time zone (IANA id) and dayStart the local time at which a CalendarDay " +
+                "bucket starts: a gas-day rollup shows timeZone=Europe/Vienna, dayStart=06:00, so its days are 23, 24 or 25 " +
+                "hours long across DST changes. dayStart=00:00 means midnight days; <none> means the rollup has no reference " +
+                "time zone (fixed-size buckets in UTC) or the server does not report it.",
+                "Rollups are created by blueprints or GraphQL (createRollupArchive), not by octo-cli."
+            ]);
 
     public override async Task Execute()
     {
@@ -47,7 +67,7 @@ public class ListRollupsForArchiveCommand : ServiceClientOctoCommand<IStreamData
         foreach (var r in rollups)
         {
             Logger.LogInformation(
-                "  {RtId} ({Name}) — {Status}, bucket={BucketMs}ms, lag={LagMs}ms, watermark={Watermark}, frozenUntil={Frozen}, aggs={AggCount}",
+                "  {RtId} ({Name}) — {Status}, bucket={BucketMs}ms, lag={LagMs}ms, watermark={Watermark}, frozenUntil={Frozen}, aggs={AggCount}, timeZone={TimeZone}, dayStart={DayStart}",
                 r.RtId,
                 r.RtWellKnownName ?? "<unnamed>",
                 r.Status,
@@ -55,7 +75,10 @@ public class ListRollupsForArchiveCommand : ServiceClientOctoCommand<IStreamData
                 r.WatermarkLagMs,
                 r.LastAggregatedBucketEnd?.ToString("O") ?? "<unset>",
                 r.FrozenUntil?.ToString("O") ?? "<not frozen>",
-                r.AggregationCount);
+                r.AggregationCount,
+                // AB#7362: a gas-day rollup reads timeZone=Europe/Vienna, dayStart=06:00.
+                r.ReferenceTimeZone ?? "<none>",
+                FormatDayStart(r.DayStartOffsetMs));
             // Recompute health (AB#4184) — surfaced as a second line so the steady-state view stays
             // compact while failures / pending work are still visible for debugging.
             Logger.LogInformation(
@@ -80,4 +103,12 @@ public class ListRollupsForArchiveCommand : ServiceClientOctoCommand<IStreamData
             }
         }
     }
+
+    /// <summary>
+    ///     The day start of a rollup as local <c>HH:mm</c> (AB#7362): <c>06:00</c> for 21600000 ms, <c>00:00</c> for
+    ///     midnight days, <c>&lt;none&gt;</c> when the server does not report it.
+    /// </summary>
+    internal static string FormatDayStart(long? dayStartOffsetMs) => dayStartOffsetMs is { } ms
+        ? TimeSpan.FromMilliseconds(ms).ToString(@"hh\:mm", CultureInfo.InvariantCulture)
+        : "<none>";
 }
