@@ -78,7 +78,7 @@ public class ListRollupsForArchiveCommand : ServiceClientOctoCommand<IStreamData
                 r.AggregationCount,
                 // AB#7362: a gas-day rollup reads timeZone=Europe/Vienna, dayStart=06:00.
                 r.ReferenceTimeZone ?? "<none>",
-                FormatDayStart(r.DayStartOffsetMs));
+                FormatDayStart(r.DayStartOffsetMs, r.ReferenceTimeZone));
             // Recompute health (AB#4184) — surfaced as a second line so the steady-state view stays
             // compact while failures / pending work are still visible for debugging.
             Logger.LogInformation(
@@ -106,9 +106,14 @@ public class ListRollupsForArchiveCommand : ServiceClientOctoCommand<IStreamData
 
     /// <summary>
     ///     The day start of a rollup as local <c>HH:mm</c> (AB#7362): <c>06:00</c> for 21600000 ms, <c>00:00</c> for
-    ///     midnight days, <c>&lt;none&gt;</c> when the server does not report it.
+    ///     midnight days, <c>&lt;none&gt;</c> when the rollup has no reference time zone or the server reports neither.
+    ///     The asset repository returns a null day start for a midnight rollup created without one, so a null day start
+    ///     with a reference time zone is midnight (<c>00:00</c>).
     /// </summary>
-    internal static string FormatDayStart(long? dayStartOffsetMs) => dayStartOffsetMs is { } ms
-        ? TimeSpan.FromMilliseconds(ms).ToString(@"hh\:mm", CultureInfo.InvariantCulture)
-        : "<none>";
+    internal static string FormatDayStart(long? dayStartOffsetMs, string? referenceTimeZone) => dayStartOffsetMs switch
+    {
+        { } ms => TimeSpan.FromMilliseconds(ms).ToString(@"hh\:mm", CultureInfo.InvariantCulture),
+        null when !string.IsNullOrEmpty(referenceTimeZone) => "00:00",
+        _ => "<none>"
+    };
 }

@@ -30,6 +30,8 @@ public sealed class ListRollupsForArchiveCommandTests
         [
             Rollup("6700000000000000000000a1", "gasday", "Europe/Vienna", 21_600_000),
             Rollup("6700000000000000000000a2", "daily", "Europe/Vienna", 0),
+            // A midnight rollup created without a day start: the server reports the zone and a null day start.
+            Rollup("6700000000000000000000a4", "midnight", "Europe/Vienna", null),
             Rollup("6700000000000000000000a3", "hourly", null, null)
         ]);
         command.CommandArgumentValue.ParseLayer(["-id", ArchiveId]);
@@ -42,18 +44,22 @@ public sealed class ListRollupsForArchiveCommandTests
         Assert.EndsWith("timeZone=Europe/Vienna, dayStart=06:00", gasDay.Message);
         Assert.EndsWith("timeZone=Europe/Vienna, dayStart=00:00",
             Assert.Single(logger.Entries, e => e.Message.Contains("(daily)")).Message);
+        Assert.EndsWith("timeZone=Europe/Vienna, dayStart=00:00",
+            Assert.Single(logger.Entries, e => e.Message.Contains("(midnight)")).Message);
         Assert.EndsWith("timeZone=<none>, dayStart=<none>",
             Assert.Single(logger.Entries, e => e.Message.Contains("(hourly)")).Message);
         Assert.DoesNotContain(logger.Entries, e => e.Level >= LogLevel.Warning);
     }
 
     [Theory]
-    [InlineData(21_600_000L, "06:00")]
-    [InlineData(0L, "00:00")]
-    [InlineData(84_600_000L, "23:30")]
-    [InlineData(null, "<none>")]
-    public void FormatDayStart_IsLocalHoursAndMinutes(long? dayStartOffsetMs, string expected) =>
-        Assert.Equal(expected, ListRollupsForArchiveCommand.FormatDayStart(dayStartOffsetMs));
+    [InlineData(21_600_000L, "Europe/Vienna", "06:00")]
+    [InlineData(0L, "Europe/Vienna", "00:00")]
+    [InlineData(84_600_000L, "Europe/Vienna", "23:30")]
+    [InlineData(null, "Europe/Vienna", "00:00")]
+    [InlineData(null, null, "<none>")]
+    [InlineData(null, "", "<none>")]
+    public void FormatDayStart_IsLocalHoursAndMinutes(long? dayStartOffsetMs, string? zone, string expected) =>
+        Assert.Equal(expected, ListRollupsForArchiveCommand.FormatDayStart(dayStartOffsetMs, zone));
 
     private static (ListRollupsForArchiveCommand Command, IStreamDataServicesClient Client,
         RecordingLogger<ListRollupsForArchiveCommand> Logger) NewCommand()
