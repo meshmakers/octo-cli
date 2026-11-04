@@ -5,7 +5,6 @@ using Meshmakers.Octo.Frontend.ManagementTool.Services;
 using Meshmakers.Octo.Sdk.ServiceClient.CommunicationControllerServices;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using Newtonsoft.Json;
 
 namespace Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Communication;
 
@@ -20,7 +19,7 @@ internal class GetLatestPipelineExecutionCommand : ServiceClientOctoCommand<ICom
         IConsoleService consoleService,
         ICommunicationServicesClient communicationServicesClient, IAuthenticationService authenticationService)
         : base(logger, Constants.CommunicationServicesGroup, "GetLatestPipelineExecution",
-            "Returns the latest pipeline execution.", options,
+            "Returns the latest pipeline execution. For a failed execution, FailureKind tells whether a write was not acknowledged (OutcomeUnknown) or the pipeline failed (Failed).", options,
             communicationServicesClient, authenticationService)
     {
         _consoleService = consoleService;
@@ -59,12 +58,11 @@ internal class GetLatestPipelineExecutionCommand : ServiceClientOctoCommand<ICom
 
         if (CommandArgumentValue.IsArgumentUsed(_jsonArg))
         {
-            _consoleService.WriteLine(JsonConvert.SerializeObject(result));
+            _consoleService.WriteLine(PipelineExecutionOutput.Serialize(result, false));
         }
         else
         {
-            var formatted = JsonConvert.SerializeObject(result, Formatting.Indented);
-            _consoleService.WriteLine(formatted);
+            _consoleService.WriteLine(PipelineExecutionOutput.Serialize(result, true));
         }
     }
 }
