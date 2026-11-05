@@ -970,10 +970,16 @@ secret or token and the command prints only report fields (pinned by tests).
 | `DeployPipeline` | `--adapterId <rtId>`, `--pipelineId <rtId>`, `--file <path>` | Deploy pipeline definition (YAML/JSON file) |
 | `ExecutePipeline` | `--identifier <rtId>`, `--inputFile <path>` (optional) | Execute a pipeline, returns execution ID |
 | `GetPipelineExecutions` | `--identifier <rtId>`, `--json` (optional) | List pipeline execution history |
-| `GetLatestPipelineExecution` | `--identifier <rtId>`, `--json` (optional) | Get the most recent pipeline execution |
+| `GetLatestPipelineExecution` | `--identifier <rtId>`, `--json` (optional) | Get the most recent pipeline execution; `FailureKind` (AB#8156) is shown as `OutcomeUnknown` / `Failed` / `null` |
 | `GetPipelineDebugPoints` | `--identifier <rtId>`, `--executionId <guid>`, `--json` (optional) | Get debug points for a specific execution |
 | `SetPipelineDebug` | `--identifier <rtId>`, `--enabled <true\|false>` | Enable or disable debug capture for a pipeline |
 | `GetPipelineDebug` | `--identifier <rtId>`, `--json` (optional) | Get the debug state of a pipeline |
+
+`GetPipelineExecutions` and `GetLatestPipelineExecution` print the execution JSON through `PipelineExecutionOutput` (AB#8156):
+`FailureKind` (octo-sdk `PipelineExecutionDataDto`, AB#8037 kind of the controller) appears as its name - `"OutcomeUnknown"` when a
+write was not acknowledged and may have taken effect, `"Failed"` for an ordinary failure, `null` otherwise (no failure, an adapter
+that reported no kind, interrupted or offline-buffered executions) - instead of the enum number. Other members keep their
+rendering (`Status` stays the number). Tests: `PipelineExecutionFailureKindOutputTests`.
 
 ### Triggers
 
