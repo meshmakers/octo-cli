@@ -126,6 +126,29 @@ AB#8008 (the identity service refuses the old reset URL form with 400; an older 
 no password in a log line). The test found that the SDK's `UpdateApiSecret*` sent `POST` (the create endpoint) instead of `PUT`,
 so `UpdateApiSecretClient` / `UpdateApiSecretApiResource` created an additional secret; fixed in the SDK with AB#8008.
 
+## User role commands run the User role methods (AB#8417)
+
+`AddUserToRole` and `RemoveUserFromRole` (`Identity/Users/`) run the CK methods `System.Identity/User.AddRole-1` and
+`User.RemoveRole-1` through `RtUserMethodClient`, which the source generator emits in **GraphQlDtos** from
+`System.Identity-[3.2,4.0)` (`src/GraphQlDtos/construction-kits.yaml`, namespace `GraphQlDtos.DataTransferObjects.System.Identity.v3`;
+pattern of the SDK migration guide, octo-sdk `docs/method-client-migration-guide.md`, "Identity wave 1"). The REST methods
+`IIdentityServicesClient.AddRoleToUser` / `RemoveRoleFromUser` are `[Obsolete]` since octo-sdk AB#8416; octo-cli builds with warnings as
+errors and does not call them. Command names, arguments, confirmation and log output are unchanged.
+
+- **Flow** (`UserRoleMethodCall`): look the user up by name (`IIdentityServicesClient.GetUserByNameEmailOrId`, `UserDto.UserId` = runtime
+  id), authenticate the tenant client (`ITenantClient` has its own access token; `PreValidate` only authenticates the identity client),
+  call the method with the role **name** (the handler resolves it case-insensitively, like REST). `AddUserToRole` keeps its role
+  existence check before the call.
+- **Refusals**: a declared error (`ROLE_NOT_FOUND`, `ROLE_ALREADY_ASSIGNED`, `ROLE_NOT_ASSIGNED`) becomes a `ServiceClientException` with
+  the code and the message the REST endpoint answered before, e.g. `ROLE_ALREADY_ASSIGNED: User 'john.doe' already has role 'dataanalyst'`
+  (Runner: error log, exit -3, as for a refused REST call). An undeclared refusal (`METHOD_FORBIDDEN` with `reason=self-grant` /
+  `role-not-held` / `last-administrator`, `METHOD_TARGET_NOT_FOUND`) is the SDK's `CkMethodCallException`; `Runner` logs it with code and
+  parameters (`CkMethodErrorText`), exit -3.
+- `CreateUser` and `ResetPassword` stay on REST: password methods are disabled on the method bus of staging and production until B0;
+  they switch with AB#8418 (the SDK obsoletes them then).
+- Tests: `UserRoleMethodCommandTests` (generated client over a fake `ITenantClient`: method document and rtId, no REST role call,
+  unchanged log lines, declared and undeclared refusals, declined confirmation, unknown user).
+
 ## Passwords and secrets never on the command line (AB#8044)
 
 A value on the command line ends up in the shell history and in the process list (`ps`), where every user of the machine and
@@ -220,7 +243,7 @@ src/
 │   ├── Services/             # Service layer (AuthenticationService, ContextManager, etc.)
 │   ├── Program.cs            # Entry point
 │   └── Runner.cs             # Command execution orchestrator
-└── GraphQlDtos/              # GraphQL DTOs for service communication
+└── GraphQlDtos/              # GraphQL DTOs and CK method clients generated from construction-kits.yaml (System, System.Bot, System.Identity)
 
 tests/
 ├── CommandReferenceGenerator.Tests/  # Tests for the Roslyn doc generator

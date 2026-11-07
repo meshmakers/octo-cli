@@ -2,3 +2,4 @@
 imports:
   - System-[2.0,3.0)
   - System.Bot-[3.0,4.0)
+  - System.Identity-[3.2,4.0)

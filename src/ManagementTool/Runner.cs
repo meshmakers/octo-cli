@@ -3,6 +3,7 @@ using Meshmakers.Common.CommandLineParser;
 using Meshmakers.Common.CommandLineParser.Commands;
 using Meshmakers.Octo.Frontend.ManagementTool.Services;
 using Meshmakers.Octo.Sdk.ServiceClient;
+using Meshmakers.Octo.Sdk.ServiceClient.AssetRepositoryServices.Tenants.Methods;
 using Meshmakers.Octo.Sdk.ServiceClient.Authentication;
 using Meshmakers.Octo.Sdk.ServiceClient.Authorization;
 using Microsoft.Extensions.Logging;
@@ -71,6 +72,13 @@ internal class Runner
         {
             _logger.LogError("Authentication failed: {Message}", ex.Message);
             return -4;
+        }
+        catch (CkMethodCallException ex)
+        {
+            // AB#8417: a CK method call refused with an undeclared code (e.g. METHOD_FORBIDDEN with reason=self-grant,
+            // METHOD_TARGET_NOT_FOUND): code, message and parameters, logged like a refused REST call.
+            _logger.LogError("{Message}", CkMethodErrorText.Format(ex));
+            return -3;
         }
         catch (ServiceClientResultException ex) when (ex.HttpStatusCode == System.Net.HttpStatusCode.Forbidden)
         {
