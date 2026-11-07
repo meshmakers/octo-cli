@@ -25,6 +25,7 @@ using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Identity.
 using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Identity.Clients;
 using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Identity.AdminProvisioning;
 using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Identity.EmailDomainGroupRules;
+using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Identity.CrossTenantGrantPermissions;
 using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Identity.ExternalTenantUserMappings;
 using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Identity.Groups;
 using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Identity.IdentityProviders;
@@ -375,6 +376,9 @@ internal static class Program
         services.AddTransient<ICommand, CreateExternalTenantUserMapping>();
         services.AddTransient<ICommand, UpdateExternalTenantUserMapping>();
         services.AddTransient<ICommand, DeleteExternalTenantUserMapping>();
+        services.AddTransient<ICommand, LookupSourceTenantUser>();
+        services.AddTransient<ICommand, GetCrossTenantGrantPermissions>();
+        services.AddTransient<ICommand, SetCrossTenantGrantPermissions>();
 
         services.AddTransient<ICommand, GetAdminProvisioningMappings>();
         services.AddTransient<ICommand, CreateAdminProvisioningMapping>();

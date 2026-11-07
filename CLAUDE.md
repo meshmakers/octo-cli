@@ -113,6 +113,32 @@ Identity commands on the tenant of the context (identity PR #210, SDK `IIdentity
   tenant. Issued access tokens stay valid until they expire.
 - Tests: `RevokeSessionsCommandTests`.
 
+## Sibling-tenant grants: LookupSourceTenantUser, groups, allow-list (AB#8346)
+
+Identity commands of Feature AB#8313 (identity AB#8341 lookup, AB#8343 groups, AB#8345 allow-list; contract
+`docs/CONCEPT-SIBLING-TENANT-GRANTS.md` in octo-identity-services). The tenant of the context is the **target** tenant T
+for the grant commands and the **source** tenant S for the allow-list commands.
+
+- `octo-cli -c LookupSourceTenantUser -st <S> -id <exact user name or e-mail>` — `POST {T}/v1/externalTenantUserMappings/sourceUserLookup`.
+  Prints `SourceTenantId`, `UserId`, `UserName`, `DisplayName` (no e-mail). Every negative case is the one message
+  `No user found that can be granted access (code SourceUserNotFound).`, exit `-3`. The identifier is **never logged**
+  (only the service's answer is printed); tests assert it for hit, miss and 429.
+- `octo-cli -c CreateExternalTenantUserMapping -stid <S> -suid <userId> -sun <userName> [-rids …] [-g <groups>]` — `-g/--groups`:
+  comma-separated group IDs (24 hex digits) or group names of T (names resolved with `GetGroupByName`; an unknown name fails
+  with exit `-5` before anything is written). Uses the SDK `GrantExternalTenantUser` and prints the mapping **as stored**
+  (user name from S's user record, `GroupNames`). `-sun` stays required (API contract) although the service ignores it.
+  Existing parameters unchanged. `GetExternalTenantUserMappings` already prints `SourceTenantId` and `GroupNames`.
+- `octo-cli -c GetCrossTenantGrantPermissions` / `octo-cli -c SetCrossTenantGrantPermissions (-ttids a,b | --none)` —
+  S's allow-list (`GET`/`PUT {S}/v1/crossTenantGrantPermissions`). Set reads the list first and logs `added […]`,
+  `removed […]`; exactly one of `--targetTenantIds`/`--none` (else exit `-5`, no call). Only S administrators
+  (UserManagement + TenantManagement, token for S) — anyone else gets 403. The SDK `UpdateCrossTenantGrantPermissions` has an
+  optional `ifMatch` reserved for AB#8432 (ETag); the command does not send it yet.
+- **Problem answers** (`Runner`): an RFC 9457 body **with a `code`** is printed as one line via SDK `ServiceProblem.ToDisplayText()`
+  — e.g. `Source tenant not permitted (HTTP 403, code SourceTenantNotPermitted)`, `… (HTTP 429, code SourceUserLookupRateLimited). Retry after 240 s`,
+  `… Unknown group ids: …`, `… Existing mapping id: …` — exit `-3`, and **without** the ProvisionCurrentUser hint of a bare 403.
+  Problems without a code (validation problems, `{"message": …}`, empty 403) keep the earlier paths.
+- Tests: `CrossTenantGrantCommandTests` (real commands + real SDK client against a local listener, through the real `Runner`).
+
 ## Credentials in the request body: ResetPassword, Delete/UpdateApiSecret* (AB#8008)
 
 `ResetPassword` and `DeleteApiSecretClient` / `DeleteApiSecretApiResource` / `UpdateApiSecretClient` / `UpdateApiSecretApiResource`

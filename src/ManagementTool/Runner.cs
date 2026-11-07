@@ -80,6 +80,14 @@ internal class Runner
             _logger.LogError("{Message}", CkMethodErrorText.Format(ex));
             return -3;
         }
+        catch (ServiceClientResultException ex) when (ServiceProblem.TryParse(ex, out var problem) && problem.Code != null)
+        {
+            // AB#8346: a problem answer with a code (e.g. SourceTenantNotPermitted, UnknownGroup, SourceUserLookupRateLimited)
+            // is printed as one readable line with code and extensions; the ProvisionCurrentUser hint of a bare 403 would
+            // point the administrator in the wrong direction. Problems without a code keep the paths below.
+            _logger.LogError("{Message}", problem.ToDisplayText());
+            return -3;
+        }
         catch (ServiceClientResultException ex) when (ex.HttpStatusCode == System.Net.HttpStatusCode.Forbidden)
         {
             if (ForbiddenResponseMessage.TryGet(ex, out var reason))
