@@ -1,22 +1,30 @@
 using Meshmakers.Common.CommandLineParser;
 using Meshmakers.Octo.Frontend.ManagementTool.Services;
 using Meshmakers.Octo.Sdk.ServiceClient;
+using Meshmakers.Octo.Sdk.ServiceClient.AssetRepositoryServices.Tenants;
 using Meshmakers.Octo.Sdk.ServiceClient.IdentityServices;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
 namespace Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Identity.Users;
 
+/// <summary>
+///     Adds a role to a user. Runs the CK method <c>System.Identity/User.AddRole-1</c> (AB#8417, see
+///     <see cref="UserRoleMethodCall" />); command name, arguments and output are unchanged.
+/// </summary>
 internal class AddUserToRole : ServiceClientOctoCommand<IIdentityServicesClient>
 {
     private readonly IArgument _nameArg;
     private readonly IArgument _roleArg;
+    private readonly UserRoleMethodCall _roleMethods;
 
     public AddUserToRole(ILogger<AddUserToRole> logger, IOptions<OctoToolOptions> options,
-        IIdentityServicesClient identityServicesClient, IAuthenticationService authenticationService)
+        IIdentityServicesClient identityServicesClient, ITenantClient tenantClient,
+        IAuthenticationService authenticationService)
         : base(logger, Constants.IdentityServicesGroup, "AddUserToRole", "Adds an user to a role", options,
             identityServicesClient, authenticationService)
     {
+        _roleMethods = new UserRoleMethodCall(identityServicesClient, tenantClient, authenticationService);
         _nameArg = CommandArgumentValue.AddArgument("un", "userName", ["User name"], true,
             1);
         _roleArg = CommandArgumentValue.AddArgument("r", "role", ["Existing role name"], false,
@@ -58,7 +66,7 @@ internal class AddUserToRole : ServiceClientOctoCommand<IIdentityServicesClient>
             }
         }
 
-        await ServiceClient.AddRoleToUser(name, roleName);
+        await _roleMethods.AddRoleAsync(name, roleName);
 
         Logger.LogInformation("User \'{Name}\' updated", name);
     }
