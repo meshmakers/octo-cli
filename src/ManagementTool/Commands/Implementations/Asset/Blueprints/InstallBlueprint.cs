@@ -24,7 +24,8 @@ internal class InstallBlueprint : ServiceClientOctoCommand<IAssetServicesClient>
         IAssetServicesClient assetServicesClient,
         IAuthenticationService authenticationService)
         : base(logger, Constants.AssetRepositoryServicesGroup, "InstallBlueprint",
-            "Installs a blueprint into the current tenant. CK models are loaded and seed data is imported via upsert.",
+            "Installs a blueprint into the current tenant. CK models are loaded and seed data is imported via upsert. " +
+            "Requires the tenant role DataModelManagement (TenantOwners carry it); otherwise 403 DataModelManagementRequired.",
             options, assetServicesClient, authenticationService)
     {
         _consoleService = consoleService;

@@ -20,7 +20,8 @@ internal class ImportFromCatalogCommand : JobWithWaitOctoCommand
         IAuthenticationService authenticationService)
         : base(logger, Constants.AssetRepositoryServicesGroup, "ImportFromCatalog",
             "Imports one or more CK models from a catalog with all dependencies. A comma-separated -m list is imported as one " +
-            "set (judged together by the tenant upgrade guard, sent in dependency order). Use -w to wait for completion.",
+            "set (judged together by the tenant upgrade guard, sent in dependency order). Use -w to wait for completion. " +
+            "Requires the tenant role DataModelManagement (TenantOwners carry it); otherwise 403 DataModelManagementRequired.",
             options, botServicesClient, authenticationService)
     {
         _assetServicesClient = assetServicesClient;

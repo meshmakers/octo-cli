@@ -21,7 +21,8 @@ internal class FixAllCommand : JobWithWaitOctoCommand
             "Imports all CK models that need update or fix. Updates that are blocked only by each other (exact pins) " +
             "are imported together in one guarded set. Updates that would break an installed model even then are skipped " +
             "and reported (FixAll never forces them; use ImportFromCatalog --force deliberately). " +
-            "Use -w to wait, -y to skip confirmation.",
+            "Use -w to wait, -y to skip confirmation. " +
+            "Requires the tenant role DataModelManagement (TenantOwners carry it); otherwise 403 DataModelManagementRequired.",
             options, botServicesClient, authenticationService)
     {
         _assetServicesClient = assetServicesClient;

@@ -24,7 +24,8 @@ internal class UninstallBlueprint : ServiceClientOctoCommand<IAssetServicesClien
         IAssetServicesClient assetServicesClient,
         IAuthenticationService authenticationService)
         : base(logger, Constants.AssetRepositoryServicesGroup, "UninstallBlueprint",
-            "Removes a blueprint from the active tenant; with --cascade, dependents and orphan dependencies go too.",
+            "Removes a blueprint from the active tenant; with --cascade, dependents and orphan dependencies go too. " +
+            "Requires the tenant role DataModelManagement (TenantOwners carry it); otherwise 403 DataModelManagementRequired.",
             options, assetServicesClient, authenticationService)
     {
         _consoleService = consoleService;
