@@ -22,7 +22,8 @@ internal class ImportConstructionKitModel : JobWithWaitOctoCommand
         : base(logger, Constants.AssetRepositoryServicesGroup, "ImportCk",
             "Schedules an import job for construction kit files. File is specified using -f argument. To wait for job, use -w argument. " +
             "The tenant upgrade guard refuses a file that would break an installed model (also for System) with CK_UPGRADE_BLOCKED; " +
-            "--forceBreakingUpdate overrides it.",
+            "--forceBreakingUpdate overrides it. " +
+            "Requires the tenant role DataModelManagement (TenantOwners carry it); otherwise 403 DataModelManagementRequired.",
             options, botServicesClient, authenticationService)
     {
         _assetServicesClient = assetServicesClient;

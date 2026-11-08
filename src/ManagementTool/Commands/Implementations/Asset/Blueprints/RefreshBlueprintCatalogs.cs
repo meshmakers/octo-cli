@@ -20,7 +20,8 @@ internal class RefreshBlueprintCatalogs : ServiceClientOctoCommand<IAssetService
         IAssetServicesClient assetServicesClient,
         IAuthenticationService authenticationService)
         : base(logger, Constants.AssetRepositoryServicesGroup, "RefreshBlueprintCatalogs",
-            "Refreshes blueprint catalog caches at the asset repository. Use -cn to refresh a specific catalog.",
+            "Refreshes blueprint catalog caches at the asset repository. Use -cn to refresh a specific catalog. " +
+            "Requires the tenant role DataModelManagement (TenantOwners carry it); otherwise 403 DataModelManagementRequired.",
             options, assetServicesClient, authenticationService)
     {
         _consoleService = consoleService;

@@ -13,7 +13,8 @@ internal class RefreshCatalogsCommand : ServiceClientOctoCommand<IAssetServicesC
     public RefreshCatalogsCommand(ILogger<RefreshCatalogsCommand> logger, IOptions<OctoToolOptions> options,
         IAssetServicesClient assetServicesClient, IAuthenticationService authenticationService)
         : base(logger, Constants.AssetRepositoryServicesGroup, "RefreshCatalogs",
-            "Refreshes CK model catalog caches. Use -cn to refresh a specific catalog.",
+            "Refreshes CK model catalog caches. Use -cn to refresh a specific catalog. " +
+            "Requires the tenant role DataModelManagement (TenantOwners carry it); otherwise 403 DataModelManagementRequired.",
             options, assetServicesClient, authenticationService)
     {
         _catalogNameArg = CommandArgumentValue.AddArgument("cn", "catalogName",

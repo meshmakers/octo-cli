@@ -24,7 +24,8 @@ internal class UpdateBlueprint : ServiceClientOctoCommand<IAssetServicesClient>
         IAssetServicesClient assetServicesClient,
         IAuthenticationService authenticationService)
         : base(logger, Constants.AssetRepositoryServicesGroup, "UpdateBlueprint",
-            "Applies a blueprint update to the active tenant. Tenant values the update would blank are kept unless confirmed.",
+            "Applies a blueprint update to the active tenant. Tenant values the update would blank are kept unless confirmed. " +
+            "Requires the tenant role DataModelManagement (TenantOwners carry it); otherwise 403 DataModelManagementRequired.",
             options, assetServicesClient, authenticationService)
     {
         _targetVersionArg = CommandArgumentValue.AddArgument("tv", "targetVersion",
