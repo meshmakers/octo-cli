@@ -4,6 +4,7 @@ using System.Text.Json.Nodes;
 using Meshmakers.Common.CommandLineParser;
 using Meshmakers.Octo.Frontend.ManagementTool.Services;
 using Meshmakers.Octo.Sdk.ServiceClient.AssetRepositoryServices.System;
+using Meshmakers.Octo.Sdk.ServiceClient.Authentication;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
@@ -55,18 +56,20 @@ internal class SetKnowledgePageStatusCommand : ServiceClientOctoCommand<IAssetSe
     private readonly IArgument _slugArg;
     private readonly IArgument _statusArg;
     private readonly IArgument _tenantIdArg;
+    private readonly ITenantTokenProvider? _tenantTokenProvider;
     private readonly TimeProvider _timeProvider;
 
     public SetKnowledgePageStatusCommand(ILogger<SetKnowledgePageStatusCommand> logger,
         IOptions<OctoToolOptions> options, IAssetServicesClient assetServicesClient,
         IAuthenticationService authenticationService, IOptions<OctoToolAuthenticationOptions> authenticationOptions,
-        TimeProvider? timeProvider = null)
+        ITenantTokenProvider? tenantTokenProvider = null, TimeProvider? timeProvider = null)
         : base(logger, Constants.AssetRepositoryServicesGroup, "SetKnowledgePageStatus", // literal for the command-reference generator
             "Sets the verification status of a knowledge page (Draft, InReview, Verified, Rejected) as the logged-in person " +
             "and records it as a new page version. The only way to set Verified: AI clients over MCP never can.",
             options, assetServicesClient, authenticationService)
     {
         _authenticationOptions = authenticationOptions;
+        _tenantTokenProvider = tenantTokenProvider;
         _timeProvider = timeProvider ?? TimeProvider.System;
 
         _tenantIdArg = CommandArgumentValue.AddArgument("tid", "tenantId",
@@ -127,12 +130,9 @@ internal class SetKnowledgePageStatusCommand : ServiceClientOctoCommand<IAssetSe
             throw new ToolException($"The note is longer than {MaxNoteLength} characters.");
         }
 
-        // A person's decision: refuse a context without a user before anything is sent.
-        var subject = UserSubject(_authenticationOptions.Value.AccessToken)
-                      ?? throw new ToolException(
-                          $"{CommandName} needs an interactive user login (octo-cli -c LogIn). This context is logged in " +
-                          "with client credentials (no user): a service account or agent cannot set the status of a " +
-                          "knowledge page here.");
+        // A person's decision: refuse a context without a user before anything is sent. The author is the subject of the
+        // token the tenant sees (the exchanged token for another tenant), as the knowledge tools record it.
+        var subject = await TargetTenantSubjectAsync(tenantId);
 
         var page = await ReadPageAsync(tenantId, slug);
         var newStatus = KnowledgePageContent.ToConstantCase(status);
@@ -155,7 +155,56 @@ internal class SetKnowledgePageStatusCommand : ServiceClientOctoCommand<IAssetSe
                 $"was written: {ErrorMessages(response.Content)}");
         }
 
+        // GraphQL has no conditional update: verify afterwards that no knowledge-tool write landed between the read and
+        // the write. If one did, the status may now stand on content the person did not review.
+        var after = await ReadPageAsync(tenantId, slug);
+        if (after.CurrentVersion != versionNumber || after.Status != newStatus || after.HashWithStatus(newStatus) != hash)
+        {
+            throw new ToolException(
+                $"The status of '{slug}' was written as version {versionNumber}, but the page changed at the same time " +
+                $"(it is now at version {after.CurrentVersion}, {KnowledgePageContent.ToPascalCase(after.Status)}). The status " +
+                "may stand on content you did not review: read the page again and set the status again.");
+        }
+
         Logger.LogInformation("Knowledge page '{Slug}' is {Status} (version {Version})", slug, status, versionNumber);
+    }
+
+    private ToolException NoUser() => new(
+        $"{CommandName} needs an interactive user login (octo-cli -c LogIn). This context is logged in with client " +
+        "credentials (no user): a service account or agent cannot set the status of a knowledge page here.");
+
+    /// <summary>
+    ///     The <c>sub</c> of the token the target tenant sees: the context token, or the token exchanged from it for
+    ///     another tenant (the same cached exchange the service client uses). Refuses a context without a user.
+    /// </summary>
+    private async Task<string> TargetTenantSubjectAsync(string tenantId)
+    {
+        var token = _authenticationOptions.Value.AccessToken;
+        if (UserSubject(token) == null)
+        {
+            throw NoUser();
+        }
+
+        if (AccessTokenInspector.IsIssuedForOtherTenant(token!, tenantId))
+        {
+            if (_tenantTokenProvider == null)
+            {
+                throw new ToolException($"No token for tenant '{tenantId}' is available; use a context of that tenant.");
+            }
+
+            try
+            {
+                token = await _tenantTokenProvider.GetAccessTokenAsync(tenantId, token!);
+            }
+            catch (TenantTokenExchangeDeniedException ex)
+            {
+                throw new ToolException(
+                    $"No token for tenant '{tenantId}' could be obtained from the signed-in user: {ex.Message} " +
+                    $"Provision yourself there (ProvisionCurrentUser -ttid {tenantId}) or use a context of that tenant.", ex);
+            }
+        }
+
+        return UserSubject(token) ?? throw NoUser();
     }
 
     internal static string ParseStatus(string value)
