@@ -35,7 +35,7 @@ public sealed class StartupRedactionTests : IDisposable
         Assert.True(File.Exists(cli), $"octo-cli.dll not found next to the tests: {cli}");
         Assert.True(File.Exists(Path.Combine(AppContext.BaseDirectory, "nlog.config")));
 
-        var start = new ProcessStartInfo("dotnet")
+        var start = new ProcessStartInfo(DotnetHost())
         {
             WorkingDirectory = _home,
             RedirectStandardOutput = true,
@@ -61,5 +61,22 @@ public sealed class StartupRedactionTests : IDisposable
         Assert.NotEqual(0, process.ExitCode);
         Assert.Contains("Context 'missing client_secret=[REDACTED]", output);
         Assert.DoesNotContain(Token, output);
+    }
+
+    // The muxer that runs the tests: "dotnet" from PATH can be another installation without this runtime (CI agents
+    // install the SDK under ~/.dotnet). The dotnet CLI hands its own path to child processes in DOTNET_HOST_PATH.
+    private static string DotnetHost()
+    {
+        var hostPath = Environment.GetEnvironmentVariable("DOTNET_HOST_PATH");
+        if (!string.IsNullOrWhiteSpace(hostPath) && File.Exists(hostPath))
+        {
+            return hostPath;
+        }
+
+        var processPath = Environment.ProcessPath;
+        return processPath != null &&
+               Path.GetFileNameWithoutExtension(processPath).Equals("dotnet", StringComparison.OrdinalIgnoreCase)
+            ? processPath
+            : "dotnet";
     }
 }
