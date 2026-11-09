@@ -14,7 +14,7 @@ public sealed class StandardStreams : IStandardStreams
     public void WriteOutput(string text) => Write(Console.Out, text);
 
     /// <inheritdoc />
-    public void WriteError(string text) => Write(Console.Error, text);
+    public void WriteError(string text) => Write(Console.Error, ErrorOutputRedactor.Redact(text));
 
     private static void Write(TextWriter writer, string text)
     {

@@ -24,6 +24,28 @@ dotnet run --project src/ManagementTool/ManagementTool.csproj -- <command> [opti
 dotnet test Octo.Cli.sln
 ```
 
+## No credentials in output: ErrorOutputRedactor (AB#8570)
+
+A failed server call surfaces as an SDK exception whose message is the **response body** (`ServiceClientResultException`:
+`"<Status>: <body>"`). A service on the local stack runs with `UseDeveloperExceptionPage()`; its plain-text 500 page ends
+with a `HEADERS` section that echoes the request headers, `Authorization: bearer …` and cookies included. That text used
+to reach the console and the log file unchanged.
+
+- **Central, not per command.** `Services/ErrorOutputRedactor.Redact` removes the developer page's header section
+  (`[request headers removed by octo-cli]`), the values of credential headers (`Authorization`, `Proxy-Authorization`,
+  `Cookie`, `Set-Cookie`, API key / auth token headers), bearer tokens, JWTs and credential-named JSON or form fields
+  (`SecretMasker.IsSecretName`: `password`, `clientSecret`, `client_secret`, `access_token`, …) — `[REDACTED]`. Status,
+  the server's message, method and URL stay.
+- **Where it applies.** `Services/RedactedLogOutput.Enable()` (first line of `Program.Main`) wraps the layout of every
+  NLog target (console, log file, counters) in a `RedactingLayout`, also for every later or reloaded configuration
+  (`LogManager.ConfigurationChanged`), so a custom `nlog.config` at `Trace` level is redacted too. `StandardStreams.WriteError`
+  (the GraphQL error body) redacts as well. Commands and `Runner` keep logging `ex.Message` as before; do not add
+  per-command redaction, and do not print response bodies through `Console` directly.
+- **Not available:** method and URL of the failed call are not part of the SDK exception, so the CLI cannot print them.
+- Tests: `ErrorOutputRedactionTests` (real `ResetPassword` + real `IdentityServicesClient` against a local listener that
+  answers 500 with a developer page echoing the `Authorization` header and the request body, through the real `Runner`
+  and the `nlog.config` console layout; Info and Trace level; fake values only).
+
 ## CK model import and the tenant upgrade guard (AB#6870)
 
 `ImportFromCatalog` and `FixAll` (`Commands/Implementations/Asset/CkModelLibraries/`) import through `ResolveDependenciesBatchAsync` +
