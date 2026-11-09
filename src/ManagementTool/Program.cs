@@ -59,6 +59,9 @@ internal static class Program
 {
     private static async Task<int> Main()
     {
+        // AB#8570: every log line (console, log file) is redacted before it is written — server error bodies can echo
+        // the request headers (Authorization, cookies) or credentials of the request body.
+        RedactedLogOutput.Enable();
         var logger = LogManager.GetCurrentClassLogger();
         try
         {

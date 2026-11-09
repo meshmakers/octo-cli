@@ -15,6 +15,10 @@ public interface IStandardStreams
     /// <summary>Writes <paramref name="text" /> to standard output, followed by a line break unless it ends with one.</summary>
     void WriteOutput(string text);
 
-    /// <summary>Writes <paramref name="text" /> to standard error, followed by a line break unless it ends with one.</summary>
+    /// <summary>
+    ///     Writes <paramref name="text" /> to standard error, followed by a line break unless it ends with one.
+    ///     Credentials are removed first (<see cref="ErrorOutputRedactor" />, AB#8570): error bodies may echo request
+    ///     headers or secrets.
+    /// </summary>
     void WriteError(string text);
 }
