@@ -242,6 +242,38 @@ token out of `contexts.json` and call the route with curl or Python: the token i
   `MachineReadableOutputTests`.
 - The command is added to the `octo` skill command reference by AB#6840, not here.
 
+## SetKnowledgePageStatus: the human path to a knowledge page status (AB#8565)
+
+`octo-cli -c SetKnowledgePageStatus [-tid <tenant>] -s <slug> -st <Draft|InReview|Verified|Rejected> [-n <note>]`
+(`Asset/Knowledge/SetKnowledgePageStatusCommand.cs`). Decision G2a (Epic AB#8449): **Verified is never set over MCP**; MCP
+callers are always AI clients, so octo-mcp-service `knowledge_set_status` refuses `Verified` for every caller
+(`VerifiedNotAllowedOverMcp`). A person sets it with this command (later: the Refinery Studio review view).
+
+- **User login only**: the context's access token must carry a `sub` claim (interactive `LogIn`). A client-credentials
+  context (no `sub`) or no token is refused **before** anything is sent. The server check stays the caller's CK roles.
+- **Author = the subject the tenant sees**: for a context of another tenant (root-tenant login, `-tid` a child) the author is
+  the `sub` of the exchanged token (`ITenantTokenProvider`, the same cached exchange the service client uses), i.e. the
+  user's id in the target tenant, as the knowledge tools record it — not the root-tenant id.
+- **Same write as the knowledge tools**: reads the page over GraphQL (`systemAiKnowledgePage`, filter on `rtWellKnownName`),
+  then one mutation request with two root fields (asset repo: one request = one transaction, root mutation fields run in
+  order): page update (`verificationStatus`, `contentHash`, `currentVersion`, `compiledAt`) and a new
+  `KnowledgePageVersion` `<slug>@<n+1>` with the full content, author `user:<sub>`, `authoredAt`, `changeNote` (the note, or
+  `status <Status>`) and the `versionOf` association. A plain GraphQL update of `verificationStatus` is not the documented
+  path (it skips the version).
+- **Content hash contract**: `KnowledgePageContent.Render` is a port of octo-mcp-service `KnowledgePages.Render` (markdown
+  with version 0; hash = SHA-256 lower-case hex). Both repos pin the same golden hash
+  (`SetKnowledgePageStatusCommandTests.ContentHash_MatchesTheGoldenHashOfTheMcpService` here,
+  `KnowledgeContentHashGoldenTests` there): a change of the render on one side must change the other in the same step.
+- **Concurrent writes**: GraphQL has no conditional update, and the read is not in the mutation's transaction. A
+  knowledge-tool write that commits between the read and the mutation would leave the page with new content but the old
+  `contentHash`, a status set on content the person did not review, and two versions with the same number. The command
+  therefore re-reads the page after the write and fails with a conflict message ("changed at the same time … read the page
+  again and set the status again") when version, status or content hash differ from what it wrote. It detects, it cannot
+  prevent; a conditional update in the asset repository would.
+- **Limits**: the note (max. 500 characters) is not checked by the MCP content guard. Duplicate slugs are refused.
+- Tests: `SetKnowledgePageStatusCommandTests` (golden hash, mutation variables, author from the exchanged token,
+  client-credentials refusal, concurrent-write conflict, errors).
+
 ## Build Configurations
 
 - **Debug/Release**: Standard configurations

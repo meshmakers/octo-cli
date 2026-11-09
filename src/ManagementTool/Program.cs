@@ -8,6 +8,7 @@ using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Asset.Blu
 using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Asset.CkModelLibraries;
 using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Asset.FixupScripts;
 using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Asset.GraphQl;
+using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Asset.Knowledge;
 using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Asset.Secrets;
 using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Asset.Models;
 using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Asset.PlatformFiles;
@@ -308,6 +309,7 @@ internal static class Program
         services.AddTransient<ICommand, RefreshCatalogsCommand>();
 
         services.AddTransient<ICommand, GraphQlCommand>();
+        services.AddTransient<ICommand, SetKnowledgePageStatusCommand>();
 
         services.AddTransient<ICommand, ListBlueprints>();
         services.AddTransient<ICommand, RefreshBlueprintCatalogs>();
