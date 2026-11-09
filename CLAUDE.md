@@ -41,7 +41,6 @@ to reach the console and the log file unchanged.
   (`LogManager.ConfigurationChanged`), so a custom `nlog.config` at `Trace` level is redacted too. `StandardStreams.WriteError`
   (the GraphQL error body) redacts as well. Commands and `Runner` keep logging `ex.Message` as before; do not add
   per-command redaction, and do not print response bodies through `Console` directly.
-- **Not available:** method and URL of the failed call are not part of the SDK exception, so the CLI cannot print them.
 - Tests: `ErrorOutputRedactionTests` (real `ResetPassword` + real `IdentityServicesClient` against a local listener that
   answers 500 with a developer page echoing the `Authorization` header and the request body, through the real `Runner`
   and the `nlog.config` console layout; Info and Trace level; fake values only).

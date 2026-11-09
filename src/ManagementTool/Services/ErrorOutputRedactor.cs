@@ -63,8 +63,12 @@ internal static partial class ErrorOutputRedactor
         RegexOptions.IgnoreCase)]
     private static partial Regex CredentialHeader();
 
-    // A bearer token anywhere in free text, e.g. in a proxy's echo of the request line.
-    [GeneratedRegex(@"(?<scheme>\bbearer)[ \t]+(?!\[REDACTED\])[A-Za-z0-9\-._~+/]{8,}=*", RegexOptions.IgnoreCase)]
+    // A bearer token anywhere in free text, e.g. in a proxy's echo of the request line. The value is an RFC 6750
+    // b64token; it is redacted when it is 8 characters or longer, or shorter but holding a digit or one of -._~+/=
+    // ("Bearer abc123"). A plain short word after "bearer" ("bearer of") stays.
+    [GeneratedRegex(
+        @"(?<scheme>\bbearer)[ \t]+(?!\[REDACTED\])(?:[A-Za-z0-9\-._~+/]{8,}|(?=[A-Za-z]*[0-9\-._~+/=])[A-Za-z0-9\-._~+/]+)=*",
+        RegexOptions.IgnoreCase)]
     private static partial Regex BearerToken();
 
     // A JSON web token (header.payload.signature, header and payload base64url of a JSON object).

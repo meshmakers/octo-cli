@@ -76,6 +76,7 @@ public sealed class ErrorOutputRedactionTests : IDisposable
     [InlineData("X-Api-Key: " + Token)]
     [InlineData("{\"Authorization\":\"Bearer " + Token + "\",\"status\":500}")]
     [InlineData("request failed, sent with bearer " + Token)]
+    [InlineData("request failed, sent with Bearer abc123, retried with Bearer " + Token)]
     [InlineData("token eyJhbGciOiJSUzI1NiJ9.eyJzdWIiOiJ0ZXN0In0.c2lnbmF0dXJlLXJlZGFjdC1tZQ was refused")]
     [InlineData("{\"clientId\":\"cli\",\"clientSecret\":\"" + Token + "\"}")]
     [InlineData("{\"access_token\": \"" + Token + "\", \"expires_in\": 3600}")]
@@ -91,6 +92,14 @@ public sealed class ErrorOutputRedactionTests : IDisposable
         Assert.DoesNotContain("c2lnbmF0dXJlLXJlZGFjdC1tZQ", redacted);
         Assert.Contains(ErrorOutputRedactor.Placeholder, redacted);
     }
+
+    [Theory]
+    [InlineData("Bearer abc123", "Bearer [REDACTED]")]
+    [InlineData("bearer a.b", "bearer [REDACTED]")]
+    [InlineData("Bearer abcdefgh", "Bearer [REDACTED]")]
+    [InlineData("bearer of", "bearer of")]
+    public void Redact_BearerValues_ShortTokensToo_ButNotPlainWords(string text, string expected) =>
+        Assert.Equal(expected, ErrorOutputRedactor.Redact(text));
 
     [Fact]
     public void Redact_KeepsNamesAndHarmlessFields()
@@ -110,6 +119,7 @@ public sealed class ErrorOutputRedactionTests : IDisposable
     [InlineData("Forbidden: {\"status\":403,\"title\":\"Missing role\",\"code\":\"RoleMissing\",\"role\":\"SecretManagement\"}")]
     [InlineData("Access denied (HTTP 403). If the context addresses a tenant other than the one you signed in on")]
     [InlineData("Token refresh failed (invalid_grant); falling back to device log-in.")]
+    [InlineData("The bearer of this request is not known.")]
     [InlineData("{\"secretIsSet\":true,\"description\":\"rotated\"}")]
     [InlineData("")]
     public void Redact_LeavesTextWithoutCredentialsUnchanged(string text) =>
