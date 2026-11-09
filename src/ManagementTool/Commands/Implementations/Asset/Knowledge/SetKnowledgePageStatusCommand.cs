@@ -29,7 +29,7 @@ internal class SetKnowledgePageStatusCommand : ServiceClientOctoCommand<IAssetSe
     private const string PageTypeId = "System.Ai/KnowledgePage";
 
     internal const string ReadQuery = """
-        query knowledgePage($slug: String!) {
+        query knowledgePage($slug: SimpleScalar!) {
           runtime {
             systemAiKnowledgePage(fieldFilter: [{attributePath: "rtWellKnownName", operator: EQUALS, comparisonValue: $slug}]) {
               items {

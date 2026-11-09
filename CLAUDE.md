@@ -272,7 +272,32 @@ callers are always AI clients, so octo-mcp-service `knowledge_set_status` refuse
   prevent; a conditional update in the asset repository would.
 - **Limits**: the note (max. 500 characters) is not checked by the MCP content guard. Duplicate slugs are refused.
 - Tests: `SetKnowledgePageStatusCommandTests` (golden hash, mutation variables, author from the exchanged token,
-  client-credentials refusal, concurrent-write conflict, errors).
+  client-credentials refusal, concurrent-write conflict, errors, and every sent request validated against the asset
+  repository schema, see below).
+
+## GraphQL documents against the asset repository schema (AB#8588)
+
+Tests that fake `SendGraphQlAsync` accept any document; the asset repository validates it and answers HTTP 200 with
+`errors`. `SetKnowledgePageStatus` shipped with `query knowledgePage($slug: String!)` for `fieldFilter.comparisonValue`
+(type `SimpleScalar`) and failed on every real server ("Variable '$slug' of type 'String!' used in position expecting
+type 'SimpleScalar'"). Hand-written GraphQL documents are therefore validated in the tests:
+
+- `tests/ManagementTool.Tests/AssetRepositoryGraphQlSchema.cs` builds the schema from an introspection snapshot of a real
+  asset repository (`Fixtures/asset-repo-schema.test-2-ai-sandbox.json.gz`: test-2, tenant `ai-sandbox`, System models
+  only, descriptions stripped) with **GraphQL.NET 8.8.5, the library and version of the asset repository**, and runs its
+  core validation rules on a document **with its variables** (field and argument names, variable types in their
+  positions, input object fields and enum values). The repository's own scalars (`SimpleScalar`, `OctoObjectId`,
+  `DateTime`, …) accept any value: their value formats are not checked.
+- Use it for every hand-written GraphQL document: capture what the command sends from the fake and call
+  `AssetRepositoryGraphQlSchema.ValidateAsync(document, variablesJson)`; expect no errors
+  (`SetKnowledgePageStatusCommandTests.EverySentRequest_IsValidAgainstTheAssetRepositorySchema`).
+- **Refresh the snapshot** when a document needs a type it does not have (a newer System model, another CK model).
+  Read-only, with any user context of a tenant that has the models:
+  `octo-cli -c GraphQl --context <ctx> -tid <tenant> -f tests/ManagementTool.Tests/Fixtures/asset-repo-introspection.graphql > schema.json`,
+  then `jq -c 'walk(if type=="object" then del(.description) else . end)' schema.json | gzip -9 -n > tests/ManagementTool.Tests/Fixtures/asset-repo-schema.<env>-<tenant>.json.gz`
+  and adjust the file name in `AssetRepositoryGraphQlSchema`. Only System models belong in it: the repository is public.
+- Limit: the snapshot is a point in time; a later breaking schema change on the server is not seen until the snapshot is
+  refreshed.
 
 ## Build Configurations
 

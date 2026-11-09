@@ -265,6 +265,53 @@ public sealed class SetKnowledgePageStatusCommandTests
         Assert.Contains("read the page again", ex.Message);
     }
 
+    /// <summary>
+    ///     AB#8588: every request the command sends (read, write, re-read) is valid against the schema of a real asset
+    ///     repository, with the variables it actually sends. The fake above accepts any document; the server does not.
+    /// </summary>
+    [Fact]
+    public async Task EverySentRequest_IsValidAgainstTheAssetRepositorySchema()
+    {
+        GivenPage(GoldenPageJson.Replace("\"VERIFIED\"", "\"IN_REVIEW\""));
+
+        await Run(UserToken, "-s", "golden-page", "-st", "Verified", "-n", "checked against the runbook");
+
+        Assert.Equal(3, _sent.Count);
+        foreach (var (document, variables) in _sent)
+        {
+            var errors = await AssetRepositoryGraphQlSchema.ValidateAsync(document, variables);
+            Assert.True(errors.Count == 0,
+                $"The asset repository refuses this request:\n{string.Join("\n", errors)}\n{document}\n{variables}");
+        }
+    }
+
+    [Fact]
+    public async Task SchemaValidation_CatchesTheStringSlugOfAB8588()
+    {
+        // The read query as released in 2ae42f1: test-2 answered "Variable '$slug' of type 'String!' used in position
+        // expecting type 'SimpleScalar'". Proves the validation above would have failed on it.
+        var released = SetKnowledgePageStatusCommand.ReadQuery.Replace("$slug: SimpleScalar!", "$slug: String!");
+        Assert.NotEqual(SetKnowledgePageStatusCommand.ReadQuery, released);
+
+        var errors = await AssetRepositoryGraphQlSchema.ValidateAsync(released, """{"slug":"golden-page"}""");
+
+        Assert.Contains(errors, e => e.Contains("$slug") && e.Contains("String!") && e.Contains("SimpleScalar"));
+    }
+
+    [Fact]
+    public async Task SchemaValidation_ChecksTheVariableValuesToo()
+    {
+        // A wrong enum value in the variables (the status in PascalCase) is refused like on the server.
+        GivenPage();
+        await Run(UserToken, "-s", "golden-page", "-st", "Rejected");
+        var (mutation, variables) = _sent[1];
+
+        var errors = await AssetRepositoryGraphQlSchema.ValidateAsync(mutation,
+            variables!.Replace("\"REJECTED\"", "\"Rejected\""));
+
+        Assert.Contains(errors, e => e.Contains("$page") || e.Contains("$version"));
+    }
+
     [Theory]
     [InlineData(null)]
     [InlineData("not-a-jwt")]
