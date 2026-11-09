@@ -18,6 +18,9 @@
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
     <PackageReference Include="FakeItEasy" Version="9.0.1" />
+    <!-- The GraphQL library of the asset repository (same version), to validate GraphQL documents against its schema. -->
+    <PackageReference Include="GraphQL" Version="8.8.5" />
+    <PackageReference Include="GraphQL.SystemTextJson" Version="8.8.5" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.9.0" />
     <PackageReference Include="xunit.v3.mtp-off" Version="4.0.0" />
     <PackageReference Include="xunit.runner.visualstudio" Version="4.0.0">
@@ -36,6 +39,7 @@
 
   <ItemGroup>
     <None Update="Fixtures\*.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Update="Fixtures\*.json.gz" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
 </Project>
