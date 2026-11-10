@@ -61,7 +61,7 @@ internal class ListOperations : ServiceClientOctoCommand<ITenantClient>
             ],
             Notes:
             [
-                "The tenant is the tenant of the context. Operations are kept 7 days after they ended.",
+                "The tenant is the tenant of the context. Operations are kept for a retention period after they ended (7 days by default).",
                 "--allOwners without administrator rights is refused with OPERATION_QUERY_REFUSED.",
                 "Standard output carries only the answer (text or -j JSON); banner and log lines go to standard error, so the output can be piped (e.g. to jq)."
             ]);
