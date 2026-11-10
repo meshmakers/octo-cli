@@ -31,7 +31,16 @@ internal static class AssetRepositoryGraphQlSchema
 {
     private const string SnapshotFile = "asset-repo-schema.test-2-ai-sandbox.json.gz";
 
-    private static readonly Lazy<ISchema> LazySchema = new(Build);
+    /// <summary>
+    ///     AB#8446: snapshot of a test-2 scratch tenant with System.Bot 3.7.0 and an asset repository with operation
+    ///     handles (AB#8444): <c>systemBotTenantRepositorys.dump</c> and <c>runtime.operations</c>, which the ai-sandbox
+    ///     snapshot predates. Same recording steps; System models only.
+    /// </summary>
+    public const string SystemBotSnapshotFile = "asset-repo-schema.test-2-system-bot-3.7.json.gz";
+
+    private static readonly Lazy<ISchema> LazySystemBotSchema = new(() => Build(SystemBotSnapshotFile));
+
+    private static readonly Lazy<ISchema> LazySchema = new(() => Build(SnapshotFile));
 
     public static ISchema Schema => LazySchema.Value;
 
@@ -39,7 +48,16 @@ internal static class AssetRepositoryGraphQlSchema
     ///     Validates <paramref name="document" /> and, when given, its <paramref name="variablesJson" /> against the
     ///     schema. Returns the validation messages; empty when the server would accept the request.
     /// </summary>
-    public static async Task<IReadOnlyList<string>> ValidateAsync(string document, string? variablesJson = null)
+    public static Task<IReadOnlyList<string>> ValidateAsync(string document, string? variablesJson = null) =>
+        ValidateAsync(Schema, document, variablesJson);
+
+    /// <summary>
+    ///     AB#8446: validates against the System.Bot 3.7.0 snapshot (<see cref="SystemBotSnapshotFile" />).
+    /// </summary>
+    public static Task<IReadOnlyList<string>> ValidateAgainstSystemBotAsync(string document, string? variablesJson = null) =>
+        ValidateAsync(LazySystemBotSchema.Value, document, variablesJson);
+
+    private static async Task<IReadOnlyList<string>> ValidateAsync(ISchema schema, string document, string? variablesJson)
     {
         var parsed = Parser.Parse(document);
         var operation = parsed.Definitions.OfType<GraphQLOperationDefinition>().Single();
@@ -49,7 +67,7 @@ internal static class AssetRepositoryGraphQlSchema
 
         var result = await new DocumentValidator().ValidateAsync(new ValidationOptions
         {
-            Schema = Schema,
+            Schema = schema,
             Document = parsed,
             Operation = operation,
             Rules = DocumentValidator.CoreRules,
@@ -60,9 +78,9 @@ internal static class AssetRepositoryGraphQlSchema
         return result.Errors.Select(e => e.Message).ToList();
     }
 
-    private static ISchema Build()
+    private static ISchema Build(string snapshotFile)
     {
-        var path = Path.Combine(AppContext.BaseDirectory, "Fixtures", SnapshotFile);
+        var path = Path.Combine(AppContext.BaseDirectory, "Fixtures", snapshotFile);
         using var file = File.OpenRead(path);
         using var gzip = new GZipStream(file, CompressionMode.Decompress);
         using var doc = JsonDocument.Parse(gzip);

@@ -196,6 +196,33 @@ errors and does not call them. Command names, arguments, confirmation and log ou
 - Tests: `UserRoleMethodCommandTests` (generated client over a fake `ITenantClient`: method document and rtId, no REST role call,
   unchanged log lines, declared and undeclared refusals, declined confirmation, unknown user).
 
+## Dump through the operation handle; GetOperation / ListOperations (AB#8446)
+
+`Dump` (`Asset/Tenants/DumpTenant.cs`) runs, for the tenant of the context, the asynchronous CK method
+`System.Bot/TenantRepository.Dump-1` (System.Bot 3.7.0, bot services AB#8445) through `TenantRepositoryDumpClient` and the
+SDK's `CkOperationsClient` (octo-sdk AB#8446, `docs/method-clients.md` "Asynchronous methods"):
+
+- **Flow**: authenticate the tenant client (it has its own token), call `DumpAsync` (handle), log
+  `Dump operation '<id>' accepted`, `WaitForOperationAsync` with `OperationProgressLogger` (one line per change: state,
+  stage, percent, `jobId`), refresh the token before every read (`BeforeReadAsync`), download the result's `JobId` with
+  `IBotServicesClient.DownloadDumpToFileAsync` as before. The wait honours `retryAfterSeconds` (1-30 s), no `Thread.Sleep`.
+- **Fallback to the job API** (`DumpMethodFallback`): only when the call was certainly not executed — every GraphQL error
+  carries `extensions.number` (document rejected by validation: asset repository without AB#8444 or tenant without
+  System.Bot 3.7.0) or the code is `METHOD_HANDLER_NOT_AVAILABLE`; and always for `-tid` other than the context's
+  tenant (the method runs only with a token of its own tenant). `METHOD_FORBIDDEN` and other refusals are thrown (Runner,
+  exit -3), no fallback. A failed operation (`DUMP_FAILED`, `DUMP_INTERRUPTED`: `ServiceClientException` with the code, a
+  readable text and the parameters; `METHOD_OUTCOME_UNKNOWN`: `CkMethodCallException`) downloads nothing.
+- **`TenantRepositoryDumpClient`** is hand-written with exactly the generator's shape because System.Bot 3.7.0 is not yet
+  in the CK catalog GraphQlDtos restores (`System.Bot-[3.0,4.0)` resolves 3.6.0). Once it is published, GraphQlDtos
+  generates `RtTenantRepositoryMethodClient`; switch to it then.
+- **`GetOperation -id <operationId> [-w] [-j]`** and **`ListOperations [-m <methodId>] [-s <state>] [--since <time>] [-a]
+  [-sk <n>] [-t <n>] [-j]`** (`Asset/Operations/`) read `runtime.operations` of the tenant of the context; text output via
+  `OperationText`. `-w` waits until final (exit -3 when FAILED). `Runner` maps `CkOperationQueryException`
+  (`OPERATION_NOT_FOUND`, `OPERATION_QUERY_REFUSED`) to one error line, exit -3.
+- Tests: `DumpMethodCommandTests` (real SDK `TenantClient` against a local listener with answers recorded on test-2;
+  every sent document validated against `Fixtures/asset-repo-schema.test-2-system-bot-3.7.json.gz` with
+  `AssetRepositoryGraphQlSchema.ValidateAgainstSystemBotAsync`).
+
 ## Passwords and secrets never on the command line (AB#8044)
 
 A value on the command line ends up in the shell history and in the process list (`ps`), where every user of the machine and
@@ -305,7 +332,8 @@ type 'SimpleScalar'"). Hand-written GraphQL documents are therefore validated in
 
 - `tests/ManagementTool.Tests/AssetRepositoryGraphQlSchema.cs` builds the schema from an introspection snapshot of a real
   asset repository (`Fixtures/asset-repo-schema.test-2-ai-sandbox.json.gz`: test-2, tenant `ai-sandbox`, System models
-  only, descriptions stripped) with **GraphQL.NET 8.8.5, the library and version of the asset repository**, and runs its
+  only, descriptions stripped; `ValidateAgainstSystemBotAsync` uses `Fixtures/asset-repo-schema.test-2-system-bot-3.7.json.gz`,
+  a test-2 scratch tenant with System.Bot 3.7.0 and `runtime.operations`, AB#8446) with **GraphQL.NET 8.8.5, the library and version of the asset repository**, and runs its
   core validation rules on a document **with its variables** (field and argument names, variable types in their
   positions, input object fields and enum values). The repository's own scalars (`SimpleScalar`, `OctoObjectId`,
   `DateTime`, …) accept any value: their value formats are not checked.
@@ -640,7 +668,7 @@ Environment variables are prefixed with `OCTO_`:
 | Category | Commands | Service |
 |----------|----------|---------|
 | Identity | users, roles, clients (+ mirror commands: GetClientMirrors, ProvisionClientInExistingTenants, ProvisionClientInTenant, UnprovisionClientFromTenant, SetClientAutoProvision, ApplyClientOverlay, CleanClientOverlays), identityProviders, groups, emailDomainGroupRules, externalTenantUserMappings, adminProvisioning, apiResources, apiScopes | Identity Services |
-| Asset | tenants, models, blueprints (ListBlueprints, RefreshBlueprintCatalogs, InstallBlueprint, GetBlueprintHistory, PreviewBlueprintUpdate, UpdateBlueprint, ListBlueprintInstallations, UninstallBlueprint), timeSeries (EnableStreamData, DisableStreamData, ActivateArchive, DisableArchive, EnableArchive, RetryArchiveActivation, DeleteArchive, FreezeRollupArchive, UnfreezeRollupArchive, RewindRollupWatermark, ListRollupsForArchive, RecomputeArchive, BackfillRollup, ListRecomputeJobs, ValidateRollups, RepairRollups, GetRollupRepairStatus, AddArchiveColumn, AddComputedColumn, RemoveComputedColumn, UpdateComputedColumnFormula) | Asset Repository |
+| Asset | tenants, models, blueprints (ListBlueprints, RefreshBlueprintCatalogs, InstallBlueprint, GetBlueprintHistory, PreviewBlueprintUpdate, UpdateBlueprint, ListBlueprintInstallations, UninstallBlueprint), timeSeries (EnableStreamData, DisableStreamData, ActivateArchive, DisableArchive, EnableArchive, RetryArchiveActivation, DeleteArchive, FreezeRollupArchive, UnfreezeRollupArchive, RewindRollupWatermark, ListRollupsForArchive, RecomputeArchive, BackfillRollup, ListRecomputeJobs, ValidateRollups, RepairRollups, GetRollupRepairStatus, AddArchiveColumn, AddComputedColumn, RemoveComputedColumn, UpdateComputedColumnFormula), operations of asynchronous CK methods (GetOperation, ListOperations) | Asset Repository |
 | Bots | Dump, Restore, ExportArchiveData, ImportArchiveData, RunFixupScripts | Bot Services |
 | Communication | enable/disable, adapters (incl. RotateAdapterServiceAccountSecret), SwitchServiceAccountsToImpersonation, pipelines (incl. MovePipelines for bulk reassignment to a different adapter), triggers, pools, adapter pool queue (GetAdapterPoolQueue, CancelQueuedExecution), dataFlows, workloads (GetWorkloadsByChart, UpdateWorkloadChartVersion, UpdateWorkloadResources, DeployWorkload, UndeployWorkload) | Communication Controller |
 | Reporting | enable/disable | Report Services |
