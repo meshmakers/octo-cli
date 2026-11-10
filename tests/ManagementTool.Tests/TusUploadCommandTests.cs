@@ -44,6 +44,22 @@ public sealed class TusUploadCommandTests : IDisposable
         Assert.Equal(expected, ImportArchiveData.BuildUploadUri(bot, tenant));
     }
 
+    [Fact]
+    public async Task ImportArchiveData_Execute_LogsTheUploadEndpointAndNotTheSystemRoute()
+    {
+        var logger = new RecordingLogger<ImportArchiveData>();
+        var options = Options.Create(new BotServiceClientOptions { EndpointUri = "https://bots.example.com/" });
+        var command = new ImportArchiveData(logger, Options.Create(new OctoToolOptions { TenantId = "acme" }), FakeBot(),
+            A.Fake<IAuthenticationService>(), options);
+        command.CommandArgumentValue.ParseLayer(["-tid", "smoke-ab7658", "-aid", "a1", "-i", _zip]);
+
+        await command.Execute();
+
+        Assert.Contains(logger.Entries,
+            e => e.Message.Contains("through 'https://bots.example.com/smoke-ab7658/v1/tus-upload'"));
+        Assert.DoesNotContain(logger.Entries, e => e.Message.Contains("system/v1"));
+    }
+
     // ── Part size option ───────────────────────────────────────────────────
 
     [Fact]
