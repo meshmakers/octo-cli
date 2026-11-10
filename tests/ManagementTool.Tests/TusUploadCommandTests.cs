@@ -34,6 +34,16 @@ public sealed class TusUploadCommandTests : IDisposable
         File.Delete(_zip);
     }
 
+    // ── Upload endpoint in the log (AB#8736) ───────────────────────────────
+
+    [Theory]
+    [InlineData("https://bots.example.com/", "smoke-ab7658", "https://bots.example.com/smoke-ab7658/v1/tus-upload")]
+    [InlineData("https://bots.example.com", "acme", "https://bots.example.com/acme/v1/tus-upload")]
+    public void ImportArchiveData_LogsTheTenantRoutedUploadEndpoint(string bot, string tenant, string expected)
+    {
+        Assert.Equal(expected, ImportArchiveData.BuildUploadUri(bot, tenant));
+    }
+
     // ── Part size option ───────────────────────────────────────────────────
 
     [Fact]

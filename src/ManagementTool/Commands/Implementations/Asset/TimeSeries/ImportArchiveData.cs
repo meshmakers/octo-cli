@@ -101,17 +101,27 @@ internal class ImportArchiveData : JobWithWaitOctoCommand
                 CommandArgumentValue.GetArgumentScalarValue<int>(_partSizeArg));
         }
 
+        // AB#8736: name the tenant-routed upload endpoint the SDK uses. The log used to print ServiceClient.ServiceUri,
+        // the system route of the bot client (…/system/v1), which reads as if the upload went there.
         Logger.LogInformation(
-            "Importing archive data into archive '{ArchiveRtId}' of tenant '{TenantId}' at '{ServiceClientServiceUri}' (mode: {Mode})",
-            archiveRtId, tenantId, ServiceClient.ServiceUri, mode);
+            "Importing archive data into archive '{ArchiveRtId}' of tenant '{TenantId}' through '{UploadUri}' (mode: {Mode})",
+            archiveRtId, tenantId, BuildUploadUri(_botOptions.Value.EndpointUri, tenantId), mode);
 
         var progress = new UploadProgressLogger(Logger, new FileInfo(filePath).Length);
         var response = await ServiceClient.StartImportArchiveDataWithTusAsync(tenantId, archiveRtId, filePath, mode,
             progress.Report);
         Logger.LogInformation("Upload complete. Import job with id '{Id}' has been started", response.JobId);
         await WaitForJob(response.JobId);
-        Logger.LogInformation(
-            "Archive data imported into archive '{ArchiveRtId}' of tenant '{TenantId}' at '{ServiceClientServiceUri}'",
-            archiveRtId, tenantId, ServiceClient.ServiceUri);
+        Logger.LogInformation("Archive data imported into archive '{ArchiveRtId}' of tenant '{TenantId}'",
+            archiveRtId, tenantId);
+    }
+
+    /// <summary>
+    ///     The tus upload endpoint of <paramref name="tenantId" /> as the SDK builds it (<c>{bot}/{tenant}/v1/tus-upload</c>),
+    ///     for the log only.
+    /// </summary>
+    internal static string BuildUploadUri(string? botEndpointUri, string tenantId)
+    {
+        return $"{(botEndpointUri ?? string.Empty).TrimEnd('/')}/{Uri.EscapeDataString(tenantId)}/v1/tus-upload";
     }
 }
