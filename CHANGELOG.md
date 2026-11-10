@@ -15,7 +15,8 @@ All notable changes to octo-cli are listed here. Newest first.
   job API unchanged when the asset repository rejects the method document (no System.Bot 3.7.0 / no operation handles)
   or no handler is live (`METHOD_HANDLER_NOT_AVAILABLE`), and always for a tenant other than the context's. New commands
   `GetOperation -id <operationId> [-w] [-j]` and `ListOperations [-m] [-s] [--since] [-a] [--skip] [-t] [-j]` read the
-  operations of asynchronous CK methods; `OPERATION_NOT_FOUND` / `OPERATION_QUERY_REFUSED` exit -3. Needs the octo-sdk
+  operations of asynchronous CK methods; `OPERATION_NOT_FOUND` / `OPERATION_QUERY_REFUSED` exit -3. Their standard output
+  carries only the answer (logs on standard error), so `-j` can be piped. Needs the octo-sdk
   package with `CkOperationsClient` (octo-sdk AB#8446).
 
 ### Fixed

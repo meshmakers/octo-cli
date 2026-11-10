@@ -50,7 +50,8 @@ internal class GetOperation : ServiceClientOctoCommand<ITenantClient>
             [
                 "The tenant is the tenant of the context. The caller who started the operation and tenant administrators can read it.",
                 "Operations are kept 7 days after they ended. An unknown, expired or foreign id is reported as OPERATION_NOT_FOUND.",
-                "-w ends with exit code -3 when the operation failed. Stopping the command (Ctrl+C) only stops waiting; operations cannot be cancelled."
+                "-w ends with exit code -3 when the operation failed. Stopping the command (Ctrl+C) only stops waiting; operations cannot be cancelled.",
+                "Standard output carries only the answer (text or -j JSON); banner and log lines go to standard error, so the output can be piped (e.g. to jq)."
             ]);
 
     public override async Task Execute()

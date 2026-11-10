@@ -62,7 +62,8 @@ internal class ListOperations : ServiceClientOctoCommand<ITenantClient>
             Notes:
             [
                 "The tenant is the tenant of the context. Operations are kept 7 days after they ended.",
-                "--allOwners without administrator rights is refused with OPERATION_QUERY_REFUSED."
+                "--allOwners without administrator rights is refused with OPERATION_QUERY_REFUSED.",
+                "Standard output carries only the answer (text or -j JSON); banner and log lines go to standard error, so the output can be piped (e.g. to jq)."
             ]);
 
     public override async Task Execute()

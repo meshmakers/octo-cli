@@ -8,9 +8,8 @@ namespace Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Asset
 ///     AB#8446: the client of the asynchronous CK method <c>System.Bot/TenantRepository.Dump-1</c> (System.Bot 3.7.0,
 ///     bot services AB#8445). It has exactly the shape the SDK's source generator emits for the method
 ///     (<c>RtTenantRepositoryMethodClient.DumpAsync</c>, octo-sdk <c>docs/method-clients.md</c>, "Asynchronous methods"),
-///     written by hand because System.Bot 3.7.0 is not yet in the CK catalog GraphQlDtos imports from
-///     (<c>System.Bot-[3.0,4.0)</c>). Once it is, GraphQlDtos generates <c>RtTenantRepositoryMethodClient</c> and this
-///     class can be replaced by it. <c>DumpMethodCommandTests</c> pins the document to the text the generator emits
+///     written by hand; it can be replaced by the <c>RtTenantRepositoryMethodClient</c> GraphQlDtos generates from a
+///     System.Bot version with the method. <c>DumpMethodCommandTests</c> pins the document to the text the generator emits
 ///     (octo-sdk <c>AsyncMethodClientTests</c>, validated there against a recorded schema with System.Bot 3.7.0).
 /// </summary>
 internal sealed class TenantRepositoryDumpClient(ITenantClient tenantClient) : CkMethodClientBase(tenantClient)

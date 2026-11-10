@@ -212,12 +212,13 @@ SDK's `CkOperationsClient` (octo-sdk AB#8446, `docs/method-clients.md` "Asynchro
   tenant (the method runs only with a token of its own tenant). `METHOD_FORBIDDEN` and other refusals are thrown (Runner,
   exit -3), no fallback. A failed operation (`DUMP_FAILED`, `DUMP_INTERRUPTED`: `ServiceClientException` with the code, a
   readable text and the parameters; `METHOD_OUTCOME_UNKNOWN`: `CkMethodCallException`) downloads nothing.
-- **`TenantRepositoryDumpClient`** is hand-written with exactly the generator's shape because System.Bot 3.7.0 is not yet
-  in the CK catalog GraphQlDtos restores (`System.Bot-[3.0,4.0)` resolves 3.6.0). Once it is published, GraphQlDtos
-  generates `RtTenantRepositoryMethodClient`; switch to it then.
+- **`TenantRepositoryDumpClient`** has exactly the shape the SDK generator emits for the method (`DumpDocument` is pinned
+  by `DumpMethodCommandTests` to the generator's text); keep it in step with the generator or replace it by the generated
+  `RtTenantRepositoryMethodClient` of GraphQlDtos.
 - **`GetOperation -id <operationId> [-w] [-j]`** and **`ListOperations [-m <methodId>] [-s <state>] [--since <time>] [-a]
   [-sk <n>] [-t <n>] [-j]`** (`Asset/Operations/`) read `runtime.operations` of the tenant of the context; text output via
-  `OperationText`. `-w` waits until final (exit -3 when FAILED). `Runner` maps `CkOperationQueryException`
+  `OperationText`. Both are in `MachineReadableOutput.CommandNames`: standard output carries only the answer, logs (incl.
+  the `-w` progress) go to standard error. `-w` waits until final (exit -3 when FAILED). `Runner` maps `CkOperationQueryException`
   (`OPERATION_NOT_FOUND`, `OPERATION_QUERY_REFUSED`) to one error line, exit -3.
 - Tests: `DumpMethodCommandTests` (real SDK `TenantClient` against a local listener with answers recorded on test-2;
   every sent document validated against `Fixtures/asset-repo-schema.test-2-system-bot-3.7.json.gz` with
@@ -276,8 +277,9 @@ token out of `contexts.json` and call the route with curl or Python: the token i
   go to standard error for this command: `MachineReadableOutput` (pre-scan of the raw command line in `Program.Main`, like the
   context selection) switches the console log target to `StdErr`; its list `CommandNames` is the place to register another
   command with this property. The body is written as the service sent it plus a final line break if it had none, so
-  `octo-cli ... | jq` and `ConvertFrom-Json` work. The other commands print JSON through `IConsoleService`/the logger on standard
-  output with banner and log lines mixed in; only `GraphQl` is clean.
+  `octo-cli ... | jq` and `ConvertFrom-Json` work. `GetOperation` and `ListOperations` (AB#8446) are registered too, so their
+  `-j` output can be piped. The other commands print JSON through `IConsoleService`/the logger on standard output with banner
+  and log lines mixed in.
 - **Exit codes:** 0 success. GraphQL errors (non-empty `errors`, HTTP 200 or 400) print the body to standard error, nothing to
   standard output, exit `-5`. A tenant where the operator is not provisioned, an exchange denial or a 403: the AB#6836 message
   (tenant, cause, step `ProvisionCurrentUser -ttid <tenant>`), exit `-4`, no request is sent for a denied exchange.
