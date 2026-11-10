@@ -62,7 +62,7 @@ internal class DumpTenant : JobOctoCommand
                 "Without --include-archive-data the backup is a plain '*.tar.gz' (MongoDB data only).",
                 "With --include-archive-data the produced artifact is a larger '*.octobak.zip' that also carries the CrateDB archive rows; pick a matching file name with -f.",
                 "The command always waits for the dump and then downloads the file.",
-                "For the tenant of the context the dump runs as the asynchronous CK method System.Bot/TenantRepository.Dump-1: the command prints the operation id and the progress (stage, percent, job id) and reads the result through the operation handle. The operation can be read again with GetOperation -id <operationId> for 7 days.",
+                "For the tenant of the context the dump runs as the asynchronous CK method System.Bot/TenantRepository.Dump-1: the command prints the operation id and the progress (stage, percent, job id) and reads the result through the operation handle. The operation can be read again for 7 days with GetOperation and the operation id.",
                 "The command uses the job API instead (as in earlier versions) when the asset repository or the bot service does not offer the dump method yet, and for a tenant other than the tenant of the context (for example a child tenant dumped with the parent's context).",
             ]
         );
