@@ -19,6 +19,9 @@ internal abstract class JobOctoCommand(
 {
     protected IBotServicesClient ServiceClient { get; } = botServiceClient;
 
+    /// <summary>Authenticates a service client of the command (e.g. a tenant client the command uses besides the bot client).</summary>
+    protected IAuthenticationService AuthenticationService { get; } = authenticationService;
+
     /// <summary>The job as last read by <see cref="WaitForJob" /> when it succeeded; <c>null</c> before or without a wait.</summary>
     protected JobDto? LastCompletedJob { get; private set; }
 
@@ -27,7 +30,7 @@ internal abstract class JobOctoCommand(
         Logger.LogInformation("Service URI: {ServiceClientServiceUri}", ServiceClient.ServiceUri);
         Logger.LogInformation("Default Tenant: {TenantId}", Options.Value.TenantId);
 
-        await authenticationService.EnsureAuthenticated(ServiceClient.AccessToken);
+        await AuthenticationService.EnsureAuthenticated(ServiceClient.AccessToken);
     }
 
     protected async Task DownloadJobResultAsync(string tenantId, string id, string filePath)
@@ -56,7 +59,7 @@ internal abstract class JobOctoCommand(
             // refresh is expiry-gated (AB#4754), so it is a timestamp check unless the token is within
             // its refresh margin, and the ServiceClientAccessToken setter updates the auth header only
             // when the token actually changed.
-            await authenticationService.EnsureAuthenticated(ServiceClient.AccessToken);
+            await AuthenticationService.EnsureAuthenticated(ServiceClient.AccessToken);
 
             var jobDto = await ServiceClient.GetImportJobStatus(id);
             if (jobDto.Status == "Succeeded")

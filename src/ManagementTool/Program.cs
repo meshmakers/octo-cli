@@ -11,6 +11,7 @@ using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Asset.Gra
 using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Asset.Knowledge;
 using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Asset.Secrets;
 using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Asset.Models;
+using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Asset.Operations;
 using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Asset.PlatformFiles;
 using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Asset.Tenants;
 using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Asset.TimeSeries;
@@ -404,6 +405,8 @@ internal static class Program
         services.AddTransient<ICommand, RecomputeDisplayNames>();
         services.AddTransient<ICommand, UpdateSystemCkModelTenant>();
         services.AddTransient<ICommand, DumpTenant>();
+        services.AddTransient<ICommand, GetOperation>();
+        services.AddTransient<ICommand, ListOperations>();
         services.AddTransient<ICommand, RestoreTenant>();
         services.AddTransient<ICommand, ExportArchiveData>();
         services.AddTransient<ICommand, ImportArchiveData>();

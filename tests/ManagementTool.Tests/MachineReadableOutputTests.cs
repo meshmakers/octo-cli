@@ -18,6 +18,12 @@ public sealed class MachineReadableOutputTests
         Assert.True(MachineReadableOutput.IsRequested(args));
 
     [Theory]
+    [InlineData("octo-cli", "-c", "GetOperation", "-id", "x", "-j")]
+    [InlineData("octo-cli", "--context", "ctx", "-c", "listoperations", "-j")]
+    public void OperationCommands_AreRecognised_SoTheirJsonCanBePiped(params string[] args) =>
+        Assert.True(MachineReadableOutput.IsRequested(args));
+
+    [Theory]
     [InlineData("octo-cli", "-c", "LibraryStatus")]
     [InlineData("octo-cli", "-c", "GraphQlDtos")]
     [InlineData("octo-cli", "-q", "GraphQl")]

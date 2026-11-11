@@ -73,6 +73,13 @@ internal class Runner
             _logger.LogError("Authentication failed: {Message}", ex.Message);
             return -4;
         }
+        catch (CkOperationQueryException ex)
+        {
+            // AB#8446: runtime.operations refused the read (OPERATION_NOT_FOUND: unknown, expired or another caller's id;
+            // OPERATION_QUERY_REFUSED: --allOwners without administrator rights).
+            _logger.LogError("{Message}", CkMethodErrorText.Format(ex.Error));
+            return -3;
+        }
         catch (CkMethodCallException ex)
         {
             // AB#8417: a CK method call refused with an undeclared code (e.g. METHOD_FORBIDDEN with reason=self-grant,

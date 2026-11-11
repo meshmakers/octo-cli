@@ -4,6 +4,21 @@ All notable changes to octo-cli are listed here. Newest first.
 
 ## Unreleased
 
+### Added
+
+- **AB#8446 — Dump follows the operation handle; GetOperation and ListOperations.** `Dump` for the tenant of the
+  context runs the asynchronous CK method `System.Bot/TenantRepository.Dump-1` (bot services AB#8445): it prints the
+  operation id and the progress (state, stage, percent, job id) read from `runtime.operations`, honours the service's
+  `retryAfterSeconds` instead of polling every 2 seconds, refreshes the token before every read and downloads the job of
+  the result as before. A declared error (`DUMP_FAILED`, `DUMP_INTERRUPTED`) and a lost handler
+  (`METHOD_OUTCOME_UNKNOWN`, `reason=handler-lost`) end the command with exit -3 and nothing is downloaded. It uses the
+  job API unchanged when the asset repository rejects the method document (no System.Bot 3.7.0 / no operation handles)
+  or no handler is live (`METHOD_HANDLER_NOT_AVAILABLE`), and always for a tenant other than the context's. New commands
+  `GetOperation -id <operationId> [-w] [-j]` and `ListOperations [-m] [-s] [--since] [-a] [--skip] [-t] [-j]` read the
+  operations of asynchronous CK methods; `OPERATION_NOT_FOUND` / `OPERATION_QUERY_REFUSED` exit -3. Their standard output
+  carries only the answer (logs on standard error), so `-j` can be piped. Needs the octo-sdk
+  package with `CkOperationsClient` (octo-sdk AB#8446).
+
 ### Fixed
 
 - **AB#8570 — no credentials in error output.** A failed server call no longer prints the request's
