@@ -135,11 +135,11 @@ internal class DumpTenant : JobOctoCommand
         {
             accepted = await new TenantRepositoryDumpClient(_tenantClient).DumpAsync(includeArchiveData);
         }
-        catch (CkMethodCallException e) when (DumpMethodFallback.IsMethodUnavailable(e))
+        catch (CkMethodCallException e) when (CkMethodFallback.IsMethodUnavailable(e))
         {
             Logger.LogInformation(
                 "The dump method {MethodId} is not available ({Reason}); the dump uses the job API",
-                TenantRepositoryDumpClient.DumpMethodId, DumpMethodFallback.Describe(e));
+                TenantRepositoryDumpClient.DumpMethodId, CkMethodFallback.Describe(e));
             return null;
         }
 
@@ -180,27 +180,4 @@ internal class DumpTenant : JobOctoCommand
             jobId);
         return jobId;
     }
-}
-
-/// <summary>
-///     AB#8446: when the dump command falls back to the job API. Only when the call was certainly not executed: the
-///     asset repository rejected the document before execution (GraphQL validation, e.g. an older asset repository or a
-///     tenant without System.Bot 3.7.0 - every error carries the spec section <c>extensions.number</c>), or no handler
-///     of the method is live (<c>METHOD_HANDLER_NOT_AVAILABLE</c>, e.g. a bot service without the method).
-/// </summary>
-internal static class DumpMethodFallback
-{
-    private const string HandlerNotAvailable = "METHOD_HANDLER_NOT_AVAILABLE";
-
-    public static bool IsMethodUnavailable(CkMethodCallException exception) =>
-        string.Equals(exception.Code, HandlerNotAvailable, StringComparison.Ordinal) || IsValidationError(exception);
-
-    public static string Describe(CkMethodCallException exception) =>
-        IsValidationError(exception)
-            ? $"the asset repository does not know it: {string.Join(", ", (exception.Errors ?? []).Select(e => e.Message))}"
-            : CkMethodErrorText.Format(exception);
-
-    private static bool IsValidationError(CkMethodCallException exception) =>
-        exception.Errors is { Count: > 0 } errors &&
-        errors.All(e => e.Extensions != null && e.Extensions.ContainsKey("number"));
 }

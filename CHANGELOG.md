@@ -21,6 +21,14 @@ All notable changes to octo-cli are listed here. Newest first.
 
 ### Fixed
 
+- **AB#8838 — AddUserToRole / RemoveUserFromRole work against released 3.5.x servers again.** Since AB#8417 the commands
+  run the CK methods `System.Identity/User.AddRole-1` / `RemoveRole-1`, which exist only from asset repository 3.5.43 and
+  identity 3.5.52 on. An older server (e.g. OctoMesh 3.5.23) rejected the call with
+  `The CK method call 'System.Identity/User.AddRole-1' failed: VARIABLES_ARE_INPUT_TYPES` and the role was not assigned.
+  When the server's schema lacks the method (GraphQL validation error) or no handler is live, the commands now log one
+  line and use the REST endpoint of those servers; other refusals are reported as before (exit -3). `AddUserToRole` with
+  an unknown role now exits with -3 instead of 0. `AddClientToRole` / `RemoveClientFromRole` use REST and were not
+  affected.
 - **AB#8570 — no credentials in error output.** A failed server call no longer prints the request's
   `Authorization` header, cookies, bearer tokens or credential fields of a request body. A service with the
   ASP.NET Core developer exception page (the local stack) answers a 500 with a page that echoes the request
