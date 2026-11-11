@@ -21,6 +21,12 @@ All notable changes to octo-cli are listed here. Newest first.
 
 ### Fixed
 
+- **AB#8839 — ResetPassword against an identity service before 3.5.55 says what is wrong.** Since AB#8008 the new
+  password travels only in the request body; older identity services accept it only in the URL and answered
+  `BadRequest: … "password":["The password field is required."],"userName":["The userName field is required."]`, which
+  read as if the CLI had sent neither. The command now recognizes that answer and exits with -3 and one message: the
+  identity service is older than 3.5.55, the password was not changed, update the identity service or let the user reset
+  the password with "Forgot password" on the sign-in page. octo-cli still never sends the password in the URL.
 - **AB#8570 — no credentials in error output.** A failed server call no longer prints the request's
   `Authorization` header, cookies, bearer tokens or credential fields of a request body. A service with the
   ASP.NET Core developer exception page (the local stack) answers a 500 with a page that echoes the request
