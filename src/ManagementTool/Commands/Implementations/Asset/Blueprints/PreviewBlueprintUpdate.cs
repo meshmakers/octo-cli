@@ -108,7 +108,8 @@ internal class PreviewBlueprintUpdate : ServiceClientOctoCommand<IAssetServicesC
         _consoleService.WriteLine(resultString);
 
         BlueprintBlanking.ReportTenantOwned(
-            Logger, preview: true, preview.TenantOwnedSkipped, preview.TenantOwnedStaysDeleted);
+            Logger, preview: true, preview.TenantOwnedSkipped, preview.TenantOwnedStaysDeleted,
+            preview.TenantOwnedRefreshed, preview.TenantOwnedUpdateAvailable);
 
         // --failOnBlocked ends the command only after the blanking report below, so a CI log that uses it together
         // with --failOnBlanking still shows every finding.

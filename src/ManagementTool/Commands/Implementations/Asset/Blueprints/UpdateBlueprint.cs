@@ -174,7 +174,8 @@ internal class UpdateBlueprint : ServiceClientOctoCommand<IAssetServicesClient>
 
         ReportBlanking(result.BlankedAttributes, dryRun, allowBlanking ? [] : confirmations);
         BlueprintBlanking.ReportTenantOwned(
-            Logger, dryRun, result.TenantOwnedSkipped, result.TenantOwnedStaysDeleted);
+            Logger, dryRun, result.TenantOwnedSkipped, result.TenantOwnedStaysDeleted,
+            result.TenantOwnedRefreshed, result.TenantOwnedUpdateAvailable);
         ReportArchiveColumns(result.ArchiveColumnsAdded);
         BlueprintArchiveActivationReport.Log(Logger, result.ArchiveActivations, result.Warnings);
     }

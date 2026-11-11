@@ -380,6 +380,58 @@ public sealed class BlueprintBlankingCommandTests
     }
 
     [Fact]
+    public async Task PreviewDryRun_PrintsRefreshedUpdateAvailableAndStaysDeleted()
+    {
+        // AB#8778: the three outcomes of a blueprint update for tenant-owned seed entities.
+        var client = A.Fake<IAssetServicesClient>();
+        A.CallTo(() => client.PreviewBlueprintUpdateAsync(A<string>._, A<BlueprintUpdateRequestDto>._))
+            .Returns(new BlueprintUpdatePreviewDto
+            {
+                TargetVersion = "Eda-1.2.0",
+                TenantOwnedRefreshed = [Kept("OwnedFresh", RtId1)],
+                TenantOwnedSkipped = [Kept("OwnedEdited", RtId2)],
+                TenantOwnedUpdateAvailable = [Kept("OwnedEdited", RtId2)],
+                TenantOwnedStaysDeleted = [Gone("OwnedGone")]
+            });
+        var logger = new RecordingLogger<PreviewBlueprintUpdate>();
+        var command = NewPreviewCommand(client, A.Fake<IConsoleService>(), logger);
+        command.CommandArgumentValue.ParseLayer(["-tv", "Eda-1.2.0"]);
+
+        await command.Execute();
+
+        var output = Infos(logger);
+        var refreshedAt = output.IndexOf("would receive the new seed content (tenant-owned, refreshed)", StringComparison.Ordinal);
+        var skippedAt = output.IndexOf("tenant-owned, skipped", StringComparison.Ordinal);
+        var availableAt = output.IndexOf("tenant-owned, update available", StringComparison.Ordinal);
+        var deletedAt = output.IndexOf("deleted by the tenant would stay deleted", StringComparison.Ordinal);
+        Assert.True(refreshedAt >= 0 && skippedAt > refreshedAt && availableAt > skippedAt && deletedAt > availableAt, output);
+        Assert.Contains("OwnedFresh", output[refreshedAt..skippedAt]);
+        Assert.Contains("OwnedEdited", output[availableAt..deletedAt]);
+        Assert.Contains("OwnedGone", output[deletedAt..]);
+        Assert.DoesNotContain(logger.Entries, e => e.Level >= LogLevel.Warning);
+    }
+
+    [Fact]
+    public async Task UpdateBlueprint_PrintsTheRefreshedSectionInThePastTense()
+    {
+        var (client, _) = NewApplyClient(new BlueprintUpdateResultDto
+        {
+            Success = true,
+            TenantOwnedRefreshed = [Kept("OwnedFresh", RtId1)]
+        });
+        var logger = new RecordingLogger<UpdateBlueprint>();
+        var command = NewUpdate(client, logger);
+        command.CommandArgumentValue.ParseLayer(["-tv", "Eda-1.2.0"]);
+
+        await command.Execute();
+
+        var output = Infos(logger);
+        Assert.Contains("received the new seed content (tenant-owned, refreshed)", output);
+        Assert.Contains("OwnedFresh", output);
+        Assert.DoesNotContain("update available", output);
+    }
+
+    [Fact]
     public async Task Preview_WithEmptyTenantOwnedLists_PrintsNothingExtra()
     {
         var (client, console, _) = NewPreview();

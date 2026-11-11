@@ -890,8 +890,10 @@ octo-cli -c PreviewBlueprintUpdate -tv MyBlueprint-2.0.0 -fb        # --failOnBl
 octo-cli -c UpdateBlueprint -tv MyBlueprint-2.0.0                   # default: tenant values KEPT, kept attributes listed, exit 0
 octo-cli -c UpdateBlueprint -tv MyBlueprint-2.0.0 -cb <rtId>:<attr> -cb <rtId2>:<attr2>  # --confirm-blanking (repeatable): blank exactly these
 octo-cli -c UpdateBlueprint -tv MyBlueprint-2.0.0 -ab               # --allow-blanking: blank EVERY listed attribute (loud warning)
-# Tenant-owned seed entities (rtBlueprintLocked: false, AB#6454, server AB#6383): never rewritten by an update. Both commands
-# log (info, not warning) a 'tenant-owned, skipped' and a 'deleted by the tenant, stays deleted' table (key, type, rtId or '-');
+# Tenant-owned seed entities (rtBlueprintLocked: false, AB#6454, server AB#6383): an edited one is never rewritten by an update;
+# one the tenant never edited receives a changed seed (server AB#8778). Both commands log (info, not warning) the tables
+# 'tenant-owned, refreshed', 'tenant-owned, skipped', 'tenant-owned, update available' (seed changed, content differs from the installed seed,
+# subset of skipped) and 'deleted by the tenant, stays deleted' (key, type, rtId or '-');
 # nothing when the lists are empty; identity only, no values; --failOnBlanking ignores them. The blanking Reason
 # (SeedEmpty | SeedOmitted | ResetToDefault, AB#6395) is printed as the service reports it.
 

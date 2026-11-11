@@ -82,16 +82,33 @@ internal static class BlueprintBlanking
     }
 
     /// <summary>
-    ///     AB#6454: logs the two tenant-owned sections of a blueprint update (preview or apply result).
+    ///     AB#6454: logs the tenant-owned sections of a blueprint update (preview or apply result).
     ///     Nothing is logged for an empty list. These entities are not blanking, so this is information, not
-    ///     a warning, and <c>--failOnBlanking</c> never looks at them.
+    ///     a warning, and <c>--failOnBlanking</c> never looks at them. AB#8778 adds the unedited entities that
+    ///     receive the changed seed (<paramref name="refreshed" />) and the ones whose seed changed but whose unedited
+    ///     state is not proven (<paramref name="updateAvailable" />, a subset of <paramref name="skipped" />).
     /// </summary>
     public static void ReportTenantOwned(
         ILogger logger,
         bool preview,
         IReadOnlyCollection<BlueprintTenantOwnedEntityDto> skipped,
-        IReadOnlyCollection<BlueprintTenantOwnedEntityDto> staysDeleted)
+        IReadOnlyCollection<BlueprintTenantOwnedEntityDto> staysDeleted,
+        IReadOnlyCollection<BlueprintTenantOwnedEntityDto>? refreshed = null,
+        IReadOnlyCollection<BlueprintTenantOwnedEntityDto>? updateAvailable = null)
     {
+        if (refreshed is { Count: > 0 })
+        {
+            logger.LogInformation(
+                preview
+                    ? "{Count} tenant-owned seed entity(ies) unedited by the tenant would receive the new seed content (tenant-owned, refreshed):"
+                    : "{Count} tenant-owned seed entity(ies) unedited by the tenant received the new seed content (tenant-owned, refreshed):",
+                refreshed.Count);
+            foreach (var line in FormatTenantOwnedTable(refreshed))
+            {
+                logger.LogInformation("{Line}", line);
+            }
+        }
+
         if (skipped.Count > 0)
         {
             logger.LogInformation(
@@ -100,6 +117,17 @@ internal static class BlueprintBlanking
                     : "{Count} tenant-owned seed entity(ies) were left untouched (tenant-owned, skipped):",
                 skipped.Count);
             foreach (var line in FormatTenantOwnedTable(skipped))
+            {
+                logger.LogInformation("{Line}", line);
+            }
+        }
+
+        if (updateAvailable is { Count: > 0 })
+        {
+            logger.LogInformation(
+                "{Count} of them have a changed seed but differ from the installed seed (edited by the tenant, or not comparable); their content is kept (tenant-owned, update available):",
+                updateAvailable.Count);
+            foreach (var line in FormatTenantOwnedTable(updateAvailable))
             {
                 logger.LogInformation("{Line}", line);
             }
