@@ -125,6 +125,7 @@ internal class RestoreTenant : JobWithWaitOctoCommand
         var response = await ServiceClient.RestoreRepositoryWithTusAsync(tenantId, databaseName, filePath, oldDatabaseName,
             restoreArchiveData: restoreArchiveData,
             progressCallback: progress.Report,
+            cancellationToken: CancellationToken.None,
             overrideForeignOwnership: overrideForeignOwnership);
         Logger.LogInformation("Upload complete. Restore job with id \'{Id}\' has been started", response.JobId);
         await WaitForJob(response.JobId);
