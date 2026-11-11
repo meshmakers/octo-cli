@@ -7,7 +7,7 @@ All notable changes to octo-cli are listed here. Newest first.
 ### Added
 
 - **AB#8778 — Tenant-owned seed refresh in the update output.** `PreviewBlueprintUpdate` and `UpdateBlueprint` (also
-  `--dryRun`) log two more tenant-owned tables: the unedited entities that receive the changed seed
+  `--dry-run`) log two more tenant-owned tables: the unedited entities that receive the changed seed
   (`tenant-owned, refreshed`) and the ones the update keeps although the seed changed because they differ from the installed
   seed (`tenant-owned, update available`). Information only; `--failOnBlanking` ignores them. Needs octo-sdk and asset repository with AB#8778.
 
