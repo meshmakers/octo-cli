@@ -9,7 +9,8 @@ namespace Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Ident
 
 /// <summary>
 ///     Removes a role from a user. Runs the CK method <c>System.Identity/User.RemoveRole-1</c> (AB#8417, see
-///     <see cref="UserRoleMethodCall" />); command name, arguments and output are unchanged.
+///     <see cref="UserRoleMethodCall" />; servers without the method get the REST call, AB#8838); command name, arguments
+///     and output are unchanged.
 /// </summary>
 internal class RemoveUserFromRole : ServiceClientOctoCommand<IIdentityServicesClient>
 {
@@ -26,7 +27,7 @@ internal class RemoveUserFromRole : ServiceClientOctoCommand<IIdentityServicesCl
             identityServicesClient, authenticationService)
     {
         _confirmationService = confirmationService;
-        _roleMethods = new UserRoleMethodCall(identityServicesClient, tenantClient, authenticationService);
+        _roleMethods = new UserRoleMethodCall(identityServicesClient, tenantClient, authenticationService, logger);
 
         _nameArg = CommandArgumentValue.AddArgument("un", "userName", ["User name"], true,
             1);
