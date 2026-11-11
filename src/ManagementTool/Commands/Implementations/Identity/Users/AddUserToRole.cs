@@ -10,7 +10,8 @@ namespace Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Ident
 
 /// <summary>
 ///     Adds a role to a user. Runs the CK method <c>System.Identity/User.AddRole-1</c> (AB#8417, see
-///     <see cref="UserRoleMethodCall" />); command name, arguments and output are unchanged.
+///     <see cref="UserRoleMethodCall" />; servers without the method get the REST call, AB#8838); command name, arguments
+///     and output are unchanged.
 /// </summary>
 internal class AddUserToRole : ServiceClientOctoCommand<IIdentityServicesClient>
 {
@@ -24,7 +25,7 @@ internal class AddUserToRole : ServiceClientOctoCommand<IIdentityServicesClient>
         : base(logger, Constants.IdentityServicesGroup, "AddUserToRole", "Adds an user to a role", options,
             identityServicesClient, authenticationService)
     {
-        _roleMethods = new UserRoleMethodCall(identityServicesClient, tenantClient, authenticationService);
+        _roleMethods = new UserRoleMethodCall(identityServicesClient, tenantClient, authenticationService, logger);
         _nameArg = CommandArgumentValue.AddArgument("un", "userName", ["User name"], true,
             1);
         _roleArg = CommandArgumentValue.AddArgument("r", "role", ["Existing role name"], false,
@@ -60,9 +61,9 @@ internal class AddUserToRole : ServiceClientOctoCommand<IIdentityServicesClient>
             }
             catch (ServiceClientResultException)
             {
-                Logger.LogError("Role \'{RoleName}\' does not exist at Service \'{ClientServiceUriUri}\'", roleName,
-                    ServiceClient.ServiceUri);
-                return;
+                // AB#8838: a failure, so the Runner logs it and the command exits with -3 (it exited 0 before).
+                throw new ServiceClientException(
+                    $"Role '{roleName}' does not exist at Service '{ServiceClient.ServiceUri}'");
             }
         }
 

@@ -17,7 +17,8 @@ namespace ManagementTool.Tests;
 ///     AB#8417 — AddUserToRole and RemoveUserFromRole run the CK methods <c>System.Identity/User.AddRole-1</c> /
 ///     <c>User.RemoveRole-1</c> through the generated <c>RtUserMethodClient</c> (GraphQlDtos, System.Identity-[3.2,4.0)):
 ///     the user is addressed by runtime id, the obsolete REST methods are not called, the output is unchanged, and a
-///     refused call names the declared error code and the message the REST endpoint answered before.
+///     refused call names the declared error code and the message the REST endpoint answered before. AB#8838: a server
+///     without the methods (released 3.5.x before identity 3.5.52) gets the REST call; an unknown role fails the command.
 /// </summary>
 public class UserRoleMethodCommandTests
 {
@@ -73,17 +74,85 @@ public class UserRoleMethodCommandTests
     }
 
     [Fact]
-    public async Task AddUserToRole_UnknownRole_StopsBeforeTheMethodCall_AsBefore()
+    public async Task AddUserToRole_UnknownRole_StopsBeforeTheMethodCall_AndFails()
     {
         A.CallTo(() => _identity.GetRoleByName(A<string>._))
             .ThrowsAsync(new ServiceClientResultException("not found", System.Net.HttpStatusCode.NotFound));
         var logger = new RecordingLogger<AddUserToRole>();
         var command = Add(logger, "-un", "john.doe", "-r", "Nope");
 
+        // AB#8838: a ServiceClientException, so the Runner exits with -3 instead of 0.
+        var ex = await Assert.ThrowsAsync<ServiceClientException>(() => command.Execute());
+
+        Assert.StartsWith("Role 'nope' does not exist at Service", ex.Message);
+        Assert.Empty(_requests);
+        AssertNoRestRoleCall();
+        Assert.DoesNotContain(logger.Entries, e => e.Message.Contains("updated"));
+    }
+
+    [Fact]
+    public async Task AddUserToRole_ServerWithoutTheMethod_FallsBackToRest()
+    {
+        // AB#8838: the validation answer of a 3.5.23 server (recorded read-only on the FH lab installation).
+        AnswerMethodCallsWithValidationErrors("SystemIdentityUserAddRoleMethodInput", "addRole");
+        var logger = new RecordingLogger<AddUserToRole>();
+        var command = Add(logger, "-un", "John.Doe", "-r", "StreamDataReader");
+
         await command.Execute();
 
-        Assert.Empty(_requests);
-        Assert.Contains(logger.Entries, e => e.Message.StartsWith("Role 'nope' does not exist at Service"));
+        Assert.Single(_requests);
+#pragma warning disable CS0618 // the obsolete REST method is the expected fallback
+        A.CallTo(() => _identity.AddRoleToUser("john.doe", "streamdatareader")).MustHaveHappenedOnceExactly();
+#pragma warning restore CS0618
+        Assert.Collection(logger.Entries,
+            e => Assert.StartsWith("Adding user 'john.doe' to role 'streamdatareader' at ", e.Message),
+            e => Assert.StartsWith(
+                "The CK method System.Identity/User.AddRole-1 is not available (the asset repository does not know it: ",
+                e.Message),
+            e => Assert.Equal("User 'john.doe' updated", e.Message));
+    }
+
+    [Fact]
+    public async Task RemoveUserFromRole_ServerWithoutTheMethod_FallsBackToRest()
+    {
+        AnswerMethodCallsWithValidationErrors("SystemIdentityUserRemoveRoleMethodInput", "removeRole");
+        var command = Remove(new RecordingLogger<RemoveUserFromRole>(), "-un", "john.doe", "-r", "DataAnalyst", "-y");
+
+        await command.Execute();
+
+#pragma warning disable CS0618 // the obsolete REST method is the expected fallback
+        A.CallTo(() => _identity.RemoveRoleFromUser("john.doe", "dataanalyst")).MustHaveHappenedOnceExactly();
+#pragma warning restore CS0618
+    }
+
+    [Fact]
+    public async Task AddUserToRole_NoLiveHandler_FallsBackToRest()
+    {
+        AnswerMethodCalls("METHOD_HANDLER_NOT_AVAILABLE", new Dictionary<string, object?> { ["reason"] = "no-live-handler" });
+        var command = Add(new RecordingLogger<AddUserToRole>(), "-un", "john.doe", "-r", "DataAnalyst");
+
+        await command.Execute();
+
+#pragma warning disable CS0618 // the obsolete REST method is the expected fallback
+        A.CallTo(() => _identity.AddRoleToUser("john.doe", "dataanalyst")).MustHaveHappenedOnceExactly();
+#pragma warning restore CS0618
+    }
+
+    [Fact]
+    public async Task AddUserToRole_FallbackRefusedByRest_IsThrown()
+    {
+        AnswerMethodCallsWithValidationErrors("SystemIdentityUserAddRoleMethodInput", "addRole");
+#pragma warning disable CS0618 // the obsolete REST method is the expected fallback
+        A.CallTo(() => _identity.AddRoleToUser(A<string>._, A<string>._))
+            .ThrowsAsync(new ServiceClientResultException("User 'john.doe' already has role 'dataanalyst'",
+                System.Net.HttpStatusCode.BadRequest));
+#pragma warning restore CS0618
+        var logger = new RecordingLogger<AddUserToRole>();
+
+        await Assert.ThrowsAsync<ServiceClientResultException>(() =>
+            Add(logger, "-un", "john.doe", "-r", "DataAnalyst").Execute());
+
+        Assert.DoesNotContain(logger.Entries, e => e.Message.Contains("updated"));
     }
 
     [Fact]
@@ -146,6 +215,7 @@ public class UserRoleMethodCommandTests
         var ex = await Assert.ThrowsAsync<CkMethodCallException>(() => command.Execute());
 
         Assert.Equal("METHOD_FORBIDDEN", ex.Code);
+        AssertNoRestRoleCall(); // AB#8838: a refusal is no reason for the REST fallback
         Assert.Equal("The CK method call 'System.Identity/User.AddRole-1' failed: METHOD_FORBIDDEN (reason=self-grant)",
             CkMethodErrorText.Format(ex));
     }
@@ -186,6 +256,34 @@ public class UserRoleMethodCommandTests
 
     private static string Variables(GraphQLRequest request) =>
         System.Text.Json.JsonSerializer.Serialize(request.Variables);
+
+    /// <summary>
+    ///     Answers every <c>SendMutationAsync</c> with the GraphQL validation errors of a server whose schema lacks the method
+    ///     (asset repository before 3.5.43 / identity before 3.5.52): the shape the FH lab installation (3.5.23) answered.
+    /// </summary>
+    private void AnswerMethodCallsWithValidationErrors(string inputType, string field)
+    {
+        A.CallTo(_tenant).Where(c => c.Method.Name == nameof(ITenantClient.SendMutationAsync))
+            .WithNonVoidReturnType()
+            .ReturnsLazily(call =>
+            {
+                _requests.Add((GraphQLRequest)call.Arguments[0]!);
+                var responseType = call.Method.ReturnType.GetGenericArguments()[0];
+                GraphQLError Validation(string message, string code, string number) => new()
+                {
+                    Message = message,
+                    Extensions = new Map { ["code"] = code, ["codes"] = new List<object> { code }, ["number"] = number }
+                };
+                var error = new QlQueryErrorException("GraphQL error",
+                [
+                    Validation($"Variable 'input' cannot be non-input type '{inputType}'.", "VARIABLES_ARE_INPUT_TYPES", "5.8.2"),
+                    Validation($"Unknown type {inputType}.", "KNOWN_TYPE_NAMES", "5.5.1.2"),
+                    Validation($"Cannot query field '{field}' on type 'SystemIdentityUserMutations'.", "FIELDS_ON_CORRECT_TYPE", "5.3.1")
+                ]);
+                return typeof(Task).GetMethod(nameof(Task.FromException), 1, [typeof(Exception)])!
+                    .MakeGenericMethod(responseType).Invoke(null, [error])!;
+            });
+    }
 
     /// <summary>
     ///     Answers every <c>SendMutationAsync</c> of the generated client: success (a response with an invocation id) or the

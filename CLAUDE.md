@@ -189,13 +189,19 @@ Tests: `ResetPasswordOlderIdentityTests` (real command, SDK client and `Runner` 
 `User.RemoveRole-1` through `RtUserMethodClient`, which the source generator emits in **GraphQlDtos** from
 `System.Identity-[3.2,4.0)` (`src/GraphQlDtos/construction-kits.yaml`, namespace `GraphQlDtos.DataTransferObjects.System.Identity.v3`;
 pattern of the SDK migration guide, octo-sdk `docs/method-client-migration-guide.md`, "Identity wave 1"). The REST methods
-`IIdentityServicesClient.AddRoleToUser` / `RemoveRoleFromUser` are `[Obsolete]` since octo-sdk AB#8416; octo-cli builds with warnings as
-errors and does not call them. Command names, arguments, confirmation and log output are unchanged.
+`IIdentityServicesClient.AddRoleToUser` / `RemoveRoleFromUser` are `[Obsolete]` since octo-sdk AB#8416; octo-cli calls them only as the
+fallback below (`#pragma warning disable CS0618` at that one place). Command names, arguments, confirmation and log output are unchanged.
 
 - **Flow** (`UserRoleMethodCall`): look the user up by name (`IIdentityServicesClient.GetUserByNameEmailOrId`, `UserDto.UserId` = runtime
   id), authenticate the tenant client (`ITenantClient` has its own access token; `PreValidate` only authenticates the identity client),
   call the method with the role **name** (the handler resolves it case-insensitively, like REST). `AddUserToRole` keeps its role
-  existence check before the call.
+  existence check before the call; an unknown role is a `ServiceClientException` (exit -3; before AB#8838 it only logged and exited 0).
+- **Older servers (AB#8838)**: the role methods exist only with asset repository 3.5.43 (AB#5670) and identity 3.5.52 (AB#7776). A released
+  server before that (e.g. the FH lab installation on 3.5.23) rejects the document in GraphQL validation (`VARIABLES_ARE_INPUT_TYPES`,
+  `KNOWN_TYPE_NAMES`, `FIELDS_ON_CORRECT_TYPE`, each with `extensions.number`). Then, and on `METHOD_HANDLER_NOT_AVAILABLE`, the call was
+  certainly not executed: `UserRoleMethodCall` logs one information line (`The CK method … is not available (…); the role is changed
+  through the REST endpoint of earlier identity versions`) and calls the REST method. The rule is `CkMethodFallback` (shared with `Dump`,
+  AB#8446); any other refusal (`METHOD_FORBIDDEN`, declared errors) never falls back.
 - **Refusals**: a declared error (`ROLE_NOT_FOUND`, `ROLE_ALREADY_ASSIGNED`, `ROLE_NOT_ASSIGNED`) becomes a `ServiceClientException` with
   the code and the message the REST endpoint answered before, e.g. `ROLE_ALREADY_ASSIGNED: User 'john.doe' already has role 'dataanalyst'`
   (Runner: error log, exit -3, as for a refused REST call). An undeclared refusal (`METHOD_FORBIDDEN` with `reason=self-grant` /
@@ -204,7 +210,8 @@ errors and does not call them. Command names, arguments, confirmation and log ou
 - `CreateUser` and `ResetPassword` stay on REST: password methods are disabled on the method bus of staging and production until B0;
   they switch with AB#8418 (the SDK obsoletes them then).
 - Tests: `UserRoleMethodCommandTests` (generated client over a fake `ITenantClient`: method document and rtId, no REST role call,
-  unchanged log lines, declared and undeclared refusals, declined confirmation, unknown user).
+  unchanged log lines, declared and undeclared refusals, declined confirmation, unknown user, unknown role fails; AB#8838: the validation
+  answer of a 3.5.23 server and `METHOD_HANDLER_NOT_AVAILABLE` fall back to REST, a REST refusal is thrown, a refusal never falls back).
 
 ## Dump through the operation handle; GetOperation / ListOperations (AB#8446)
 
@@ -216,9 +223,9 @@ SDK's `CkOperationsClient` (octo-sdk AB#8446, `docs/method-clients.md` "Asynchro
   `Dump operation '<id>' accepted`, `WaitForOperationAsync` with `OperationProgressLogger` (one line per change: state,
   stage, percent, `jobId`), refresh the token before every read (`BeforeReadAsync`), download the result's `JobId` with
   `IBotServicesClient.DownloadDumpToFileAsync` as before. The wait honours `retryAfterSeconds` (1-30 s), no `Thread.Sleep`.
-- **Fallback to the job API** (`DumpMethodFallback`): only when the call was certainly not executed — every GraphQL error
-  carries `extensions.number` (document rejected by validation: asset repository without AB#8444 or tenant without
-  System.Bot 3.7.0) or the code is `METHOD_HANDLER_NOT_AVAILABLE`; and always for `-tid` other than the context's
+- **Fallback to the job API** (`CkMethodFallback`, shared with the user role commands since AB#8838): only when the call
+  was certainly not executed — every GraphQL error carries `extensions.number` (document rejected by validation: asset
+  repository without AB#8444 or tenant without System.Bot 3.7.0) or the code is `METHOD_HANDLER_NOT_AVAILABLE`; and always for `-tid` other than the context's
   tenant (the method runs only with a token of its own tenant). `METHOD_FORBIDDEN` and other refusals are thrown (Runner,
   exit -3), no fallback. A failed operation (`DUMP_FAILED`, `DUMP_INTERRUPTED`: `ServiceClientException` with the code, a
   readable text and the parameters; `METHOD_OUTCOME_UNKNOWN`: `CkMethodCallException`) downloads nothing.
