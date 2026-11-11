@@ -85,8 +85,8 @@ internal static class BlueprintBlanking
     ///     AB#6454: logs the tenant-owned sections of a blueprint update (preview or apply result).
     ///     Nothing is logged for an empty list. These entities are not blanking, so this is information, not
     ///     a warning, and <c>--failOnBlanking</c> never looks at them. AB#8778 adds the unedited entities that
-    ///     receive the changed seed (<paramref name="refreshed" />) and the edited ones whose seed changed
-    ///     (<paramref name="updateAvailable" />, a subset of <paramref name="skipped" />).
+    ///     receive the changed seed (<paramref name="refreshed" />) and the ones whose seed changed but whose unedited
+    ///     state is not proven (<paramref name="updateAvailable" />, a subset of <paramref name="skipped" />).
     /// </summary>
     public static void ReportTenantOwned(
         ILogger logger,
@@ -125,7 +125,7 @@ internal static class BlueprintBlanking
         if (updateAvailable is { Count: > 0 })
         {
             logger.LogInformation(
-                "{Count} of them were edited by the tenant although the seed changed; the tenant's content is kept (tenant-owned, update available):",
+                "{Count} of them have a changed seed but differ from the installed seed (edited by the tenant, or not comparable); their content is kept (tenant-owned, update available):",
                 updateAvailable.Count);
             foreach (var line in FormatTenantOwnedTable(updateAvailable))
             {
