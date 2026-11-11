@@ -176,7 +176,9 @@ so `UpdateApiSecretClient` / `UpdateApiSecretApiResource` created an additional 
 **Older identity services (AB#8839).** Identity services before release 3.5.55 (e.g. the FH lab installation on OctoMesh 3.5.23)
 bind `userName` and `password` of `POST users/ResetPassword` only from the query string and answer the body form with a 400
 validation problem whose `errors` name both fields as required. `ResetPassword.IsBodyFormRefusedByOlderIdentity` recognizes
-exactly that answer (400 + `errors` with `userName` and `password`) and the command throws a `ServiceClientException` (exit -3)
+exactly that answer (400 + `errors` with `userName` and `password`, and only when both values sent are non-blank: the
+identity service has no version endpoint, and a current one reports a blank value as missing too, so blank values keep the
+original errors) and the command throws a `ServiceClientException` (exit -3)
 that names the needed version (`ResetPassword.MinimumIdentityVersion`), says the password was not changed and points to
 "Forgot password" on the sign-in page. **No fallback to the URL form** - that is the leak AB#8008 closed; those versions have no
 other endpoint that takes the password in the body. Other 400 answers (password policy, unknown user) are reported unchanged.

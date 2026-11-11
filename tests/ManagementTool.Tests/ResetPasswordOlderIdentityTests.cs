@@ -88,10 +88,34 @@ public sealed class ResetPasswordOlderIdentityTests : IDisposable
     {
         var exception = new ServiceClientResultException(body, status) { ResponseContent = body };
 
-        Assert.Equal(expected, ResetPassword.IsBodyFormRefusedByOlderIdentity(exception));
+        Assert.Equal(expected, ResetPassword.IsBodyFormRefusedByOlderIdentity(exception, "alice", "pw-1"));
     }
 
-    private async Task<(int ExitCode, List<LogEntry> Errors)> RunResetPassword()
+    [Theory]
+    [InlineData(" ", "pw-1")]
+    [InlineData("alice", "   ")]
+    [InlineData("\t", " ")]
+    public void Detection_BlankValueSent_KeepsTheOriginalValidationErrors(string userName, string password)
+    {
+        // A current identity reports blank values as missing too; that answer must not be read as the older service.
+        var exception = new ServiceClientResultException(OlderIdentityAnswer, HttpStatusCode.BadRequest)
+            { ResponseContent = OlderIdentityAnswer };
+
+        Assert.False(ResetPassword.IsBodyFormRefusedByOlderIdentity(exception, userName, password));
+    }
+
+    [Fact]
+    public async Task BlankPassword_RefusedByTheService_IsReportedUnchanged()
+    {
+        var (exitCode, errors) = await RunResetPassword("   ");
+
+        Assert.Equal(-3, exitCode);
+        var error = Assert.Single(errors);
+        Assert.Contains("field is required", error.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain("3.5.55", error.Message, StringComparison.Ordinal);
+    }
+
+    private async Task<(int ExitCode, List<LogEntry> Errors)> RunResetPassword(string? password = null)
     {
         var client = new IdentityServicesClient(
             new IdentityServiceClientOptions { EndpointUri = _baseUri, TenantId = "acme" },
@@ -99,7 +123,7 @@ public sealed class ResetPasswordOlderIdentityTests : IDisposable
         var command = new ResetPassword(new RecordingLogger<ResetPassword>(),
             Options.Create(new OctoToolOptions { TenantId = "acme" }), client, A.Fake<IAuthenticationService>(),
             A.Fake<IConfirmationService>(), FakeSecretConsole.Empty());
-        command.CommandArgumentValue.ParseLayer(["-un", "alice", "-p", _password, "-y"]);
+        command.CommandArgumentValue.ParseLayer(["-un", "alice", "-p", password ?? _password, "-y"]);
 
         var parser = A.Fake<ICommandParser>();
         A.CallTo(() => parser.ParseAndValidateAsync(A<string?>._))

@@ -91,7 +91,7 @@ internal class ResetPassword : ServiceClientOctoCommand<IIdentityServicesClient>
         {
             await ServiceClient.ResetPassword(name, password);
         }
-        catch (ServiceClientResultException e) when (IsBodyFormRefusedByOlderIdentity(e))
+        catch (ServiceClientResultException e) when (IsBodyFormRefusedByOlderIdentity(e, name, password))
         {
             throw new ServiceClientException(OlderIdentityMessage(ServiceClient.ServiceUri?.ToString()));
         }
@@ -102,11 +102,16 @@ internal class ResetPassword : ServiceClientOctoCommand<IIdentityServicesClient>
     /// <summary>
     ///     AB#8839: the answer of an identity service before <see cref="MinimumIdentityVersion" /> to the body form - a 400
     ///     validation problem whose <c>errors</c> name both <c>userName</c> and <c>password</c> (it binds both only from the
-    ///     query string). A current service never answers so for a body with both values.
+    ///     query string). The identity service has no version endpoint, so the version is established by elimination: a
+    ///     current service validates the body, and its <c>[Required]</c> checks report a field as missing only when the
+    ///     value is empty or whitespace. So the answer counts as the older service only when both values sent are
+    ///     non-blank; otherwise the original validation errors are reported unchanged.
     /// </summary>
-    internal static bool IsBodyFormRefusedByOlderIdentity(ServiceClientResultException exception)
+    internal static bool IsBodyFormRefusedByOlderIdentity(ServiceClientResultException exception, string userName,
+        string password)
     {
-        if (exception.HttpStatusCode != HttpStatusCode.BadRequest)
+        if (exception.HttpStatusCode != HttpStatusCode.BadRequest ||
+            string.IsNullOrWhiteSpace(userName) || string.IsNullOrWhiteSpace(password))
         {
             return false;
         }
