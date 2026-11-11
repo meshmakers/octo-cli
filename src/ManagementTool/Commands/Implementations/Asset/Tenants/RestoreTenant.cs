@@ -74,7 +74,8 @@ internal class RestoreTenant : JobWithWaitOctoCommand
                 "The backup is uploaded in parts of 50 MiB (change with --part-size-mib), so a backup of several GB passes the body limit of the ingress; an interrupted upload resumes from the server's offset.",
                 "When the upload is refused, the command reports the HTTP status, the part number and the offset of the failed part, and no restore job is started.",
                 "The target tenant's archive schemas must match those in the backup; mismatched archives are skipped and reported.",
-                "A restore into a database that belongs to another OctoMesh instance on the same MongoDB server is refused, and the message names the owner (AB#8672). " +
+                "A restore into a database that belongs to another OctoMesh instance on the same MongoDB server is refused with the uniform " +
+                "\"Database name '...' is not available.\"; the owner is in the server log only (AB#8672). " +
                 "Detach the tenant in the owning instance first or choose another database name; --override-foreign-ownership overwrites a database whose recorded owner no longer registers it and is logged by the service. " +
                 "A database another instance still registers, and another instance's system database, are never overwritten.",
             ]
