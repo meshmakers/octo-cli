@@ -68,6 +68,18 @@ public sealed class ScratchTenantCommandTests : IDisposable
         A.CallTo(() => identity.ProvisionCurrentUser("plain1")).MustHaveHappenedOnceExactly();
     }
 
+    [Fact]
+    public async Task Create_WithoutDatabase_LetsTheServiceDeriveTheName()
+    {
+        // AB#8797: no -db = no databaseName; the service names the database (tenant id, instance prefix).
+        var (command, asset, _) = NewCreate();
+        command.CommandArgumentValue.ParseLayer(["-tid", "MeshTest"]);
+
+        await command.Execute();
+
+        A.CallTo(() => asset.CreateTenantAsync("meshtest", null)).MustHaveHappenedOnceExactly();
+    }
+
     // ---- Delete --disable-features ----------------------------------------
 
     private sealed class DeleteFixture
