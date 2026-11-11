@@ -16,6 +16,7 @@ internal class RestoreTenant : JobWithWaitOctoCommand
     private readonly IArgument _oldDatabaseNameArg;
     private readonly IArgument _restoreArchiveDataArg;
     private readonly IArgument _partSizeArg;
+    private readonly IArgument _overrideForeignOwnershipArg;
     private readonly IOptions<BotServiceClientOptions> _botOptions;
 
     public RestoreTenant(ILogger<RestoreTenant> logger, IOptions<OctoToolOptions> options,
@@ -37,6 +38,9 @@ internal class RestoreTenant : JobWithWaitOctoCommand
         _partSizeArg = CommandArgumentValue.AddArgument("ps", "part-size-mib",
             ["Size of one upload request in MiB (default 50, from 1 to 90). Keep it below the body limit of the ingress (100 MiB on staging-1, prod-1 and prod-2)."],
             false, 1);
+        _overrideForeignOwnershipArg = CommandArgumentValue.AddArgument("ofo", "override-foreign-ownership",
+            ["Deliberately overwrite a tenant database that belongs to another OctoMesh instance on the same MongoDB server (refused without this flag). The service logs the override. Never overwrites another instance's system database."],
+            false, 0);
         _botOptions = botOptions;
     }
 
@@ -70,6 +74,9 @@ internal class RestoreTenant : JobWithWaitOctoCommand
                 "The backup is uploaded in parts of 50 MiB (change with --part-size-mib), so a backup of several GB passes the body limit of the ingress; an interrupted upload resumes from the server's offset.",
                 "When the upload is refused, the command reports the HTTP status, the part number and the offset of the failed part, and no restore job is started.",
                 "The target tenant's archive schemas must match those in the backup; mismatched archives are skipped and reported.",
+                "A restore into a database that belongs to another OctoMesh instance on the same MongoDB server is refused, and the message names the owner (AB#8672). " +
+                "Detach the tenant in the owning instance first or choose another database name; --override-foreign-ownership overwrites it deliberately and is logged by the service. " +
+                "Another instance's system database is never overwritten.",
             ]
         );
 
@@ -85,6 +92,7 @@ internal class RestoreTenant : JobWithWaitOctoCommand
         }
 
         var restoreArchiveData = CommandArgumentValue.IsArgumentUsed(_restoreArchiveDataArg);
+        var overrideForeignOwnership = CommandArgumentValue.IsArgumentUsed(_overrideForeignOwnershipArg);
 
         if (CommandArgumentValue.IsArgumentUsed(_partSizeArg))
         {
@@ -95,6 +103,12 @@ internal class RestoreTenant : JobWithWaitOctoCommand
         Logger.LogInformation(
             "Restoring tenant \'{TenantId}\' (database \'{DatabaseName}\') at \'{ServiceClientServiceUri}\'. Old database name: \'{oldDatabaseName}\', restore archive data: {RestoreArchiveData}", tenantId,
             databaseName, ServiceClient.ServiceUri, oldDatabaseName ?? databaseName, restoreArchiveData);
+        if (overrideForeignOwnership)
+        {
+            Logger.LogWarning(
+                "--override-foreign-ownership is set: the restore overwrites database '{DatabaseName}' even when it belongs to another OctoMesh instance",
+                databaseName);
+        }
 
         if (string.IsNullOrEmpty(tenantId))
         {
@@ -109,7 +123,8 @@ internal class RestoreTenant : JobWithWaitOctoCommand
         var progress = new UploadProgressLogger(Logger, new FileInfo(filePath).Length);
         var response = await ServiceClient.RestoreRepositoryWithTusAsync(tenantId, databaseName, filePath, oldDatabaseName,
             restoreArchiveData: restoreArchiveData,
-            progressCallback: progress.Report);
+            progressCallback: progress.Report,
+            overrideForeignOwnership: overrideForeignOwnership);
         Logger.LogInformation("Upload complete. Restore job with id \'{Id}\' has been started", response.JobId);
         await WaitForJob(response.JobId);
 
