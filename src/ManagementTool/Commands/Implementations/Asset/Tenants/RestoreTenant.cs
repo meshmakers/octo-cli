@@ -39,7 +39,7 @@ internal class RestoreTenant : JobWithWaitOctoCommand
             ["Size of one upload request in MiB (default 50, from 1 to 90). Keep it below the body limit of the ingress (100 MiB on staging-1, prod-1 and prod-2)."],
             false, 1);
         _overrideForeignOwnershipArg = CommandArgumentValue.AddArgument("ofo", "override-foreign-ownership",
-            ["Deliberately overwrite a tenant database that belongs to another OctoMesh instance on the same MongoDB server (refused without this flag). The service logs the override. Never overwrites another instance's system database."],
+            ["Deliberately overwrite a tenant database that records another OctoMesh instance on the same MongoDB server as its owner while no instance registers it any more (refused without this flag). The service logs the override. A database another instance still registers, and another instance's system database, are refused even with this flag."],
             false, 0);
         _botOptions = botOptions;
     }
@@ -75,8 +75,8 @@ internal class RestoreTenant : JobWithWaitOctoCommand
                 "When the upload is refused, the command reports the HTTP status, the part number and the offset of the failed part, and no restore job is started.",
                 "The target tenant's archive schemas must match those in the backup; mismatched archives are skipped and reported.",
                 "A restore into a database that belongs to another OctoMesh instance on the same MongoDB server is refused, and the message names the owner (AB#8672). " +
-                "Detach the tenant in the owning instance first or choose another database name; --override-foreign-ownership overwrites it deliberately and is logged by the service. " +
-                "Another instance's system database is never overwritten.",
+                "Detach the tenant in the owning instance first or choose another database name; --override-foreign-ownership overwrites a database whose recorded owner no longer registers it and is logged by the service. " +
+                "A database another instance still registers, and another instance's system database, are never overwritten.",
             ]
         );
 
