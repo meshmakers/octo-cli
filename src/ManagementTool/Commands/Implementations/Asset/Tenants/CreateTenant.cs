@@ -26,8 +26,9 @@ internal class CreateTenant : ServiceClientOctoCommand<IAssetServicesClient>
 
         _tenantIdArg = CommandArgumentValue.AddArgument("tid", "tenantId", ["Id of tenant"],
             true, 1);
-        _databaseArg = CommandArgumentValue.AddArgument("db", "database", ["Name of database"], true,
-            1);
+        _databaseArg = CommandArgumentValue.AddArgument("db", "database",
+            ["Name of database (optional: without it the service names the database after the tenant id, with the " +
+             "instance's tenant-database prefix when one is configured)"], false, 1);
         _noProvisionArg = CommandArgumentValue.AddArgument("np", "no-provision",
             ["Skip admin provisioning of the current user"], false, 0);
         _scratchArg = CommandArgumentValue.AddArgument("sc", "scratch",
@@ -44,6 +45,10 @@ internal class CreateTenant : ServiceClientOctoCommand<IAssetServicesClient>
                     new CodeSampleArgument(_databaseArg, "newtenant_db"),
                 ],
                     description: "Basic usage"),
+                new CodeSample(arguments: [
+                    new CodeSampleArgument(_tenantIdArg, "newtenant"),
+                ],
+                    description: "Default database name (tenant id, prefixed with the instance's tenant-database prefix)"),
                 new CodeSample(arguments: [
                     new CodeSampleArgument(_tenantIdArg, "scratch1"),
                     new CodeSampleArgument(_databaseArg, "scratch1_db"),
@@ -64,20 +69,26 @@ internal class CreateTenant : ServiceClientOctoCommand<IAssetServicesClient>
                 "otherwise it has no mirror in the child and gets nothing. --scratch skips the provisioning of the current user (a " +
                 "service token has no user). GetTenants shows isScratch, scratchCreatorClientId and scratchAccessRevoked.",
                 "Without --scratch nothing changes: the current user becomes administrator unless --no-provision is given.",
+                "--database is optional (AB#8797): without it the service names the database after the tenant id. An instance with " +
+                "a tenant-database prefix (System:TenantDatabasePrefix) prefixes that name and refuses an explicit name without " +
+                "the prefix (HTTP 409, 'Database name ... is not available'). Services before AB#8797 require --database.",
             ]
         );
 
     public override async Task Execute()
     {
         var tenantId = CommandArgumentValue.GetArgumentScalarValue<string>(_tenantIdArg).ToLower();
-        var databaseName = CommandArgumentValue.GetArgumentScalarValue<string>(_databaseArg).ToLower();
+        // AB#8797: without --database the service derives the name (tenant id, with the instance's prefix).
+        var databaseName = CommandArgumentValue.IsArgumentUsed(_databaseArg)
+            ? CommandArgumentValue.GetArgumentScalarValue<string>(_databaseArg).ToLower()
+            : null;
         var scratch = CommandArgumentValue.IsArgumentUsed(_scratchArg);
         // A scratch tenant is created by a service token: there is no user to provision, the creator's mirror is the admin.
         var skipProvisioning = scratch || CommandArgumentValue.IsArgumentUsed(_noProvisionArg);
 
         Logger.LogInformation(
             "Creating {Kind} tenant \'{TenantId}\' (database \'{DatabaseName}\') at \'{ServiceClientServiceUri}\'",
-            scratch ? "scratch" : "a", tenantId, databaseName, ServiceClient.ServiceUri);
+            scratch ? "scratch" : "a", tenantId, databaseName ?? "<default>", ServiceClient.ServiceUri);
 
         if (scratch)
         {
@@ -90,7 +101,7 @@ internal class CreateTenant : ServiceClientOctoCommand<IAssetServicesClient>
 
         Logger.LogInformation(
             "Tenant \'{TenantId}\' (database \'{DatabaseName}\') at \'{ServiceClientServiceUri}\' created", tenantId,
-            databaseName, ServiceClient.ServiceUri);
+            databaseName ?? "<default>", ServiceClient.ServiceUri);
 
         if (!skipProvisioning)
         {

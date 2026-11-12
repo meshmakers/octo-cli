@@ -68,6 +68,18 @@ public sealed class ScratchTenantCommandTests : IDisposable
         A.CallTo(() => identity.ProvisionCurrentUser("plain1")).MustHaveHappenedOnceExactly();
     }
 
+    [Fact]
+    public async Task Create_WithoutDatabase_LetsTheServiceDeriveTheName()
+    {
+        // AB#8797: no -db = no databaseName; the service names the database (tenant id, instance prefix).
+        var (command, asset, _) = NewCreate();
+        command.CommandArgumentValue.ParseLayer(["-tid", "MeshTest"]);
+
+        await command.Execute();
+
+        A.CallTo(() => asset.CreateTenantAsync("meshtest", null)).MustHaveHappenedOnceExactly();
+    }
+
     // ---- Delete --disable-features ----------------------------------------
 
     private sealed class DeleteFixture
@@ -97,7 +109,7 @@ public sealed class ScratchTenantCommandTests : IDisposable
             A.CallTo(() => Features.Switches).Returns(new DelegateTenantFeatureSwitches(
                 () => Switch(TenantFeatureKind.AiServices), () => Switch(TenantFeatureKind.Communication),
                 () => Switch(TenantFeatureKind.Reporting), () => Switch(TenantFeatureKind.StreamData)));
-            A.CallTo(() => Asset.DeleteTenantAsync("scratch1")).Invokes(() => Calls.Add("delete"));
+            A.CallTo(() => Asset.DeleteTenantAsync("scratch1", false)).Invokes(() => Calls.Add("delete"));
             A.CallTo(() => Asset.AccessToken).Returns(A.Fake<IServiceClientAccessToken>());
 
             Command = new DeleteTenant(NullLogger<DeleteTenant>.Instance,
@@ -124,6 +136,31 @@ public sealed class ScratchTenantCommandTests : IDisposable
 
         Assert.Equal(["delete"], f.Calls);
         A.CallTo(() => f.Access.GetAccessTokenAsync(A<string>._)).MustNotHaveHappened();
+    }
+
+    [Fact]
+    public async Task Delete_WithoutOverrideFlag_DoesNotOverrideTheOwnershipGuard()
+    {
+        // AB#8807: a plain delete never overrides the cross-instance ownership guard of the service.
+        var f = new DeleteFixture(Enabled(false, false, false, false));
+        f.Command.CommandArgumentValue.ParseLayer(["-tid", "scratch1", "-y"]);
+
+        await f.Command.Execute();
+
+        A.CallTo(() => f.Asset.DeleteTenantAsync("scratch1", false)).MustHaveHappenedOnceExactly();
+        A.CallTo(() => f.Asset.DeleteTenantAsync("scratch1", true)).MustNotHaveHappened();
+    }
+
+    [Fact]
+    public async Task Delete_WithOverrideFlag_PassesTheOverride()
+    {
+        var f = new DeleteFixture(Enabled(false, false, false, false));
+        f.Command.CommandArgumentValue.ParseLayer(["-tid", "scratch1", "-y", "--override-foreign-ownership"]);
+
+        await f.Command.Execute();
+
+        A.CallTo(() => f.Asset.DeleteTenantAsync("scratch1", true)).MustHaveHappenedOnceExactly();
+        A.CallTo(() => f.Asset.DeleteTenantAsync("scratch1", false)).MustNotHaveHappened();
     }
 
     [Fact]

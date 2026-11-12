@@ -17,6 +17,7 @@ internal class DeleteTenant : ServiceClientOctoCommand<IAssetServicesClient>
     private readonly IArgument _tenantIdArg;
     private readonly IArgument _yesArg;
     private readonly IArgument _disableFeaturesArg;
+    private readonly IArgument _overrideForeignOwnershipArg;
 
     public DeleteTenant(ILogger<DeleteTenant> logger, IOptions<OctoToolOptions> options,
         IAssetServicesClient assetServicesClient, IAuthenticationService authenticationService,
@@ -36,6 +37,11 @@ internal class DeleteTenant : ServiceClientOctoCommand<IAssetServicesClient>
         _disableFeaturesArg = CommandArgumentValue.AddArgument("df", "disable-features",
             ["Switch off every capability the tenant has enabled (Stream Data, Communication, Reporting, AI Services) " +
              "with your token for that tenant, then delete it. Requires -y."], false, 0);
+        _overrideForeignOwnershipArg = CommandArgumentValue.AddArgument("ofo", "override-foreign-ownership",
+            ["Deliberately drop a tenant database that only carries the ownership marker of another OctoMesh instance " +
+             "(an orphaned marker: no other instance registers it; refused without this flag). The service logs the override. " +
+             "Never drops another instance's system database or a database another instance still registers."],
+            false, 0);
     }
 
     public override CommandDocumentation? GetDocumentation() =>
@@ -76,6 +82,13 @@ internal class DeleteTenant : ServiceClientOctoCommand<IAssetServicesClient>
                 "Answers 404 when the tenant is not a child of the current tenant.",
                 "A 409 is also answered while the tenant is still being created; that message names the lifecycle state, " +
                 "not capabilities - retry once the tenant is active or failed.",
+                "A delete whose database belongs to another OctoMesh instance on the same MongoDB server (its ownership marker " +
+                "names another instance, or another instance's system database registers it) is refused with the uniform 409 " +
+                "\"Database name '...' is not available.\"; the owner is in the server log only (AB#8807). To end a double " +
+                "registration, Detach the tenant in the instance that does not use it - detach keeps the database. " +
+                "--override-foreign-ownership drops a database with an orphaned foreign marker (no other instance registers it) " +
+                "deliberately and is logged by the service; another instance's system database and a database another instance " +
+                "still registers are never dropped.",
             ]
         );
 
@@ -84,6 +97,7 @@ internal class DeleteTenant : ServiceClientOctoCommand<IAssetServicesClient>
         var tenantId = CommandArgumentValue.GetArgumentScalarValue<string>(_tenantIdArg).ToLower();
         var disableFeatures = CommandArgumentValue.IsArgumentUsed(_disableFeaturesArg);
         var confirmed = CommandArgumentValue.IsArgumentUsed(_yesArg);
+        var overrideForeignOwnership = CommandArgumentValue.IsArgumentUsed(_overrideForeignOwnershipArg);
 
         if (disableFeatures && !confirmed)
         {
@@ -107,7 +121,14 @@ internal class DeleteTenant : ServiceClientOctoCommand<IAssetServicesClient>
         Logger.LogInformation("Deleting tenant \'{TenantId}\' on at \'{ServiceClientServiceUri}\'", tenantId,
             ServiceClient.ServiceUri);
 
-        await ServiceClient.DeleteTenantAsync(tenantId);
+        if (overrideForeignOwnership)
+        {
+            Logger.LogWarning(
+                "--override-foreign-ownership is set: the delete drops the database of tenant '{TenantId}' even when it " +
+                "belongs to another OctoMesh instance", tenantId);
+        }
+
+        await ServiceClient.DeleteTenantAsync(tenantId, overrideForeignOwnership);
 
         Logger.LogInformation("Tenant \'{TenantId}\' on at \'{ServiceClientServiceUri}\' deleted", tenantId,
             ServiceClient.ServiceUri);
