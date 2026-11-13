@@ -256,6 +256,18 @@ public sealed class UserPasswordMethodCommandTests
         Assert.Equal("nothing here", UserPasswordMethodCall.Scrub("nothing here", ""));
     }
 
+    [Fact]
+    public void CommandNotes_NameTheVersionsTheMessagesUse()
+    {
+        // The notes are written inline for the command-reference generator; they must match the constants.
+        var createNotes = string.Join(' ', Create(new RecordingLogger<CreateUser>(), "-un", "x", "-e", "x@example.com")
+            .GetDocumentation()!.Notes!);
+        var resetNotes = string.Join(' ', Reset(new RecordingLogger<ResetPassword>(), "-un", "x").GetDocumentation()!.Notes!);
+
+        Assert.Contains($"identity services {UserPasswordMethodCall.CreateUserMinimumIdentityVersion} or newer", createNotes);
+        Assert.Contains($"identity services {UserPasswordMethodCall.ResetPasswordMinimumIdentityVersion} or newer", resetNotes);
+    }
+
     // ------------------------------------------------------------------ helpers
 
     private CreateUser Create(RecordingLogger<CreateUser> logger, params string[] args)
