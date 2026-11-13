@@ -4,7 +4,6 @@ using System.Text.Json;
 using FakeItEasy;
 using Meshmakers.Octo.Frontend.ManagementTool;
 using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Identity.ApiSecrets;
-using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Identity.Users;
 using Meshmakers.Octo.Frontend.ManagementTool.Services;
 using Meshmakers.Octo.Sdk.ServiceClient.IdentityServices;
 using Microsoft.Extensions.Options;
@@ -12,15 +11,15 @@ using Microsoft.Extensions.Options;
 namespace ManagementTool.Tests;
 
 /// <summary>
-///     AB#8008 — <c>ResetPassword</c>, <c>DeleteApiSecret*</c> and <c>UpdateApiSecret*</c> send the password / the stored
+///     AB#8008 — <c>DeleteApiSecret*</c> and <c>UpdateApiSecret*</c> send the stored
 ///     secret value in the JSON body, never in the request URL (request logs, traces, proxy access logs). The real
 ///     command and the real <see cref="IdentityServicesClient" /> talk to a local HTTP listener that records every
-///     request; neither value appears in a URL or a log line.
+///     request; the value appears in no URL and no log line. <c>ResetPassword</c> moved to the CK method
+///     <c>User.ResetPassword-1</c> (AB#8418); its body/URL/output check is in <see cref="UserPasswordCanaryTests" />.
 /// </summary>
 public sealed class CredentialsInRequestBodyTests : IDisposable
 {
     // Throwaway values, generated per test run.
-    private readonly string _password = "pw-" + Guid.NewGuid().ToString("N");
     private readonly string _storedHash = Convert.ToBase64String(Guid.NewGuid().ToByteArray());
 
     private readonly HttpListener _listener;
@@ -102,25 +101,6 @@ public sealed class CredentialsInRequestBodyTests : IDisposable
     private IdentityServicesClient CreateClient() =>
         new(new IdentityServiceClientOptions { EndpointUri = _baseUri, TenantId = "acme" },
             A.Fake<IIdentityServiceClientAccessToken>());
-
-    [Fact]
-    public async Task ResetPassword_SendsThePasswordInTheBody_NotInTheUrl_AndLogsItNowhere()
-    {
-        var logger = new RecordingLogger<ResetPassword>();
-        var command = new ResetPassword(logger, _options, CreateClient(), A.Fake<IAuthenticationService>(), _confirm,
-            FakeSecretConsole.Empty());
-        command.CommandArgumentValue.ParseLayer(["-un", "alice", "-p", _password, "-y"]);
-
-        await command.Execute();
-
-        var request = Assert.Single(_requests);
-        Assert.Equal("POST", request.Method);
-        Assert.Equal("/acme/v1/users/ResetPassword", request.PathAndQuery);
-        using var body = JsonDocument.Parse(request.Body);
-        Assert.Equal("alice", body.RootElement.GetProperty("userName").GetString());
-        Assert.Equal(_password, body.RootElement.GetProperty("password").GetString());
-        Assert.DoesNotContain(logger.Entries, e => e.Message.Contains(_password));
-    }
 
     [Theory]
     [InlineData("client")]

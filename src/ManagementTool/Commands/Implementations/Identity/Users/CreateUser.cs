@@ -1,12 +1,16 @@
 using Meshmakers.Common.CommandLineParser;
-using Meshmakers.Octo.Communication.Contracts.DataTransferObjects;
 using Meshmakers.Octo.Frontend.ManagementTool.Services;
+using Meshmakers.Octo.Sdk.ServiceClient.AssetRepositoryServices.Tenants;
 using Meshmakers.Octo.Sdk.ServiceClient.IdentityServices;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
 namespace Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Identity.Users;
 
+/// <summary>
+///     Creates a user. Runs the CK method <c>System.Identity/User.CreateUser-1</c> (AB#8418, see
+///     <see cref="UserPasswordMethodCall" />; no REST fallback); command name, arguments and output are unchanged.
+/// </summary>
 internal class CreateUser : ServiceClientOctoCommand<IIdentityServicesClient>
 {
     private readonly IArgument _eMailArg;
@@ -14,15 +18,17 @@ internal class CreateUser : ServiceClientOctoCommand<IIdentityServicesClient>
     private readonly IArgument _passwordArg;
     private readonly IArgument _passwordStdinArg;
     private readonly SecretInput _secretInput;
+    private readonly UserPasswordMethodCall _passwordMethods;
 
     public CreateUser(ILogger<CreateUser> logger, IOptions<OctoToolOptions> options,
-        IIdentityServicesClient identityServicesClient, IAuthenticationService authenticationService,
-        SecretInput secretInput)
+        IIdentityServicesClient identityServicesClient, ITenantClient tenantClient,
+        IAuthenticationService authenticationService, SecretInput secretInput)
         : base(logger, Constants.IdentityServicesGroup, "CreateUser", "Create a new user account", options,
             identityServicesClient,
             authenticationService)
     {
         _secretInput = secretInput;
+        _passwordMethods = new UserPasswordMethodCall(identityServicesClient, tenantClient, authenticationService, logger);
         _eMailArg = CommandArgumentValue.AddArgument("e", "eMail", ["E-Mail of user"],
             true, 1);
         _nameArg = CommandArgumentValue.AddArgument("un", "userName", ["User name"], true,
@@ -52,6 +58,7 @@ internal class CreateUser : ServiceClientOctoCommand<IIdentityServicesClient>
             Notes:
             [
                 $"The password is optional. It is read from standard input (--password-stdin) or from the environment variable {Constants.EnvVarNewPassword}; without either the user is created without a password (there is no prompt). -p still works in this release but logs a deprecation warning, because a value on the command line ends up in the shell history and the process list.",
+                $"Runs the CK method System.Identity/User.CreateUser-1 through the asset repository (GraphQL); the password travels only in the request body. Requires identity services {UserPasswordMethodCall.CreateUserMinimumIdentityVersion} or newer with the password methods switched on (Methods:Identity:EnablePasswordMethods); against an older service the command stops with a message naming that version and does not fall back to the REST endpoint. Refusals (e.g. USER_ALREADY_EXISTS, PASSWORD_POLICY_VIOLATION with the policy description) are decided by the server and printed as code and message.",
             ]
         );
 
@@ -66,14 +73,7 @@ internal class CreateUser : ServiceClientOctoCommand<IIdentityServicesClient>
         Logger.LogInformation("Creating user \'{Name}\' at \'{ServiceClientServiceUri}\'", name,
             ServiceClient.ServiceUri);
 
-        var userDto = new RegisterUserDto
-        {
-            Email = eMail,
-            Name = name,
-            Password = password
-        };
-
-        await ServiceClient.CreateUser(userDto);
+        await _passwordMethods.CreateUserAsync(name, eMail, password);
 
         Logger.LogInformation("User \'{Name}\' added", name);
     }

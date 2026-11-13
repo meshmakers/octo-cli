@@ -4,6 +4,20 @@ All notable changes to octo-cli are listed here. Newest first.
 
 ## Unreleased
 
+### Changed
+
+- **AB#8418 — CreateUser and ResetPassword run the User password methods.** Both commands now call the CK methods
+  `System.Identity/User.CreateUser-1` / `User.ResetPassword-1` through GraphQL instead of the REST endpoints
+  `POST users` / `POST users/ResetPassword`. Names, options, the confirmation prompt and the output are unchanged; the
+  password is read from the hidden prompt, `--password-stdin` or `OCTO_CLI_NEW_PASSWORD` (`-p` keeps its deprecation
+  warning) and travels only in the request body. Refusals are decided by the server and printed as code and message with
+  exit code -3 (`USER_ALREADY_EXISTS`, `USER_NAME_RESERVED`, `PASSWORD_POLICY_VIOLATION` with the policy description,
+  `SHADOW_USER_PASSWORD_NOT_ALLOWED`, `METHOD_FORBIDDEN`, `METHOD_TARGET_NOT_FOUND`). **Needs** identity services 3.5.57
+  (CreateUser) / 3.5.52 (ResetPassword) or newer with `Methods:Identity:EnablePasswordMethods` on; against an older
+  service the command stops with a message naming that version - there is no REST fallback. This replaces the AB#8839
+  detection of identity services before 3.5.55. Tests prove with a canary password that it appears in no log line (Trace
+  included), no console output and no request URL.
+
 ### Added
 
 - **AB#8778 — Tenant-owned seed refresh in the update output.** `PreviewBlueprintUpdate` and `UpdateBlueprint` (also
