@@ -98,7 +98,7 @@ internal sealed class UserPasswordMethodCall(
         if (!result.IsSuccess)
         {
             // A declared error of the method (USER_ALREADY_EXISTS, PASSWORD_POLICY_VIOLATION, …): code, the server's
-            // message (e.g. the policy description) and parameters. Logged by the Runner with exit code -3.
+            // message, parameters and detail codes (e.g. the failed password rules). Logged by the Runner with exit code -3.
             throw new ServiceClientException(Scrub(CkMethodErrorText.Format(result.Error!), password));
         }
     }

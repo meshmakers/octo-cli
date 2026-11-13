@@ -16,7 +16,7 @@ internal static class MethodFakes
     ///     of the method gateway (extensions <c>code</c> and <c>parameters</c>).
     /// </summary>
     public static void AnswerMethodCalls(ITenantClient tenant, List<GraphQLRequest> requests, string? errorCode,
-        string? message = null, Dictionary<string, object?>? parameters = null)
+        string? message = null, Dictionary<string, object?>? parameters = null, IReadOnlyList<string>? detailCodes = null)
     {
         A.CallTo(tenant).Where(c => c.Method.Name == nameof(ITenantClient.SendMutationAsync))
             .WithNonVoidReturnType()
@@ -34,6 +34,14 @@ internal static class MethodFakes
                             ["methodId"] = "System.Identity/User.Method-1"
                         }
                     };
+                    if (detailCodes is { Count: > 0 })
+                    {
+                        extensions["details"] = detailCodes
+                            .Select(c => (object?)new Dictionary<string, object?>
+                                { ["code"] = c, ["parameters"] = new Dictionary<string, object?>() })
+                            .ToList();
+                    }
+
                     var error = new QlQueryErrorException("GraphQL error",
                     [
                         new GraphQLError

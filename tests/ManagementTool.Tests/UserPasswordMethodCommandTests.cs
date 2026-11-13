@@ -119,6 +119,29 @@ public sealed class UserPasswordMethodCommandTests
         AssertNoRestPasswordCall();
     }
 
+    [Theory]
+    [InlineData("create")]
+    [InlineData("reset")]
+    public async Task PasswordPolicyViolation_AsTheServerSendsIt_PrintsTheFailedRuleCodes(string command)
+    {
+        // The asset repository answers a declared error with the message "The CK method call failed: <code>" and the
+        // failed password rules as details (codes only) - the only description of the policy it sends (AB#8418 E2E).
+        MethodFakes.AnswerMethodCalls(_tenant, _requests, "PASSWORD_POLICY_VIOLATION", null, null,
+            ["PasswordTooShort", "PasswordRequiresUpper"]);
+
+        var (exitCode, errors) = command == "create"
+            ? await RunAsync(Create(new RecordingLogger<CreateUser>(), "-un", "bob", "-e", "bob@example.com",
+                "--password-stdin").Execute)
+            : await RunAsync(Reset(new RecordingLogger<ResetPassword>(), "-un", "alice", "--password-stdin", "-y")
+                .Execute);
+
+        Assert.Equal(-3, exitCode);
+        Assert.Equal(
+            "PASSWORD_POLICY_VIOLATION: The CK method call failed: PASSWORD_POLICY_VIOLATION [PasswordTooShort, PasswordRequiresUpper]",
+            Assert.Single(errors).Message);
+        AssertNoRestPasswordCall();
+    }
+
     // ------------------------------------------------------------------ refusals of the platform (abuse cases)
 
     [Theory]

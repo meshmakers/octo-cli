@@ -192,8 +192,9 @@ password sources stay those of AB#8044 (hidden prompt, `--password-stdin`, `OCTO
   version (`UserPasswordMethodCall.CreateUserMinimumIdentityVersion` 3.5.57, `ResetPasswordMinimumIdentityVersion` 3.5.52 - the
   releases that added the handlers), the switch, that nothing was changed and that octo-cli does not fall back to REST.
 - **Refusals are the server's**: a declared error (`USER_NAME_RESERVED`, `USER_ALREADY_EXISTS`, `PASSWORD_POLICY_VIOLATION`,
-  `SHADOW_USER_PASSWORD_NOT_ALLOWED`) becomes `CODE: message (parameters)` (the policy description comes from the server; the CLI keeps
-  no copy of the password policy). An undeclared refusal (`METHOD_FORBIDDEN` with `reason=role-required` / `tenant-not-allowed`,
+  `SHADOW_USER_PASSWORD_NOT_ALLOWED`) becomes `CODE: message (parameters) [detail codes]` (`CkMethodErrorText`; the asset repository sends the failed password
+  rules only as detail codes, e.g. `[PasswordTooShort, PasswordRequiresUpper]` — found in the E2E run; the CLI keeps no
+  copy of the password policy). An undeclared refusal (`METHOD_FORBIDDEN` with `reason=role-required` / `tenant-not-allowed`,
   `METHOD_TARGET_NOT_FOUND`, …) is rethrown as a `ServiceClientException` with the same text the Runner prints for a
   `CkMethodCallException`. A 403 of the asset repository (token of another tenant) is the SDK's `Call to GraphQL source failed.` All exit -3.
 - **The password never reaches output**: every text `UserPasswordMethodCall` produces passes `Scrub` (the password replaced by

@@ -58,7 +58,7 @@ internal class CreateUser : ServiceClientOctoCommand<IIdentityServicesClient>
             Notes:
             [
                 $"The password is optional. It is read from standard input (--password-stdin) or from the environment variable {Constants.EnvVarNewPassword}; without either the user is created without a password (there is no prompt). -p still works in this release but logs a deprecation warning, because a value on the command line ends up in the shell history and the process list.",
-                "Runs the CK method System.Identity/User.CreateUser-1 through the asset repository (GraphQL); the password travels only in the request body. Requires identity services 3.5.57 or newer with the password methods switched on (Methods:Identity:EnablePasswordMethods); against an older service the command stops with a message naming that version and does not fall back to the REST endpoint. Refusals (e.g. USER_ALREADY_EXISTS, PASSWORD_POLICY_VIOLATION with the policy description) are decided by the server and printed as code and message.",
+                "Runs the CK method System.Identity/User.CreateUser-1 through the asset repository (GraphQL); the password travels only in the request body. Requires identity services 3.5.57 or newer with the password methods switched on (Methods:Identity:EnablePasswordMethods); against an older service the command stops with a message naming that version and does not fall back to the REST endpoint. Refusals (e.g. USER_ALREADY_EXISTS, PASSWORD_POLICY_VIOLATION with the codes of the failed rules) are decided by the server and printed as code and message.",
             ]
         );
 
