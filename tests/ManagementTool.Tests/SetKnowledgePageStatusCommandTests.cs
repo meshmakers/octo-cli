@@ -51,6 +51,12 @@ public sealed class SetKnowledgePageStatusCommandTests
 
     private System.Text.Json.Nodes.JsonObject? _page;
 
+    // AB#8968: the versions the tenant has (well-known name, versionNumber) and whether its model has BaseVersion.
+    private readonly List<(string Name, int? Number)> _versions = [];
+    private bool _modelHasBaseVersion = true;
+
+    private (string Query, string? Variables) Write => _sent.Single(s => s.Query.StartsWith("mutation", StringComparison.Ordinal));
+
     /// <summary>
     ///     A stateful fake of the tenant: queries return the current page, the mutation applies the page update (like the
     ///     asset repository), and <paramref name="concurrentWrite" /> simulates a knowledge-tool write that lands with it.
@@ -63,6 +69,11 @@ public sealed class SetKnowledgePageStatusCommandTests
             .ReturnsLazily((string _, string query, string? variables, string? _, CancellationToken _) =>
             {
                 _sent.Add((query, variables));
+                if (query.StartsWith("query knowledgePageVersions", StringComparison.Ordinal))
+                {
+                    return new GraphQlRawResponse(HistoryResponse(), HttpStatusCode.OK);
+                }
+
                 if (query.StartsWith("query", StringComparison.Ordinal))
                 {
                     return new GraphQlRawResponse(
@@ -83,8 +94,46 @@ public sealed class SetKnowledgePageStatusCommandTests
                     _page["summary"] = "changed by an agent";
                 }
 
+                var version = System.Text.Json.Nodes.JsonNode.Parse(variables!)!["version"]![0]!;
+                _versions.Add((version["rtWellKnownName"]!.GetValue<string>(), version["versionNumber"]!.GetValue<int>()));
                 return new GraphQlRawResponse("""{"data":{"page":{},"version":{}}}""", HttpStatusCode.OK);
             });
+    }
+
+    /// <summary>
+    ///     The answer of the history query: the stored versions, highest number first (the server sorts and filters by the
+    ///     name pattern), plus the input fields of the version input type.
+    /// </summary>
+    private string HistoryResponse()
+    {
+        var items = new System.Text.Json.Nodes.JsonArray(_versions.OrderByDescending(v => v.Number ?? 0)
+            .Select(v => (System.Text.Json.Nodes.JsonNode?)new System.Text.Json.Nodes.JsonObject
+            {
+                ["rtWellKnownName"] = v.Name,
+                ["versionNumber"] = v.Number
+            }).ToArray());
+        var fields = new System.Text.Json.Nodes.JsonArray(
+            new[] { "versionNumber", "restoredFromVersion" }.Concat(_modelHasBaseVersion ? ["baseVersion"] : [])
+            .Select(n => (System.Text.Json.Nodes.JsonNode?)new System.Text.Json.Nodes.JsonObject { ["name"] = n })
+            .ToArray());
+        return new System.Text.Json.Nodes.JsonObject
+        {
+            ["data"] = new System.Text.Json.Nodes.JsonObject
+            {
+                ["runtime"] = new System.Text.Json.Nodes.JsonObject
+                {
+                    ["systemAiKnowledgePageVersion"] = new System.Text.Json.Nodes.JsonObject { ["items"] = items }
+                },
+                ["versionInput"] = new System.Text.Json.Nodes.JsonObject { ["inputFields"] = fields }
+            }
+        }.ToJsonString();
+    }
+
+    /// <summary>The versions of the golden page up to its current version 3, as the knowledge tools wrote them.</summary>
+    private void GivenHistory(params (string Name, int? Number)[] versions)
+    {
+        _versions.Clear();
+        _versions.AddRange(versions);
     }
 
     private SetKnowledgePageStatusCommand Create(string? accessToken) =>
@@ -126,8 +175,8 @@ public sealed class SetKnowledgePageStatusCommandTests
 
         await Run(UserToken, "-s", "golden-page", "-st", "Verified", "-n", "checked against the runbook");
 
-        Assert.Equal(3, _sent.Count); // read, write, verifying re-read
-        var (mutation, variablesJson) = _sent[1];
+        Assert.Equal(4, _sent.Count); // read, version history, write, verifying re-read
+        var (mutation, variablesJson) = Write;
         Assert.Contains("systemAiKnowledgePages", mutation);
         Assert.Contains("systemAiKnowledgePageVersions", mutation);
 
@@ -168,8 +217,8 @@ public sealed class SetKnowledgePageStatusCommandTests
         await Run(UserToken, "-tid", "AI-Sandbox", "-s", "golden-page", "-st", argument);
 
         A.CallTo(() => _client.SendGraphQlAsync(Tenant, A<string>._, A<string?>._, A<string?>._, A<CancellationToken>._))
-            .MustHaveHappened(3, Times.Exactly);
-        using var variables = JsonDocument.Parse(_sent[1].Variables!);
+            .MustHaveHappened(4, Times.Exactly);
+        using var variables = JsonDocument.Parse(Write.Variables!);
         var version = variables.RootElement.GetProperty("version")[0];
         Assert.Equal(expected, version.GetProperty("verificationStatus").GetString());
         Assert.StartsWith("status ", version.GetProperty("changeNote").GetString());
@@ -249,7 +298,7 @@ public sealed class SetKnowledgePageStatusCommandTests
 
         await Run(rootToken, "-s", "golden-page", "-st", "Rejected");
 
-        using var variables = JsonDocument.Parse(_sent[1].Variables!);
+        using var variables = JsonDocument.Parse(Write.Variables!);
         Assert.Equal("user:686a6215fd3e5972ff5693fd",
             variables.RootElement.GetProperty("version")[0].GetProperty("author").GetString());
     }
@@ -276,13 +325,150 @@ public sealed class SetKnowledgePageStatusCommandTests
 
         await Run(UserToken, "-s", "golden-page", "-st", "Verified", "-n", "checked against the runbook");
 
-        Assert.Equal(3, _sent.Count);
+        Assert.Equal(4, _sent.Count);
+        Assert.Contains("baseVersion", Write.Variables);
+        foreach (var (document, variables) in _sent)
+        {
+            var errors = await AssetRepositoryGraphQlSchema.ValidateAgainstSystemAi411Async(document, variables);
+            Assert.True(errors.Count == 0,
+                $"The asset repository refuses this request:\n{string.Join("\n", errors)}\n{document}\n{variables}");
+        }
+    }
+
+    /// <summary>
+    ///     AB#8968: on a tenant before System.Ai 4.11.0 (the snapshot itself: no <c>baseVersion</c>) every request is valid
+    ///     too, because the command writes no BaseVersion there; and the snapshot does refuse a BaseVersion.
+    /// </summary>
+    [Fact]
+    public async Task EverySentRequest_IsValidOnATenantWithoutBaseVersion()
+    {
+        _modelHasBaseVersion = false;
+        GivenPage();
+
+        await Run(UserToken, "-s", "golden-page", "-st", "Verified");
+
+        Assert.Equal(4, _sent.Count);
+        Assert.DoesNotContain("baseVersion", Write.Variables);
         foreach (var (document, variables) in _sent)
         {
             var errors = await AssetRepositoryGraphQlSchema.ValidateAsync(document, variables);
             Assert.True(errors.Count == 0,
                 $"The asset repository refuses this request:\n{string.Join("\n", errors)}\n{document}\n{variables}");
         }
+
+        var withBase = System.Text.Json.Nodes.JsonNode.Parse(Write.Variables!)!;
+        withBase["version"]![0]!["baseVersion"] = 3;
+        Assert.NotEmpty(await AssetRepositoryGraphQlSchema.ValidateAsync(Write.Query, withBase.ToJsonString()));
+    }
+
+    [Fact]
+    public async Task UnadoptedBlueprintVersionAboveTheCurrentOne_IsNeverReused()
+    {
+        // The golden page is at @3; a blueprint update seeded @4 and @5 that are not adopted yet. CurrentVersion+1 would
+        // write a second "golden-page@4".
+        GivenPage();
+        GivenHistory(("golden-page@1", 1), ("golden-page@2", 2), ("golden-page@3", 3), ("golden-page@4", 4),
+            ("golden-page@5", 5));
+
+        await Run(UserToken, "-s", "golden-page", "-st", "Verified");
+
+        using var variables = JsonDocument.Parse(Write.Variables!);
+        var item = variables.RootElement.GetProperty("page")[0].GetProperty("item");
+        var version = variables.RootElement.GetProperty("version")[0];
+        Assert.Equal(6, item.GetProperty("currentVersion").GetInt32());
+        Assert.Equal("golden-page@6", version.GetProperty("rtWellKnownName").GetString());
+        Assert.Equal(6, version.GetProperty("versionNumber").GetInt32());
+        Assert.Equal(_versions.Count, _versions.Select(v => v.Name).Distinct().Count());
+    }
+
+    [Fact]
+    public async Task NewVersion_RecordsTheReplacedVersionAsBaseVersion()
+    {
+        // The chain of AB#8780: the verify is written on @3, so the Blueprint versions up to @3 count as seen and the
+        // platform-update rule reports none of them; a seeded @4 the person did not see stays pending.
+        GivenPage();
+        GivenHistory(("golden-page@1", 1), ("golden-page@2", 2), ("golden-page@3", 3), ("golden-page@4", 4));
+
+        await Run(UserToken, "-s", "golden-page", "-st", "Verified");
+
+        using var variables = JsonDocument.Parse(Write.Variables!);
+        var version = variables.RootElement.GetProperty("version")[0];
+        Assert.Equal(5, version.GetProperty("versionNumber").GetInt32());
+        Assert.Equal(3, version.GetProperty("baseVersion").GetInt32());
+        Assert.False(version.TryGetProperty("restoredFromVersion", out _), "a status change restores nothing");
+    }
+
+    [Fact]
+    public async Task ConsecutiveStatusChanges_KeepTheChainLinked()
+    {
+        // InReview, then Verified: each version names the one before it, so the chain reaches back to @3.
+        GivenPage();
+        GivenHistory(("golden-page@1", 1), ("golden-page@2", 2), ("golden-page@3", 3));
+
+        await Run(UserToken, "-s", "golden-page", "-st", "InReview");
+        await Run(UserToken, "-s", "golden-page", "-st", "Verified");
+
+        var writes = _sent.Where(s => s.Query.StartsWith("mutation", StringComparison.Ordinal))
+            .Select(s => JsonDocument.Parse(s.Variables!).RootElement.GetProperty("version")[0]).ToList();
+        Assert.Equal([4, 5], writes.Select(v => v.GetProperty("versionNumber").GetInt32()));
+        Assert.Equal([3, 4], writes.Select(v => v.GetProperty("baseVersion").GetInt32()));
+    }
+
+    [Fact]
+    public async Task TenantWithoutBaseVersion_StillTakesTheNextFreeNumber()
+    {
+        _modelHasBaseVersion = false;
+        GivenPage();
+        GivenHistory(("golden-page@3", 3), ("golden-page@7", 7));
+
+        await Run(UserToken, "-s", "golden-page", "-st", "Rejected");
+
+        using var variables = JsonDocument.Parse(Write.Variables!);
+        var version = variables.RootElement.GetProperty("version")[0];
+        Assert.Equal(8, version.GetProperty("versionNumber").GetInt32());
+        Assert.False(version.TryGetProperty("baseVersion", out _));
+    }
+
+    [Fact]
+    public void HighestVersion_CountsOnlyThisPage_AndFallsBackToTheName()
+    {
+        using var doc = JsonDocument.Parse("""
+            {"runtime":{"systemAiKnowledgePageVersion":{"items":[
+              {"rtWellKnownName":"golden-page@2","versionNumber":2},
+              {"rtWellKnownName":"golden-page@9","versionNumber":null},
+              {"rtWellKnownName":"golden-pagex@20","versionNumber":20},
+              {"rtWellKnownName":"golden-page@x","versionNumber":30}]}}}
+            """);
+
+        Assert.Equal(9, SetKnowledgePageStatusCommand.HighestVersion(doc.RootElement, "golden-page"));
+        Assert.Equal(0, SetKnowledgePageStatusCommand.HighestVersion(JsonDocument.Parse("{}").RootElement, "golden-page"));
+    }
+
+    [Fact]
+    public void VersionNamePattern_EscapesTheSlug()
+    {
+        var pattern = SetKnowledgePageStatusCommand.VersionNamePattern("a.b+c");
+
+        Assert.Equal(@"^a\.b\+c@[0-9]+$", pattern);
+        Assert.Matches(pattern, "a.b+c@12");
+        Assert.DoesNotMatch(pattern, "aXb+c@12");
+        Assert.DoesNotMatch(pattern, "a.b+c@12-draft");
+    }
+
+    [Fact]
+    public async Task HistoryReadError_IsReportedAndNothingIsWritten()
+    {
+        GivenPage();
+        A.CallTo(() => _client.SendGraphQlAsync(A<string>._, A<string>.That.StartsWith("query knowledgePageVersions"),
+                A<string?>._, A<string?>._, A<CancellationToken>._))
+            .Returns(new GraphQlRawResponse("""{"errors":[{"message":"boom"}],"data":null}""", HttpStatusCode.OK));
+
+        var ex = await Assert.ThrowsAsync<ToolException>(() => Run(UserToken, "-s", "golden-page", "-st", "Verified"));
+
+        Assert.Contains("nothing was written", ex.Message);
+        Assert.Contains("boom", ex.Message);
+        A.CallTo(() => _client.SendGraphQlAsync(A<string>._, A<string>.That.StartsWith("mutation"), A<string?>._,
+            A<string?>._, A<CancellationToken>._)).MustNotHaveHappened();
     }
 
     [Fact]
@@ -304,9 +490,10 @@ public sealed class SetKnowledgePageStatusCommandTests
         // A wrong enum value in the variables (the status in PascalCase) is refused like on the server.
         GivenPage();
         await Run(UserToken, "-s", "golden-page", "-st", "Rejected");
-        var (mutation, variables) = _sent[1];
+        var (mutation, variables) = Write;
+        Assert.Empty(await AssetRepositoryGraphQlSchema.ValidateAgainstSystemAi411Async(mutation, variables));
 
-        var errors = await AssetRepositoryGraphQlSchema.ValidateAsync(mutation,
+        var errors = await AssetRepositoryGraphQlSchema.ValidateAgainstSystemAi411Async(mutation,
             variables!.Replace("\"REJECTED\"", "\"Rejected\""));
 
         Assert.Contains(errors, e => e.Contains("$page") || e.Contains("$version"));

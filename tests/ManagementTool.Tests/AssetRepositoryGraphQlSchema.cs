@@ -42,6 +42,14 @@ internal static class AssetRepositoryGraphQlSchema
 
     private static readonly Lazy<ISchema> LazySchema = new(() => Build(SnapshotFile));
 
+    /// <summary>
+    ///     AB#8968: the ai-sandbox snapshot predates System.Ai 4.11.0, whose <c>KnowledgePageVersion</c> has the attribute
+    ///     <c>BaseVersion</c> (AB#8780). This overlay adds exactly that input field (<c>baseVersion: Int</c>, the GraphQL
+    ///     name of an optional CK Int attribute) to the snapshot until it is refreshed from a 4.11.0 tenant.
+    /// </summary>
+    private static readonly Lazy<ISchema> LazySystemAi411Schema = new(() => Build(SnapshotFile,
+        new Dictionary<string, string> { ["SystemAiKnowledgePageVersionInput"] = "baseVersion: Int" }));
+
     public static ISchema Schema => LazySchema.Value;
 
     /// <summary>
@@ -56,6 +64,10 @@ internal static class AssetRepositoryGraphQlSchema
     /// </summary>
     public static Task<IReadOnlyList<string>> ValidateAgainstSystemBotAsync(string document, string? variablesJson = null) =>
         ValidateAsync(LazySystemBotSchema.Value, document, variablesJson);
+
+    /// <summary>AB#8968: validates against the ai-sandbox snapshot with the System.Ai 4.11.0 overlay (<c>baseVersion</c>).</summary>
+    public static Task<IReadOnlyList<string>> ValidateAgainstSystemAi411Async(string document, string? variablesJson = null) =>
+        ValidateAsync(LazySystemAi411Schema.Value, document, variablesJson);
 
     private static async Task<IReadOnlyList<string>> ValidateAsync(ISchema schema, string document, string? variablesJson)
     {
@@ -78,7 +90,7 @@ internal static class AssetRepositoryGraphQlSchema
         return result.Errors.Select(e => e.Message).ToList();
     }
 
-    private static ISchema Build(string snapshotFile)
+    private static ISchema Build(string snapshotFile, IReadOnlyDictionary<string, string>? extraInputFields = null)
     {
         var path = Path.Combine(AppContext.BaseDirectory, "Fixtures", snapshotFile);
         using var file = File.OpenRead(path);
@@ -86,7 +98,7 @@ internal static class AssetRepositoryGraphQlSchema
         using var doc = JsonDocument.Parse(gzip);
         var schemaElement = doc.RootElement.GetProperty("data").GetProperty("__schema");
 
-        var sdl = ToSdl(schemaElement, out var customScalars);
+        var sdl = ToSdl(schemaElement, out var customScalars, extraInputFields);
         var schema = GraphQL.Types.Schema.For<ScalarRegisteringSchemaBuilder>(sdl,
             builder => builder.CustomScalars = customScalars);
         schema.Initialize();
@@ -96,7 +108,8 @@ internal static class AssetRepositoryGraphQlSchema
     private static readonly HashSet<string> SpecScalars = ["String", "Int", "Float", "Boolean", "ID"];
 
     /// <summary>Turns an introspection result into SDL (types only; descriptions and directives are not needed).</summary>
-    private static string ToSdl(JsonElement schema, out List<string> customScalars)
+    private static string ToSdl(JsonElement schema, out List<string> customScalars,
+        IReadOnlyDictionary<string, string>? extraInputFields = null)
     {
         customScalars = [];
         var sdl = new StringBuilder();
@@ -137,6 +150,11 @@ internal static class AssetRepositoryGraphQlSchema
                     foreach (var field in type.GetProperty("inputFields").EnumerateArray())
                     {
                         sdl.Append("  ").AppendLine(InputValue(field));
+                    }
+
+                    if (extraInputFields != null && extraInputFields.TryGetValue(name, out var extra))
+                    {
+                        sdl.Append("  ").AppendLine(extra);
                     }
 
                     sdl.AppendLine("}");

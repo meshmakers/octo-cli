@@ -40,6 +40,13 @@ All notable changes to octo-cli are listed here. Newest first.
 
 ### Fixed
 
+- **AB#8968 — SetKnowledgePageStatus keeps the version chain of a knowledge page.** The status version takes the next free
+  number (above the current version and every existing version, e.g. a seeded Blueprint version not adopted yet) instead
+  of `CurrentVersion + 1`, so a version name is never written twice, and records the replaced version as `BaseVersion`
+  (System.Ai 4.11.0 or newer). A verify no longer cuts the ancestor chain of the platform-update rule (AB#8780): Blueprint
+  versions the person already saw are not reported as `PlatformUpdateAvailable` again. A verified page counts as edited:
+  a newer Blueprint version is reported, never adopted automatically.
+
 - **AB#8838 — AddUserToRole / RemoveUserFromRole work against released 3.5.x servers again.** Since AB#8417 the commands
   run the CK methods `System.Identity/User.AddRole-1` / `RemoveRole-1`, which exist only from asset repository 3.5.43 and
   identity 3.5.52 on. An older server (e.g. OctoMesh 3.5.23) rejected the call with
