@@ -42,8 +42,9 @@ to reach the console and the log file unchanged.
   (the GraphQL error body) redacts as well. Commands and `Runner` keep logging `ex.Message` as before; do not add
   per-command redaction, and do not print response bodies through `Console` directly.
 - Tests: `ErrorOutputRedactionTests` (real `ResetPassword` + real `IdentityServicesClient` against a local listener that
-  answers 500 with a developer page echoing the `Authorization` header and the request body, through the real `Runner`
-  and the `nlog.config` console layout; Info and Trace level; fake values only).
+  answers 500 with a developer page echoing the `Authorization` header and the request body - since AB#8418 to the user
+  lookup that precedes the method call - through the real `Runner` and the `nlog.config` console layout; Info and Trace
+  level; fake values only).
 
 ## CK model import and the tenant upgrade guard (AB#6870)
 
@@ -160,30 +161,52 @@ for the grant commands and the **source** tenant S for the allow-list commands.
   Problems without a code (validation problems, `{"message": …}`, empty 403) keep the earlier paths.
 - Tests: `CrossTenantGrantCommandTests` (real commands + real SDK client against a local listener, through the real `Runner`).
 
-## Credentials in the request body: ResetPassword, Delete/UpdateApiSecret* (AB#8008)
+## Credentials in the request body: Delete/UpdateApiSecret* (AB#8008)
 
-`ResetPassword` and `DeleteApiSecretClient` / `DeleteApiSecretApiResource` / `UpdateApiSecretClient` / `UpdateApiSecretApiResource`
-go through the SDK `IIdentityServicesClient`, which since AB#8008 sends the new password (`POST users/ResetPassword`, body
-`{ userName, password }`) and the stored secret hash (`POST apiSecrets/{client|apiResource}/{id}/delete` and `.../lookup`, body
-`{ valueEncrypted }`) only in the JSON body - never in the URL, where request logs, traces and proxy access logs capture it. No
-command code changed; the behaviour comes with the SDK package. **Compatibility:** these commands need an identity service with
-AB#8008 (the identity service refuses the old reset URL form with 400; an older identity service answers the new forms with 400 /
-405). Ship octo-cli after the identity release. The command notes (`GetDocumentation().Notes`) say so. Tests:
-`CredentialsInRequestBodyTests` (real command + real SDK client against a local listener: method, URL without the value, body;
-no password in a log line). The test found that the SDK's `UpdateApiSecret*` sent `POST` (the create endpoint) instead of `PUT`,
-so `UpdateApiSecretClient` / `UpdateApiSecretApiResource` created an additional secret; fixed in the SDK with AB#8008.
+`DeleteApiSecretClient` / `DeleteApiSecretApiResource` / `UpdateApiSecretClient` / `UpdateApiSecretApiResource` go through the SDK
+`IIdentityServicesClient`, which since AB#8008 sends the stored secret hash (`POST apiSecrets/{client|apiResource}/{id}/delete` and
+`.../lookup`, body `{ valueEncrypted }`) only in the JSON body - never in the URL, where request logs, traces and proxy access logs
+capture it. No command code changed; the behaviour comes with the SDK package. Tests: `CredentialsInRequestBodyTests` (real
+command + real SDK client against a local listener: method, URL without the value, body). The test found that the SDK's
+`UpdateApiSecret*` sent `POST` (the create endpoint) instead of `PUT`, so `UpdateApiSecretClient` / `UpdateApiSecretApiResource`
+created an additional secret; fixed in the SDK with AB#8008.
 
-**Older identity services (AB#8839).** Identity services before release 3.5.55 (e.g. the FH lab installation on OctoMesh 3.5.23)
-bind `userName` and `password` of `POST users/ResetPassword` only from the query string and answer the body form with a 400
-validation problem whose `errors` name both fields as required. `ResetPassword.IsBodyFormRefusedByOlderIdentity` recognizes
-exactly that answer (400 + `errors` with `userName` and `password`, and only when both values sent are non-blank: the
-identity service has no version endpoint, and a current one reports a blank value as missing too, so blank values keep the
-original errors) and the command throws a `ServiceClientException` (exit -3)
-that names the needed version (`ResetPassword.MinimumIdentityVersion`), says the password was not changed and points to
-"Forgot password" on the sign-in page. **No fallback to the URL form** - that is the leak AB#8008 closed; those versions have no
-other endpoint that takes the password in the body. Other 400 answers (password policy, unknown user) are reported unchanged.
-Tests: `ResetPasswordOlderIdentityTests` (real command, SDK client and `Runner` against a listener answering like 3.5.23: exit
--3, one message without the raw problem, exactly one request, no password in the URL; detection theory).
+`ResetPassword` used the same REST body form (`POST users/ResetPassword`, AB#8008) and recognized identity services before 3.5.55
+(AB#8839); since AB#8418 it runs the CK method instead (next section), so that REST path and its older-identity detection are gone.
+
+## CreateUser and ResetPassword run the User password methods (AB#8418)
+
+`CreateUser` and `ResetPassword` (`Identity/Users/`) run the CK methods `System.Identity/User.CreateUser-1` and
+`User.ResetPassword-1` through the generated `RtUserMethodClient` (GraphQlDtos, `System.Identity-[3.2,4.0)`), via
+`UserPasswordMethodCall`. Command names, arguments, the confirmation prompt of `ResetPassword` and the log output are unchanged; the
+password sources stay those of AB#8044 (hidden prompt, `--password-stdin`, `OCTO_CLI_NEW_PASSWORD`; `-p` deprecated with a warning).
+
+- **Flow**: `CreateUser` calls `CreateUserAsync(userName, email, password)` (no target; password optional). `ResetPassword` looks the
+  user up by name (`GetUserByNameEmailOrId`, `UserDto.UserId`; an unknown user - also a user of another tenant - is
+  `User with name '<name>' not found.`, exit -3, no method call) and calls `ResetPasswordAsync(rtId, password)`. Both authenticate the
+  tenant client first (own access token). The password travels only in the GraphQL request body (`variables.input.password` /
+  `.newPassword`).
+- **No REST fallback** (decision AB#7039; the AB#8838 role fallback is deliberately not copied). When the asset repository rejects the
+  document (GraphQL validation, `CkMethodFallback.IsMethodUnavailable`) or answers `METHOD_HANDLER_NOT_AVAILABLE` (identity too old or
+  `Methods:Identity:EnablePasswordMethods=false`), the command throws a `ServiceClientException` (exit -3) that names the needed identity
+  version (`UserPasswordMethodCall.CreateUserMinimumIdentityVersion` 3.5.57, `ResetPasswordMinimumIdentityVersion` 3.5.52 - the
+  releases that added the handlers), the switch, that nothing was changed and that octo-cli does not fall back to REST.
+- **Refusals are the server's**: a declared error (`USER_NAME_RESERVED`, `USER_ALREADY_EXISTS`, `PASSWORD_POLICY_VIOLATION`,
+  `SHADOW_USER_PASSWORD_NOT_ALLOWED`) becomes `CODE: message (parameters) [detail codes]` (`CkMethodErrorText`; the asset repository sends the failed password
+  rules only as detail codes, e.g. `[PasswordTooShort, PasswordRequiresUpper]` — found in the E2E run; the CLI keeps no
+  copy of the password policy). An undeclared refusal (`METHOD_FORBIDDEN` with `reason=role-required` / `tenant-not-allowed`,
+  `METHOD_TARGET_NOT_FOUND`, …) is rethrown as a `ServiceClientException` with the same text the Runner prints for a
+  `CkMethodCallException`. A 403 of the asset repository (token of another tenant) is the SDK's `Call to GraphQL source failed.` All exit -3.
+- **The password never reaches output**: every text `UserPasswordMethodCall` produces passes `Scrub` (the password replaced by
+  `[REDACTED]`, defence in depth against a server that would echo it), and undeclared refusals are rethrown without the inner exception.
+  On top, `RedactedLogOutput` applies as for every command.
+- Tests: `UserPasswordMethodCommandTests` (fake `ITenantClient`, real `Runner`: method document and variables, no REST call, unchanged
+  log lines, one test per declared error, `METHOD_FORBIDDEN` role/tenant, `METHOD_TARGET_NOT_FOUND`, HTTP 403, unknown user, server
+  without the method → version message, echoed password redacted); `UserPasswordCanaryTests` (real commands, real SDK clients and real
+  `Runner` against a local identity + GraphQL listener, NLog at Trace with the `nlog.config` layout, stdout/stderr captured: a canary
+  password appears only in the GraphQL request body - in no log line, no console output and no URL - for success, every declared error,
+  refusals, a missing method, HTTP 403 and the deprecated `-p`); `SecretArgumentCommandTests` (the three input sources, now read from the
+  method call's variables).
 
 ## User role commands run the User role methods (AB#8417)
 
@@ -209,8 +232,7 @@ fallback below (`#pragma warning disable CS0618` at that one place). Command nam
   (Runner: error log, exit -3, as for a refused REST call). An undeclared refusal (`METHOD_FORBIDDEN` with `reason=self-grant` /
   `role-not-held` / `last-administrator`, `METHOD_TARGET_NOT_FOUND`) is the SDK's `CkMethodCallException`; `Runner` logs it with code and
   parameters (`CkMethodErrorText`), exit -3.
-- `CreateUser` and `ResetPassword` stay on REST: password methods are disabled on the method bus of staging and production until B0;
-  they switch with AB#8418 (the SDK obsoletes them then).
+- `CreateUser` and `ResetPassword` run the password methods since AB#8418 (previous section), without a REST fallback.
 - Tests: `UserRoleMethodCommandTests` (generated client over a fake `ITenantClient`: method document and rtId, no REST role call,
   unchanged log lines, declared and undeclared refusals, declined confirmation, unknown user, unknown role fails; AB#8838: the validation
   answer of a 3.5.23 server and `METHOD_HANDLER_NOT_AVAILABLE` fall back to REST, a REST refusal is thrown, a refusal never falls back).

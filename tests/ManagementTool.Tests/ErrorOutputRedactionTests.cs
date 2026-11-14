@@ -135,9 +135,10 @@ public sealed class ErrorOutputRedactionTests : IDisposable
         var (exitCode, output) = await RunResetPasswordAgainstFailingServer(NLogLevel.Info);
 
         Assert.Equal(-3, exitCode);
+        // AB#8418: ResetPassword looks the user up first (identity REST); the failing server answers that lookup.
         var request = Assert.Single(_requests);
-        Assert.Equal("POST", request.Method);
-        Assert.Equal("/acme/v1/users/ResetPassword", request.Path);
+        Assert.Equal("GET", request.Method);
+        Assert.Equal("/acme/v1/users/alice", request.Path);
 
         Assert.DoesNotContain(Token, output);
         Assert.DoesNotContain(Password, output);
@@ -234,9 +235,11 @@ public sealed class ErrorOutputRedactionTests : IDisposable
             new ServiceClientAccessToken { AccessToken = Token });
         var confirm = A.Fake<IConfirmationService>();
         A.CallTo(() => confirm.Confirm(A<string>._)).Returns(true);
+        var tenantClient = new TenantClient(new TenantClientOptions { EndpointUri = _baseUri, TenantId = "acme" },
+            A.Fake<ITenantClientAccessToken>());
         var command = new ResetPassword(loggerFactory.CreateLogger<ResetPassword>(),
-            Options.Create(new OctoToolOptions { TenantId = "acme" }), client, A.Fake<IAuthenticationService>(),
-            confirm, FakeSecretConsole.Empty());
+            Options.Create(new OctoToolOptions { TenantId = "acme" }), client, tenantClient,
+            A.Fake<IAuthenticationService>(), confirm, FakeSecretConsole.Empty());
         command.CommandArgumentValue.ParseLayer(["-un", "alice", "-p", Password, "-y"]);
 
         var parser = A.Fake<ICommandParser>();

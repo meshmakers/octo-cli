@@ -1,4 +1,6 @@
+using System.Text.Json;
 using FakeItEasy;
+using GraphQL;
 using Meshmakers.Octo.Communication.Contracts;
 using Meshmakers.Octo.Communication.Contracts.DataTransferObjects;
 using Meshmakers.Octo.Frontend.ManagementTool;
@@ -10,6 +12,7 @@ using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Identity.
 using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Identity.Users;
 using Meshmakers.Octo.Frontend.ManagementTool.Services;
 using Meshmakers.Octo.Sdk.ServiceClient.AiServices;
+using Meshmakers.Octo.Sdk.ServiceClient.AssetRepositoryServices.Tenants;
 using Meshmakers.Octo.Sdk.ServiceClient.Authentication;
 using Meshmakers.Octo.Sdk.ServiceClient.IdentityServices;
 using Microsoft.Extensions.Logging;
@@ -31,9 +34,34 @@ public sealed class SecretArgumentCommandTests
     private readonly IIdentityServicesClient _identity = A.Fake<IIdentityServicesClient>();
     private readonly IConfirmationService _confirm = A.Fake<IConfirmationService>();
 
+    // AB#8418: CreateUser and ResetPassword run the CK methods through the tenant client; the password is read from the
+    // variables of the GraphQL request the generated RtUserMethodClient sent.
+    private readonly ITenantClient _tenant = A.Fake<ITenantClient>();
+    private readonly List<GraphQLRequest> _methodRequests = [];
+
     public SecretArgumentCommandTests()
     {
         A.CallTo(() => _confirm.Confirm(A<string>._)).Returns(true);
+        A.CallTo(() => _identity.GetUserByNameEmailOrId(A<string>._)).ReturnsLazily((string name) =>
+            Task.FromResult(new UserDto { Name = name, UserId = "65f0c0ffee0000000000abcd" }));
+        A.CallTo(_tenant).Where(c => c.Method.Name == nameof(ITenantClient.SendMutationAsync))
+            .WithNonVoidReturnType()
+            .ReturnsLazily(call =>
+            {
+                _methodRequests.Add((GraphQLRequest)call.Arguments[0]!);
+                var responseType = call.Method.ReturnType.GetGenericArguments()[0];
+                var response = Activator.CreateInstance(responseType)!;
+                responseType.GetProperty("InvocationId")?.SetValue(response, "inv-1");
+                return typeof(Task).GetMethod(nameof(Task.FromResult))!.MakeGenericMethod(responseType)
+                    .Invoke(null, [response])!;
+            });
+    }
+
+    /// <summary>The value of <c>input.&lt;field&gt;</c> of the single method call (null when not sent).</summary>
+    private string? SentInput(string field)
+    {
+        var variables = JsonSerializer.SerializeToElement(Assert.Single(_methodRequests).Variables);
+        return variables.GetProperty("input").TryGetProperty(field, out var value) ? value.GetString() : null;
     }
 
     private static void AssertNoSecretIn<T>(RecordingLogger<T> logger, string secret) =>
@@ -48,18 +76,15 @@ public sealed class SecretArgumentCommandTests
     [Fact]
     public async Task ResetPassword_FromStandardInput_WithoutAnyPasswordArgument()
     {
-        string? sent = null;
-        A.CallTo(() => _identity.ResetPassword(A<string>._, A<string>._))
-            .Invokes((string _, string password) => sent = password);
         var console = new FakeSecretConsole { IsInputRedirected = true, StandardInput = _secret + "\n" };
         var logger = new RecordingLogger<ResetPassword>();
-        var command = new ResetPassword(logger, _options, _identity, A.Fake<IAuthenticationService>(), _confirm,
+        var command = new ResetPassword(logger, _options, _identity, _tenant, A.Fake<IAuthenticationService>(), _confirm,
             new SecretInput(console));
         command.CommandArgumentValue.ParseLayer(["-un", "alice", "--password-stdin", "-y"]);
 
         await command.Execute();
 
-        Assert.Equal(_secret, sent);
+        Assert.Equal(_secret, SentInput("newPassword"));
         AssertNoSecretIn(logger, _secret);
         Assert.DoesNotContain(logger.Entries, e => e.Level == LogLevel.Warning);
     }
@@ -67,51 +92,42 @@ public sealed class SecretArgumentCommandTests
     [Fact]
     public async Task ResetPassword_OnATerminal_PromptsTwice()
     {
-        string? sent = null;
-        A.CallTo(() => _identity.ResetPassword(A<string>._, A<string>._))
-            .Invokes((string _, string password) => sent = password);
         var console = new FakeSecretConsole().Answer(_secret, _secret);
-        var command = new ResetPassword(new RecordingLogger<ResetPassword>(), _options, _identity,
+        var command = new ResetPassword(new RecordingLogger<ResetPassword>(), _options, _identity, _tenant,
             A.Fake<IAuthenticationService>(), _confirm, new SecretInput(console));
         command.CommandArgumentValue.ParseLayer(["-un", "alice"]);
 
         await command.Execute();
 
-        Assert.Equal(_secret, sent);
+        Assert.Equal(_secret, SentInput("newPassword"));
         Assert.Equal(2, console.Prompts.Count);
     }
 
     [Fact]
     public async Task ResetPassword_FromTheEnvironment()
     {
-        string? sent = null;
-        A.CallTo(() => _identity.ResetPassword(A<string>._, A<string>._))
-            .Invokes((string _, string password) => sent = password);
         var console = new FakeSecretConsole { IsInputRedirected = true };
         console.Environment[Constants.EnvVarNewPassword] = _secret;
-        var command = new ResetPassword(new RecordingLogger<ResetPassword>(), _options, _identity,
+        var command = new ResetPassword(new RecordingLogger<ResetPassword>(), _options, _identity, _tenant,
             A.Fake<IAuthenticationService>(), _confirm, new SecretInput(console));
         command.CommandArgumentValue.ParseLayer(["-un", "alice", "-y"]);
 
         await command.Execute();
 
-        Assert.Equal(_secret, sent);
+        Assert.Equal(_secret, SentInput("newPassword"));
     }
 
     [Fact]
     public async Task ResetPassword_DeprecatedArgument_StillWorks_WithAWarning()
     {
-        string? sent = null;
-        A.CallTo(() => _identity.ResetPassword(A<string>._, A<string>._))
-            .Invokes((string _, string password) => sent = password);
         var logger = new RecordingLogger<ResetPassword>();
-        var command = new ResetPassword(logger, _options, _identity, A.Fake<IAuthenticationService>(), _confirm,
+        var command = new ResetPassword(logger, _options, _identity, _tenant, A.Fake<IAuthenticationService>(), _confirm,
             FakeSecretConsole.Empty());
         command.CommandArgumentValue.ParseLayer(["-un", "alice", "-p", _secret, "-y"]);
 
         await command.Execute();
 
-        Assert.Equal(_secret, sent);
+        Assert.Equal(_secret, SentInput("newPassword"));
         AssertDeprecationWarning(logger, "-p");
         AssertNoSecretIn(logger, _secret);
     }
@@ -119,14 +135,14 @@ public sealed class SecretArgumentCommandTests
     [Fact]
     public async Task ResetPassword_InAScriptWithoutAnySource_FailsBeforeAnyRequest()
     {
-        var command = new ResetPassword(new RecordingLogger<ResetPassword>(), _options, _identity,
+        var command = new ResetPassword(new RecordingLogger<ResetPassword>(), _options, _identity, _tenant,
             A.Fake<IAuthenticationService>(), _confirm, FakeSecretConsole.Empty());
         command.CommandArgumentValue.ParseLayer(["-un", "alice", "-y"]);
 
         var ex = await Assert.ThrowsAsync<ToolException>(command.Execute);
 
         Assert.Contains(Constants.EnvVarNewPassword, ex.Message);
-        A.CallTo(() => _identity.ResetPassword(A<string>._, A<string>._)).MustNotHaveHappened();
+        Assert.Empty(_methodRequests);
     }
 
     [Fact]
@@ -134,7 +150,7 @@ public sealed class SecretArgumentCommandTests
     {
         A.CallTo(() => _confirm.Confirm(A<string>._)).Returns(false);
         var console = new FakeSecretConsole().Answer(_secret, _secret);
-        var command = new ResetPassword(new RecordingLogger<ResetPassword>(), _options, _identity,
+        var command = new ResetPassword(new RecordingLogger<ResetPassword>(), _options, _identity, _tenant,
             A.Fake<IAuthenticationService>(), _confirm, new SecretInput(console));
         command.CommandArgumentValue.ParseLayer(["-un", "alice"]);
 
@@ -148,49 +164,43 @@ public sealed class SecretArgumentCommandTests
     [Fact]
     public async Task CreateUser_WithoutAnySource_CreatesTheUserWithoutPassword_AndDoesNotPrompt()
     {
-        UserDto? sent = null;
-        A.CallTo(() => _identity.CreateUser(A<UserDto>._)).Invokes((UserDto dto) => sent = dto);
         var console = new FakeSecretConsole();
-        var command = new CreateUser(new RecordingLogger<CreateUser>(), _options, _identity,
+        var command = new CreateUser(new RecordingLogger<CreateUser>(), _options, _identity, _tenant,
             A.Fake<IAuthenticationService>(), new SecretInput(console));
         command.CommandArgumentValue.ParseLayer(["-un", "bob", "-e", "bob@example.com"]);
 
         await command.Execute();
 
-        Assert.Null(Assert.IsType<RegisterUserDto>(sent).Password);
+        Assert.Null(SentInput("password"));
         Assert.Empty(console.Prompts);
     }
 
     [Fact]
     public async Task CreateUser_FromStandardInput()
     {
-        UserDto? sent = null;
-        A.CallTo(() => _identity.CreateUser(A<UserDto>._)).Invokes((UserDto dto) => sent = dto);
         var console = new FakeSecretConsole { IsInputRedirected = true, StandardInput = _secret };
         var logger = new RecordingLogger<CreateUser>();
-        var command = new CreateUser(logger, _options, _identity, A.Fake<IAuthenticationService>(),
+        var command = new CreateUser(logger, _options, _identity, _tenant, A.Fake<IAuthenticationService>(),
             new SecretInput(console));
         command.CommandArgumentValue.ParseLayer(["-un", "bob", "-e", "bob@example.com", "--password-stdin"]);
 
         await command.Execute();
 
-        Assert.Equal(_secret, Assert.IsType<RegisterUserDto>(sent).Password);
+        Assert.Equal(_secret, SentInput("password"));
         AssertNoSecretIn(logger, _secret);
     }
 
     [Fact]
     public async Task CreateUser_DeprecatedArgument_StillWorks_WithAWarning()
     {
-        UserDto? sent = null;
-        A.CallTo(() => _identity.CreateUser(A<UserDto>._)).Invokes((UserDto dto) => sent = dto);
         var logger = new RecordingLogger<CreateUser>();
-        var command = new CreateUser(logger, _options, _identity, A.Fake<IAuthenticationService>(),
+        var command = new CreateUser(logger, _options, _identity, _tenant, A.Fake<IAuthenticationService>(),
             FakeSecretConsole.Empty());
         command.CommandArgumentValue.ParseLayer(["-un", "bob", "-e", "bob@example.com", "-p", _secret]);
 
         await command.Execute();
 
-        Assert.Equal(_secret, Assert.IsType<RegisterUserDto>(sent).Password);
+        Assert.Equal(_secret, SentInput("password"));
         AssertDeprecationWarning(logger, "-p");
         AssertNoSecretIn(logger, _secret);
     }
