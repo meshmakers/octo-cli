@@ -348,9 +348,20 @@ callers are always AI clients, so octo-mcp-service `knowledge_set_status` refuse
 - **Same write as the knowledge tools**: reads the page over GraphQL (`systemAiKnowledgePage`, filter on `rtWellKnownName`),
   then one mutation request with two root fields (asset repo: one request = one transaction, root mutation fields run in
   order): page update (`verificationStatus`, `contentHash`, `currentVersion`, `compiledAt`) and a new
-  `KnowledgePageVersion` `<slug>@<n+1>` with the full content, author `user:<sub>`, `authoredAt`, `changeNote` (the note, or
+  `KnowledgePageVersion` `<slug>@<n>` (next free number, below) with the full content, author `user:<sub>`, `authoredAt`, `changeNote` (the note, or
   `status <Status>`) and the `versionOf` association. A plain GraphQL update of `verificationStatus` is not the documented
   path (it skips the version).
+- **Version number and chain (AB#8968)**: before the write a second query reads the page's versions (`MATCH_REG_EX`
+  `^<slug>@[0-9]+$`, sorted by `versionNumber` descending) and the input fields of `SystemAiKnowledgePageVersionInput`
+  (`__type`). The new version is `max(CurrentVersion, highest existing version) + 1`, so a seeded Blueprint version not
+  adopted yet is never reused (octo-mcp-service `KnowledgePages.BuildWrite` + `HighestVersionAsync`). On System.Ai 4.11.0
+  or newer it records `baseVersion` = the replaced `CurrentVersion`, so the ancestor chain of the platform-update rule
+  (AB#8780, `KnowledgePlatformUpdates.Ancestors`) stays intact; older tenants get no `baseVersion` (the field does not
+  exist there). **Rule (Odin, AB#8968):** a page a person verified counts as edited; a newer Blueprint version is reported
+  as `PlatformUpdateAvailable` (adopt = `knowledge_restore_version`, keep = `knowledge_dismiss_platform_update`) and never
+  switched automatically, while the Blueprint versions in its chain are not reported again. The schema test validates the
+  `baseVersion` write against the ai-sandbox snapshot plus a one-field overlay (`ValidateAgainstSystemAi411Async`) until
+  the snapshot is refreshed from a 4.11.0 tenant.
 - **Content hash contract**: `KnowledgePageContent.Render` is a port of octo-mcp-service `KnowledgePages.Render` (markdown
   with version 0; hash = SHA-256 lower-case hex). Both repos pin the same golden hash
   (`SetKnowledgePageStatusCommandTests.ContentHash_MatchesTheGoldenHashOfTheMcpService` here,

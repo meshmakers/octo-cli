@@ -1,6 +1,8 @@
+using System.Globalization;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using System.Text.RegularExpressions;
 using Meshmakers.Common.CommandLineParser;
 using Meshmakers.Octo.Frontend.ManagementTool.Services;
 using Meshmakers.Octo.Sdk.ServiceClient.AssetRepositoryServices.System;
@@ -16,6 +18,14 @@ namespace Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Asset
 ///     every status change of the knowledge tools it appends a <c>KnowledgePageVersion</c> with the same content, the user
 ///     as author and the note; page update and version create run in one GraphQL mutation request, which the asset
 ///     repository executes in one transaction.
+///     <para>
+///         AB#8968: the new version takes the next free number (above the current one and every existing version of the
+///         page, e.g. a seeded Blueprint version not adopted yet) and records the replaced version as <c>BaseVersion</c>
+///         (System.Ai 4.11.0), like the knowledge tools of octo-mcp-service (<c>KnowledgePages.BuildWrite</c>). The page's
+///         ancestor chain stays intact, so the platform-update rule (AB#8780) reports no Blueprint version the person
+///         already saw. A page a person verified counts as edited: a newer Blueprint version is reported as
+///         <c>PlatformUpdateAvailable</c> and adopted by a person, never switched automatically.
+///     </para>
 ///     <para>
 ///         It needs an interactive user login: a context whose token has no <c>sub</c> claim (client credentials) is
 ///         refused before anything is sent, because a status decision is a person's decision.
@@ -42,6 +52,24 @@ internal class SetKnowledgePageStatusCommand : ServiceClientOctoCommand<IAssetSe
           }
         }
         """;
+
+    /// <summary>
+    ///     The versions of a page (<c>&lt;slug&gt;@&lt;n&gt;</c>), highest number first, and whether the tenant's model has
+    ///     <c>KnowledgePageVersion.BaseVersion</c> (System.Ai 4.11.0; the input type of older tenants has no such field).
+    /// </summary>
+    internal const string HistoryQuery = """
+        query knowledgePageVersions($pattern: SimpleScalar!) {
+          runtime {
+            systemAiKnowledgePageVersion(first: 50, sortOrder: [{attributePath: "versionNumber", sortOrder: DESCENDING}], fieldFilter: [{attributePath: "rtWellKnownName", operator: MATCH_REG_EX, comparisonValue: $pattern}]) {
+              items { rtWellKnownName versionNumber }
+            }
+          }
+          versionInput: __type(name: "SystemAiKnowledgePageVersionInput") { inputFields { name } }
+        }
+        """;
+
+    /// <summary>The version attribute of System.Ai 4.11.0 naming the version a write was based on (AB#8780).</summary>
+    internal const string BaseVersionField = "baseVersion";
 
     // Two root fields: GraphQL runs root mutation fields one after the other, in the request's single transaction.
     internal const string WriteMutation = """
@@ -106,7 +134,13 @@ internal class SetKnowledgePageStatusCommand : ServiceClientOctoCommand<IAssetSe
                 "Writes the page status and a new KnowledgePageVersion (same content, author user:<sub>, the note) in one " +
                 "GraphQL mutation request (one transaction). The note is not checked by the MCP content guard: do not put " +
                 "credentials into it.",
-                "A plain GraphQL update of verificationStatus is not the documented path: it skips the version."
+                "A plain GraphQL update of verificationStatus is not the documented path: it skips the version.",
+                "The new version takes the next free number (above the current version and every existing version of the " +
+                "page, e.g. a seeded Blueprint version not adopted yet) and records the replaced version as BaseVersion " +
+                "(System.Ai 4.11.0 or newer; older tenants get no BaseVersion), like the MCP knowledge tools.",
+                "A page you verified counts as edited by a person: a newer Blueprint version is not adopted automatically " +
+                "but reported as PlatformUpdateAvailable (adopt it with knowledge_restore_version, or keep the page with " +
+                "knowledge_dismiss_platform_update). Blueprint versions you already saw are not reported again."
             ]);
 
     public override async Task Execute()
@@ -136,7 +170,9 @@ internal class SetKnowledgePageStatusCommand : ServiceClientOctoCommand<IAssetSe
 
         var page = await ReadPageAsync(tenantId, slug);
         var newStatus = KnowledgePageContent.ToConstantCase(status);
-        var versionNumber = page.CurrentVersion + 1;
+        var history = await ReadHistoryAsync(tenantId, slug);
+        var versionNumber = Math.Max(page.CurrentVersion, history.HighestVersion) + 1;
+        int? baseVersion = history.HasBaseVersion && page.CurrentVersion > 0 ? page.CurrentVersion : null;
         var hash = page.HashWithStatus(newStatus);
         var now = _timeProvider.GetUtcNow().UtcDateTime;
         var changeNote = string.IsNullOrWhiteSpace(note) ? $"status {status}" : note;
@@ -145,7 +181,8 @@ internal class SetKnowledgePageStatusCommand : ServiceClientOctoCommand<IAssetSe
             "Setting knowledge page '{Slug}' in tenant '{TenantId}' from {OldStatus} to {NewStatus} as version {Version}",
             slug, tenantId, KnowledgePageContent.ToPascalCase(page.Status), status, versionNumber);
 
-        var variables = BuildVariables(page, newStatus, hash, versionNumber, $"user:{subject}", changeNote, now);
+        var variables = BuildVariables(page, newStatus, hash, versionNumber, $"user:{subject}", changeNote, now,
+            baseVersion);
         var response = await ServiceClient.SendGraphQlAsync(tenantId, WriteMutation,
             variables.ToJsonString(), "setKnowledgePageStatus");
         if (response.HasErrors)
@@ -242,10 +279,10 @@ internal class SetKnowledgePageStatusCommand : ServiceClientOctoCommand<IAssetSe
     }
 
     internal static JsonObject BuildVariables(KnowledgePageContent page, string newStatus, string hash,
-        int versionNumber, string author, string changeNote, DateTime now)
+        int versionNumber, string author, string changeNote, DateTime now, int? baseVersion = null)
     {
-        var timestamp = now.ToString("O", System.Globalization.CultureInfo.InvariantCulture);
-        return new JsonObject
+        var timestamp = now.ToString("O", CultureInfo.InvariantCulture);
+        var variables = new JsonObject
         {
             ["page"] = new JsonArray(new JsonObject
             {
@@ -280,7 +317,73 @@ internal class SetKnowledgePageStatusCommand : ServiceClientOctoCommand<IAssetSe
                 })
             })
         };
+        if (baseVersion != null)
+        {
+            variables["version"]![0]![BaseVersionField] = baseVersion.Value;
+        }
+
+        return variables;
     }
+
+    /// <summary>
+    ///     The highest version number of the page (0 when it has none) and whether the tenant's model records
+    ///     <c>BaseVersion</c>. A version counts with the higher of its <c>versionNumber</c> and the number in its name (the
+    ///     name is what must stay unique); the server returns the 50 highest by <c>versionNumber</c>.
+    /// </summary>
+    private async Task<(int HighestVersion, bool HasBaseVersion)> ReadHistoryAsync(string tenantId, string slug)
+    {
+        var variables = new JsonObject { ["pattern"] = VersionNamePattern(slug) }.ToJsonString();
+        var response = await ServiceClient.SendGraphQlAsync(tenantId, HistoryQuery, variables, "knowledgePageVersions");
+        if (response.HasErrors)
+        {
+            throw new ToolException(
+                $"Reading the versions of knowledge page '{slug}' in tenant '{tenantId}' failed " +
+                $"(HTTP {(int)response.StatusCode}); nothing was written: {ErrorMessages(response.Content)}");
+        }
+
+        using var doc = JsonDocument.Parse(response.Content);
+        var data = doc.RootElement.GetProperty("data");
+        return (HighestVersion(data, slug), HasBaseVersion(data));
+    }
+
+    /// <summary>The regular expression of the version names of a page: <c>^&lt;slug&gt;@[0-9]+$</c>, the slug escaped.</summary>
+    internal static string VersionNamePattern(string slug) => $"^{Regex.Escape(slug)}@[0-9]+$";
+
+    internal static int HighestVersion(JsonElement data, string slug)
+    {
+        var highest = 0;
+        if (!data.TryGetProperty("runtime", out var runtime) ||
+            !runtime.TryGetProperty("systemAiKnowledgePageVersion", out var connection) ||
+            !connection.TryGetProperty("items", out var items) || items.ValueKind != JsonValueKind.Array)
+        {
+            return highest;
+        }
+
+        var prefix = slug + "@";
+        foreach (var item in items.EnumerateArray())
+        {
+            // The filter is a regular expression on the server; only exact names of this page count here.
+            if (!item.TryGetProperty("rtWellKnownName", out var nameElement) ||
+                nameElement.GetString() is not { } name || !name.StartsWith(prefix, StringComparison.Ordinal) ||
+                !int.TryParse(name[prefix.Length..], NumberStyles.None, CultureInfo.InvariantCulture, out var fromName))
+            {
+                continue;
+            }
+
+            var number = item.TryGetProperty("versionNumber", out var n) && n.ValueKind == JsonValueKind.Number
+                ? n.GetInt32()
+                : fromName;
+            highest = Math.Max(highest, Math.Max(number, fromName));
+        }
+
+        return highest;
+    }
+
+    internal static bool HasBaseVersion(JsonElement data) =>
+        data.TryGetProperty("versionInput", out var type) && type.ValueKind == JsonValueKind.Object &&
+        type.TryGetProperty("inputFields", out var fields) && fields.ValueKind == JsonValueKind.Array &&
+        fields.EnumerateArray().Any(f =>
+            f.TryGetProperty("name", out var name) && name.GetString() == BaseVersionField);
 
     private async Task<KnowledgePageContent> ReadPageAsync(string tenantId, string slug)
     {
