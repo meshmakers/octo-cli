@@ -272,8 +272,8 @@ every process monitor can read it. The commands that take a password or secret t
 `Services/SecretInput` (`ISecretConsole` = console + environment, faked in tests by `FakeSecretConsole`). Sources, first match
 wins:
 
-1. the old argument (`-p`, `-s`, `-cs`) - **deprecated, still works in this release**, logs a warning naming the alternatives,
-   never the value; it is no longer mandatory in the parser;
+1. the old argument (`-p`, `-s`, `-cs`) - **deprecated, still works in this release** (removal date to be announced, AB#8861),
+   logs a warning naming the alternatives, never the value; it is no longer mandatory in the parser;
 2. the stdin flag (`--password-stdin` / `-ps`, `--secret-stdin` / `-ss`, `--client-secret-stdin` / `-css`): standard input to its
    end, one trailing line break removed; empty input is an error; together with the old argument it is refused;
 3. the environment variable;
@@ -292,6 +292,9 @@ wins:
 | `LogInClientCredentials` | `-s` | `--secret-stdin` | `OCTO_CLI_CLIENT_SECRET` (as before) | yes, once |
 | `RedeemAiTicket` | `-at`, `-rt` | - (two values) | `OCTO_CLI_AI_ACCESS_TOKEN`, `OCTO_CLI_AI_REFRESH_TOKEN` | no (all four values absent = dev fakes, as before) |
 
+- Help-text samples and this file never show a password as an argument (AB#9010): `ResetPassword`, `CreateUser` and
+  `Setup` show the prompt or `--password-stdin`; their notes name `-p/--password` as deprecated with the removal date to be
+  announced. Check: `git grep -nE 'octo-cli.*-c +(ResetPassword|CreateUser|Setup)( |$).*( -p( |$)|--password( |=|$))'` finds nothing.
 - `ResetPassword` asks for confirmation **before** it reads the password; with `--password-stdin` standard input is a pipe, so
   `ConfirmationService` cannot ask and `-y` is needed.
 - Not changed: `Update/DeleteApiSecret*` `-s` take the stored secret **hash** as an identifier (not the secret; logged masked,
