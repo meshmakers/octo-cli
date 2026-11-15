@@ -294,7 +294,10 @@ wins:
 
 - Help-text samples and this file never show a password as an argument (AB#9010): `ResetPassword`, `CreateUser` and
   `Setup` show the prompt or `--password-stdin`; their notes name `-p/--password` as deprecated with the removal date to be
-  announced. Check: `git grep -nE 'octo-cli.*-c +(ResetPassword|CreateUser|Setup)( |$).*( -p( |$)|--password( |=|$))'` finds nothing.
+  announced; the interactive samples say they prompt only when `OCTO_CLI_NEW_PASSWORD` is not set. Checks, both find nothing:
+  `git grep -nE 'octo-cli.*-c +(ResetPassword|CreateUser|Setup)( |$).*( -p( |$)|--password( |=|$))'` (rendered commands in
+  docs and this file) and `git grep -nE 'CodeSampleArgument\(_[A-Za-z]*([Pp]assword|[Ss]ecret)Arg[,)]' -- src` (structured
+  help samples, which become commands only in the generated reference).
 - `ResetPassword` asks for confirmation **before** it reads the password; with `--password-stdin` standard input is a pipe, so
   `ConfirmationService` cannot ask and `-y` is needed.
 - Not changed: `Update/DeleteApiSecret*` `-s` take the stored secret **hash** as an identifier (not the secret; logged masked,

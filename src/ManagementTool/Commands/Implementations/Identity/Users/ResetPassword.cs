@@ -53,7 +53,7 @@ internal class ResetPassword : ServiceClientOctoCommand<IIdentityServicesClient>
                 new CodeSample(arguments: [
                     new CodeSampleArgument(_nameArg, "john.doe"),
                 ],
-                    description: "Interactive: asks for the new password twice, without echoing it"),
+                    description: "Interactive: asks for the new password twice, without echoing it (when OCTO_CLI_NEW_PASSWORD is not set)"),
                 new CodeSample(arguments: [
                     new CodeSampleArgument(_nameArg, "john.doe"),
                     new CodeSampleArgument(_passwordStdinArg),

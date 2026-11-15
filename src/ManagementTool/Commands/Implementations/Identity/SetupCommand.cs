@@ -42,7 +42,7 @@ internal class SetupCommand : Command<OctoToolOptions>
                 new CodeSample(arguments: [
                     new CodeSampleArgument(_eMailArg, "admin@example.com"),
                 ],
-                    description: "Interactive: asks for the admin password twice, without echoing it"),
+                    description: "Interactive: asks for the admin password twice, without echoing it (when OCTO_CLI_NEW_PASSWORD is not set)"),
                 new CodeSample(arguments: [
                     new CodeSampleArgument(_eMailArg, "admin@example.com"),
                     new CodeSampleArgument(_passwordStdinArg),
