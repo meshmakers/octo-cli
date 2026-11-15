@@ -6,6 +6,10 @@ All notable changes to octo-cli are listed here. Newest first.
 
 ### Changed
 
+- **AB#9010 — Help never shows a password as an argument.** `Setup` gets help samples (hidden prompt and
+  `--password-stdin`) and a note; the notes of `Setup`, `CreateUser` and `ResetPassword` name `-p/--password` as deprecated,
+  removal date to be announced (AB#8861). Help text only, no behaviour change.
+
 - **AB#8418 — CreateUser and ResetPassword run the User password methods.** Both commands now call the CK methods
   `System.Identity/User.CreateUser-1` / `User.ResetPassword-1` through GraphQL instead of the REST endpoints
   `POST users` / `POST users/ResetPassword`. Names, options, the confirmation prompt and the output are unchanged; the

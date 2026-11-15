@@ -35,6 +35,26 @@ internal class SetupCommand : Command<OctoToolOptions>
             ["Read the admin password from standard input (one value; a trailing line break is removed)"], false, 0);
     }
 
+    public override CommandDocumentation? GetDocumentation() =>
+        new(
+            Samples:
+            [
+                new CodeSample(arguments: [
+                    new CodeSampleArgument(_eMailArg, "admin@example.com"),
+                ],
+                    description: "Interactive: asks for the admin password twice, without echoing it (when OCTO_CLI_NEW_PASSWORD is not set)"),
+                new CodeSample(arguments: [
+                    new CodeSampleArgument(_eMailArg, "admin@example.com"),
+                    new CodeSampleArgument(_passwordStdinArg),
+                ],
+                    description: "Automation: pipe the password in (e.g. from a secret store)"),
+            ],
+            Notes:
+            [
+                $"The admin password is read from a hidden prompt, from standard input (--password-stdin) or from the environment variable {Constants.EnvVarNewPassword}, so it does not end up in the shell history or the process list. -p/--password is deprecated: it still works in this release but logs a deprecation warning; the date of its removal will be announced.",
+            ]
+        );
+
     public override async Task Execute()
     {
         Logger.LogInformation("Adding admin");
