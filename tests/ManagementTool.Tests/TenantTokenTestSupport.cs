@@ -61,6 +61,7 @@ internal sealed class StubContextManager(ContextEntry? entry, string? name = "ch
 
     public string ConfigurationFilePath => "<test>";
     public bool IsContextOverridden => false;
+    public string? RequestedContextName => null;
     public ContextConfiguration Load() => new();
     public ContextEntry? GetActiveContext() => entry;
     public string? GetActiveContextName() => name;

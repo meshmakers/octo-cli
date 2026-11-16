@@ -13,6 +13,14 @@ public interface IContextManager
     /// </summary>
     bool IsContextOverridden { get; }
 
+    /// <summary>
+    ///     The context name exactly as passed to <see cref="SelectContext" /> (from <c>--context</c> or
+    ///     <c>OCTO_CLI_CONTEXT</c>), or null when no context was selected for this invocation. It can differ
+    ///     from <see cref="GetEffectiveContextName" /> in case only, because names are matched
+    ///     case-insensitively.
+    /// </summary>
+    string? RequestedContextName { get; }
+
     ContextConfiguration Load();
 
     /// <summary>

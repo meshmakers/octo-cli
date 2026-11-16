@@ -244,6 +244,7 @@ public class AuthenticationServiceTests
 
         public string ConfigurationFilePath => "<test>";
         public bool IsContextOverridden => false;
+        public string? RequestedContextName => null;
         public ContextConfiguration Load() => new();
         public ContextEntry? GetActiveContext() => null;
         public string? GetActiveContextName() => _effectiveContextName;
