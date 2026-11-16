@@ -1,6 +1,7 @@
 using Meshmakers.Common.CommandLineParser;
 using Meshmakers.Common.Shared.Services;
 using Meshmakers.Octo.Frontend.ManagementTool.Services;
+using Meshmakers.Octo.Sdk.ServiceClient.AssetRepositoryServices.Blueprints;
 using Meshmakers.Octo.Sdk.ServiceClient.AssetRepositoryServices.System;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -15,6 +16,7 @@ internal class UninstallBlueprint : ServiceClientOctoCommand<IAssetServicesClien
     private readonly IArgument _blueprintNameArg;
     private readonly IArgument _cascadeArg;
     private readonly IArgument _yesArg;
+    private readonly IArgument _dryRunArg;
 
     public UninstallBlueprint(
         ILogger<UninstallBlueprint> logger,
@@ -25,6 +27,8 @@ internal class UninstallBlueprint : ServiceClientOctoCommand<IAssetServicesClien
         IAuthenticationService authenticationService)
         : base(logger, Constants.AssetRepositoryServicesGroup, "UninstallBlueprint",
             "Removes a blueprint from the active tenant; with --cascade, dependents and orphan dependencies go too. " +
+            "Erases the locked entities and the tenant-owned seed entities the tenant never edited; edited or referenced ones " +
+            "stay and are listed with the reason (tenantOwnedKept). --dry-run shows what would be erased and kept, changing nothing. " +
             "Requires the tenant role DataModelManagement (TenantOwners carry it); otherwise 403 DataModelManagementRequired.",
             options, assetServicesClient, authenticationService)
     {
@@ -40,6 +44,12 @@ internal class UninstallBlueprint : ServiceClientOctoCommand<IAssetServicesClien
 
         _yesArg = CommandArgumentValue.AddArgument("y", "yes",
             ["Skip the interactive confirmation prompt"], false, 0);
+
+        _dryRunArg = CommandArgumentValue.AddArgument("dr", "dry-run",
+            [
+                "Change nothing: list the entities the uninstall would erase and the tenant-owned seed entities it would keep,",
+                "with the reason (Edited, Referenced, NotComparable, EraseFailed). A 404 without a message means the asset repository predates AB#8966."
+            ], false, 0);
     }
 
     public override async Task Execute()
@@ -53,13 +63,25 @@ internal class UninstallBlueprint : ServiceClientOctoCommand<IAssetServicesClien
         var blueprintName = CommandArgumentValue.GetArgumentScalarValue<string>(_blueprintNameArg);
         var cascade = CommandArgumentValue.IsArgumentUsed(_cascadeArg);
         var skipConfirmation = CommandArgumentValue.IsArgumentUsed(_yesArg);
+        var dryRun = CommandArgumentValue.IsArgumentUsed(_dryRunArg);
+
+        if (dryRun)
+        {
+            // Nothing is changed, so no confirmation is asked.
+            Logger.LogInformation(
+                "Dry run: uninstalling blueprint '{BlueprintName}' from tenant '{TenantId}' (cascade={Cascade}) - nothing is changed",
+                blueprintName, Options.Value.TenantId, cascade);
+            var preview = await ServiceClient.PreviewUninstallBlueprintAsync(Options.Value.TenantId, blueprintName, cascade);
+            Report(blueprintName, preview);
+            return;
+        }
 
         var promptDetail = cascade
             ? $" together with any blueprints that depend on it and any orphaned dependencies"
             : string.Empty;
 
         if (!skipConfirmation && !_confirmationService.Confirm(
-                $"uninstall blueprint '{blueprintName}' from tenant '{Options.Value.TenantId}'{promptDetail}? Locked owned entities will be erased"))
+                $"uninstall blueprint '{blueprintName}' from tenant '{Options.Value.TenantId}'{promptDetail}? Locked owned entities and unedited tenant-owned seed entities will be erased (see --dry-run)"))
         {
             throw ToolException.OperationCancelledByUser();
         }
@@ -70,7 +92,12 @@ internal class UninstallBlueprint : ServiceClientOctoCommand<IAssetServicesClien
 
         var result = await ServiceClient.UninstallBlueprintAsync(
             Options.Value.TenantId, blueprintName, cascade);
+        Report(blueprintName, result);
+    }
 
+    private void Report(string blueprintName, BlueprintUninstallResultDto result)
+    {
+        var verb = result.DryRun ? "would be" : "were";
         if (!result.Success)
         {
             if (result.BlockingDependents.Count > 0)
@@ -81,16 +108,41 @@ internal class UninstallBlueprint : ServiceClientOctoCommand<IAssetServicesClien
             }
             else
             {
-                Logger.LogError("Uninstall failed");
+                Logger.LogError("Uninstall {Mode} failed", result.DryRun ? "dry run" : "run");
             }
 
             _consoleService.WriteLine(JsonConvert.SerializeObject(result, Formatting.Indented));
-            return;
+            // After the report, so scripts see a non-zero exit code (the result JSON is already printed).
+            throw new ToolException(result.BlockingDependents.Count > 0
+                ? $"Uninstall {(result.DryRun ? "dry run " : string.Empty)}of '{blueprintName}' blocked by {string.Join(", ", result.BlockingDependents)}"
+                : $"Uninstall {(result.DryRun ? "dry run " : string.Empty)}of '{blueprintName}' failed");
         }
 
-        Logger.LogInformation(
-            "Uninstall complete: {EntitiesDeleted} entities erased, {CascadedCount} cascaded blueprints",
-            result.EntitiesDeleted, result.CascadedDependencies.Count);
+        if (result.DryRun)
+        {
+            Logger.LogInformation(
+                "Uninstall dry run: {EntitiesDeleted} entities would be erased, {KeptCount} tenant-owned seed entities kept, {CascadedCount} cascaded blueprints",
+                result.EntitiesDeleted, result.TenantOwnedKept.Count, result.CascadedDependencies.Count);
+        }
+        else
+        {
+            Logger.LogInformation(
+                "Uninstall complete: {EntitiesDeleted} entities erased, {KeptCount} tenant-owned seed entities kept, {CascadedCount} cascaded blueprints",
+                result.EntitiesDeleted, result.TenantOwnedKept.Count, result.CascadedDependencies.Count);
+        }
+
+        foreach (var kept in result.TenantOwnedKept)
+        {
+            Logger.LogInformation("  kept ({Reason}): {CkTypeId} {Key} {RtId}{ReferencedBy}",
+                kept.Reason, kept.CkTypeId, kept.Key, kept.EntityId ?? "-",
+                kept.ReferencedBy.Count > 0 ? $" referenced by {string.Join(", ", kept.ReferencedBy)}" : string.Empty);
+        }
+
+        if (result.DeletedEntities.Count > 0)
+        {
+            Logger.LogInformation("{Count} entities {Verb} erased (deletedEntities in the JSON below)",
+                result.DeletedEntities.Count, verb);
+        }
 
         _consoleService.WriteLine(JsonConvert.SerializeObject(result, Formatting.Indented));
     }
