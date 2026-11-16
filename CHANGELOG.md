@@ -4,6 +4,16 @@ All notable changes to octo-cli are listed here. Newest first.
 
 ## Unreleased
 
+### Added
+
+- **AB#8966 — `UninstallBlueprint --dry-run` and the kept entities.** `--dry-run` (`-dr`) lists the entities an uninstall would
+  erase and the tenant-owned seed entities it would keep, with the reason (`Edited`, `Referenced` with the referencing rtIds,
+  `NotComparable`, `EraseFailed`), without changing anything and without a prompt. It calls the asset repository's
+  `POST blueprints/{name}/uninstall/preview`; an asset repository without AB#8966 answers an empty 404 and nothing happens ("not installed" is a 404
+  with a message). With the new SDK a blocked uninstall (409) prints the `--cascade` hint again instead of an exception. Both modes
+  log one line per kept entity; the JSON output carries `DryRun`, `DeletedEntities` and `TenantOwnedKept`. The confirmation
+  prompt now says that unedited tenant-owned seed entities are erased too.
+
 ### Changed
 
 - **AB#9010 — Help never shows a password as an argument.** `Setup` gets help samples (hidden prompt and

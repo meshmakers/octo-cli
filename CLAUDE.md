@@ -905,6 +905,7 @@ octo-cli -c ListBlueprintInstallations                              # list bluep
 octo-cli -c UninstallBlueprint -n MyBlueprint                       # uninstall a blueprint (locked owned entities erased)
 octo-cli -c UninstallBlueprint -n MyBlueprint -c                    # cascade: also remove dependents and orphan deps
 octo-cli -c UninstallBlueprint -n MyBlueprint -y                    # skip the confirmation prompt
+octo-cli -c UninstallBlueprint -n MyBlueprint --dry-run             # AB#8966: list what would be erased and kept (reason), change nothing
 
 # Blueprints — update (Phase 2a: operations layer; richer diff/merge in Phase 2b)
 octo-cli -c PreviewBlueprintUpdate -tv MyBlueprint-2.0.0            # preview changes a target version would apply (Merge mode)
@@ -1337,7 +1338,7 @@ deleting rows: a verb that makes an existing credential stop working belongs in 
 | `DeleteApiSecretApiResource` | `delete API secret for resource '{name}'` |
 | `DeleteApiSecretClient` | `delete API secret for client '{clientId}'` |
 | `DeleteArchive` | `delete archive '{archiveRtId}'? The CrateDB table will be dropped and historical data lost` |
-| `UninstallBlueprint` | `uninstall blueprint '{name}' from tenant '{tenantId}'[ together with any blueprints that depend on it and any orphaned dependencies]? Locked owned entities will be erased` |
+| `UninstallBlueprint` | `uninstall blueprint '{name}' from tenant '{tenantId}'[ together with any blueprints that depend on it and any orphaned dependencies]? Locked owned entities and unedited tenant-owned seed entities will be erased (see --dry-run)` (no prompt with `--dry-run`) |
 | `UnprovisionClientFromTenant` | `remove client '{clientId}' from child tenant '{childTenantId}' of {parent scope}? …` |
 | `SwitchServiceAccountsToImpersonation` (`--apply` without `-y`) | `switch the pipeline service accounts of tenant '{tenantId}' to impersonation? Stored client secrets are cleared and the old secrets are invalidated` |
 | `RotateAdapterServiceAccountSecret` | `rotate the pipeline service account secret of adapter '{adapterRtId}' in tenant '{tenantId}'? The current secret stops working immediately, and the adapter's pipelines / data flows must be redeployed afterwards` |
