@@ -112,7 +112,10 @@ internal class UninstallBlueprint : ServiceClientOctoCommand<IAssetServicesClien
             }
 
             _consoleService.WriteLine(JsonConvert.SerializeObject(result, Formatting.Indented));
-            return;
+            // After the report, so scripts see a non-zero exit code (the result JSON is already printed).
+            throw new ToolException(result.BlockingDependents.Count > 0
+                ? $"Uninstall {(result.DryRun ? "dry run " : string.Empty)}of '{blueprintName}' blocked by {string.Join(", ", result.BlockingDependents)}"
+                : $"Uninstall {(result.DryRun ? "dry run " : string.Empty)}of '{blueprintName}' failed");
         }
 
         if (result.DryRun)

@@ -94,10 +94,12 @@ public sealed class UninstallBlueprintCommandTests
         var command = NewCommand();
         command.CommandArgumentValue.ParseLayer(["-n", "System.Ai.Builder", "--dry-run"]);
 
-        await command.Execute();
+        var error = await Assert.ThrowsAsync<ToolException>(command.Execute); // non-zero exit code for scripts
 
+        Assert.Contains("Addon-1.0.0", error.Message);
         Assert.Contains(_logger.Entries, e => e.Level == LogLevel.Error && e.Message.Contains("Addon-1.0.0")
                                               && e.Message.Contains("--cascade"));
+        A.CallTo(() => _console.WriteLine(A<string>.That.Contains("BlockingDependents"))).MustHaveHappenedOnceExactly();
     }
 
     [Fact]
