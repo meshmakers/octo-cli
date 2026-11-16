@@ -377,7 +377,8 @@ internal class SetKnowledgePageStatusCommand : ServiceClientOctoCommand<IAssetSe
             // The filter is a regular expression on the server; only exact names of this page count here.
             if (!item.TryGetProperty("rtWellKnownName", out var nameElement) ||
                 nameElement.GetString() is not { } name || !name.StartsWith(prefix, StringComparison.Ordinal) ||
-                !int.TryParse(name[prefix.Length..].TrimStart('t'), NumberStyles.None, CultureInfo.InvariantCulture,
+                !int.TryParse(name[prefix.Length..] is ['t', .. var rest] ? rest : name[prefix.Length..], NumberStyles.None,
+                    CultureInfo.InvariantCulture,
                     out var fromName))
             {
                 continue;

@@ -452,7 +452,8 @@ public sealed class SetKnowledgePageStatusCommandTests
             {"runtime":{"systemAiKnowledgePageVersion":{"items":[
               {"rtWellKnownName":"golden-page@2","versionNumber":2},
               {"rtWellKnownName":"golden-page@t7","versionNumber":null},
-              {"rtWellKnownName":"golden-page@t3","versionNumber":3}]}}}
+              {"rtWellKnownName":"golden-page@t3","versionNumber":3},
+              {"rtWellKnownName":"golden-page@tt9","versionNumber":9}]}}}
             """);
 
         Assert.Equal(7, SetKnowledgePageStatusCommand.HighestVersion(doc.RootElement, "golden-page"));
