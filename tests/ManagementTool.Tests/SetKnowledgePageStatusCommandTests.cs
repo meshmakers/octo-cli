@@ -188,7 +188,7 @@ public sealed class SetKnowledgePageStatusCommandTests
         Assert.Equal(GoldenHash, page.GetProperty("item").GetProperty("contentHash").GetString());
 
         var version = variables.RootElement.GetProperty("version")[0];
-        Assert.Equal("golden-page@4", version.GetProperty("rtWellKnownName").GetString());
+        Assert.Equal("golden-page@t4", version.GetProperty("rtWellKnownName").GetString());
         Assert.Equal(4, version.GetProperty("versionNumber").GetInt32());
         Assert.Equal("VERIFIED", version.GetProperty("verificationStatus").GetString());
         Assert.Equal("user:686a6215fd3e5972ff5693fd", version.GetProperty("author").GetString());
@@ -376,7 +376,7 @@ public sealed class SetKnowledgePageStatusCommandTests
         var item = variables.RootElement.GetProperty("page")[0].GetProperty("item");
         var version = variables.RootElement.GetProperty("version")[0];
         Assert.Equal(6, item.GetProperty("currentVersion").GetInt32());
-        Assert.Equal("golden-page@6", version.GetProperty("rtWellKnownName").GetString());
+        Assert.Equal("golden-page@t6", version.GetProperty("rtWellKnownName").GetString());
         Assert.Equal(6, version.GetProperty("versionNumber").GetInt32());
         Assert.Equal(_versions.Count, _versions.Select(v => v.Name).Distinct().Count());
     }
@@ -445,12 +445,29 @@ public sealed class SetKnowledgePageStatusCommandTests
     }
 
     [Fact]
+    public void HighestVersion_CountsTenantKeys_AB9103()
+    {
+        // A tenant version keyed <slug>@t<n> continues the same sequence as the Blueprint versions <slug>@<n>.
+        using var doc = JsonDocument.Parse("""
+            {"runtime":{"systemAiKnowledgePageVersion":{"items":[
+              {"rtWellKnownName":"golden-page@2","versionNumber":2},
+              {"rtWellKnownName":"golden-page@t7","versionNumber":null},
+              {"rtWellKnownName":"golden-page@t3","versionNumber":3},
+              {"rtWellKnownName":"golden-page@tt9","versionNumber":9}]}}}
+            """);
+
+        Assert.Equal(7, SetKnowledgePageStatusCommand.HighestVersion(doc.RootElement, "golden-page"));
+        Assert.Equal("golden-page@t8", SetKnowledgePageStatusCommand.TenantVersionName("golden-page", 8));
+    }
+
+    [Fact]
     public void VersionNamePattern_EscapesTheSlug()
     {
         var pattern = SetKnowledgePageStatusCommand.VersionNamePattern("a.b+c");
 
-        Assert.Equal(@"^a\.b\+c@[0-9]+$", pattern);
+        Assert.Equal(@"^a\.b\+c@t?[0-9]+$", pattern);
         Assert.Matches(pattern, "a.b+c@12");
+        Assert.Matches(pattern, "a.b+c@t12");
         Assert.DoesNotMatch(pattern, "aXb+c@12");
         Assert.DoesNotMatch(pattern, "a.b+c@12-draft");
     }

@@ -54,7 +54,7 @@ internal class SetKnowledgePageStatusCommand : ServiceClientOctoCommand<IAssetSe
         """;
 
     /// <summary>
-    ///     The versions of a page (<c>&lt;slug&gt;@&lt;n&gt;</c>), highest number first, and whether the tenant's model has
+    ///     The versions of a page (<c>&lt;slug&gt;@&lt;n&gt;</c> and <c>&lt;slug&gt;@t&lt;n&gt;</c>), highest number first, and whether the tenant's model has
     ///     <c>KnowledgePageVersion.BaseVersion</c> (System.Ai 4.11.0; the input type of older tenants has no such field).
     /// </summary>
     internal const string HistoryQuery = """
@@ -297,7 +297,9 @@ internal class SetKnowledgePageStatusCommand : ServiceClientOctoCommand<IAssetSe
             }),
             ["version"] = new JsonArray(new JsonObject
             {
-                ["rtWellKnownName"] = $"{page.Slug}@{versionNumber}",
+                // AB#9103: a tenant-written version is keyed <slug>@t<n>; <slug>@<n> belongs to the blueprint seed, so a
+                // later blueprint version with the same number is never held back by this write.
+                ["rtWellKnownName"] = TenantVersionName(page.Slug, versionNumber),
                 ["versionNumber"] = versionNumber,
                 ["title"] = page.Title,
                 ["kind"] = page.Kind,
@@ -346,8 +348,18 @@ internal class SetKnowledgePageStatusCommand : ServiceClientOctoCommand<IAssetSe
         return (HighestVersion(data, slug), HasBaseVersion(data));
     }
 
-    /// <summary>The regular expression of the version names of a page: <c>^&lt;slug&gt;@[0-9]+$</c>, the slug escaped.</summary>
-    internal static string VersionNamePattern(string slug) => $"^{Regex.Escape(slug)}@[0-9]+$";
+    /// <summary>
+    ///     The regular expression of the version names of a page: <c>^&lt;slug&gt;@t?[0-9]+$</c>, the slug escaped -
+    ///     Blueprint versions (<c>@&lt;n&gt;</c>) and tenant versions (<c>@t&lt;n&gt;</c>, AB#9103).
+    /// </summary>
+    internal static string VersionNamePattern(string slug) => $"^{Regex.Escape(slug)}@t?[0-9]+$";
+
+    /// <summary>
+    ///     Key of a version written in the tenant (AB#9103, same rule as the knowledge tools of octo-mcp-service):
+    ///     <c>&lt;slug&gt;@t&lt;n&gt;</c>. The number continues the page's one sequence.
+    /// </summary>
+    internal static string TenantVersionName(string slug, int versionNumber) =>
+        $"{slug}@t{versionNumber.ToString(CultureInfo.InvariantCulture)}";
 
     internal static int HighestVersion(JsonElement data, string slug)
     {
@@ -365,7 +377,9 @@ internal class SetKnowledgePageStatusCommand : ServiceClientOctoCommand<IAssetSe
             // The filter is a regular expression on the server; only exact names of this page count here.
             if (!item.TryGetProperty("rtWellKnownName", out var nameElement) ||
                 nameElement.GetString() is not { } name || !name.StartsWith(prefix, StringComparison.Ordinal) ||
-                !int.TryParse(name[prefix.Length..], NumberStyles.None, CultureInfo.InvariantCulture, out var fromName))
+                !int.TryParse(name[prefix.Length..] is ['t', .. var rest] ? rest : name[prefix.Length..], NumberStyles.None,
+                    CultureInfo.InvariantCulture,
+                    out var fromName))
             {
                 continue;
             }
