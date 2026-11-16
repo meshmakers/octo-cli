@@ -26,7 +26,7 @@ internal class LogInClientCredentialsCommand : Command<OctoToolOptions>
         SecretInput secretInput,
         IContextManager contextManager)
         : base(logger, "LogInClientCredentials",
-            $"Non-interactive login using OAuth2 client_credentials. Reads the client ID from -id or {Constants.EnvVarClientId} and the secret from {Constants.EnvVarClientSecret}, standard input (--secret-stdin) or a hidden prompt. Tenant comes from the active context.",
+            $"Non-interactive login using OAuth2 client_credentials. Reads the client ID from -id or {Constants.EnvVarClientId} and the secret from {Constants.EnvVarClientSecret}, standard input (--secret-stdin) or a hidden prompt. Tenant comes from the effective context (--context, OCTO_CLI_CONTEXT or the active one).",
             options)
     {
         _secretInput = secretInput;
@@ -65,10 +65,10 @@ internal class LogInClientCredentialsCommand : Command<OctoToolOptions>
             Notes:
             [
                 $"Secret sources, first match wins: --secret-stdin, {Constants.EnvVarClientSecret}, a hidden prompt (only on a terminal). -s still works in this release but logs a deprecation warning and will be removed, because a value on the command line ends up in the shell history and the process list.",
-                "Tenant comes from the active context. Switch contexts (e.g. `octo-cli -c UseContext -n prod`) to target a different tenant. The login fails fast if the active context has no `TenantId`.",
+                "Tenant comes from the effective context. Target a different tenant with `--context <name>` (or `OCTO_CLI_CONTEXT`) for one invocation, or switch the active context with `UseContext`. The login fails fast if that context has no `TenantId`.",
                 "The client is per-tenant. If a script needs to address multiple tenants, create one `client_credentials` client per tenant and switch contexts before each login.",
                 "No refresh token is issued (per OAuth2 spec for `client_credentials`). While `OCTO_CLI_CLIENT_ID` and `OCTO_CLI_CLIENT_SECRET` remain set in the environment, octo-cli automatically re-acquires the token when it expires — long-running scripts do not need to call `LogInClientCredentials` again between commands. If the env vars are unset, the next API call after expiry returns 401 and you must re-run the login.",
-                "The token is stored in the active context's `Authentication` block, exactly like a device-code token.",
+                "The token is stored in the effective context's `Authentication` block (`--context`, `OCTO_CLI_CONTEXT` or the active context), exactly like a device-code token.",
                 "Context names are matched case-insensitively. The command refuses, names the matched context and changes nothing when the context holds an interactive login (LogIn) or when the name given with `--context` / `OCTO_CLI_CONTEXT` matched the stored context only by case; pass `--replace-login` to replace the login anyway, or add a separate context for the client.",
             ]
         );
@@ -84,7 +84,6 @@ internal class LogInClientCredentialsCommand : Command<OctoToolOptions>
 
         // Before the secret is read or a token requested: refuse to replace an interactive login or a context
         // that was matched only by case (AB#9063).
-        var contextName = _contextManager.GetEffectiveContextName();
         if (!CommandArgumentValue.IsArgumentUsed(_replaceLoginArg))
         {
             var refusal = LoginReplacementGuard.GetRefusal(_contextManager, "--replace-login");
@@ -94,6 +93,7 @@ internal class LogInClientCredentialsCommand : Command<OctoToolOptions>
             }
         }
 
+        var contextName = _contextManager.GetEffectiveContextName();
         var clientId = ResolveArg(_clientIdArg, Constants.EnvVarClientId,
             $"Client ID required. Provide via -id or {Constants.EnvVarClientId}.");
         var clientSecret = _secretInput.Resolve(CommandArgumentValue,

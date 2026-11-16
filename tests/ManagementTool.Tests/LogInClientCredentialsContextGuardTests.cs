@@ -130,6 +130,24 @@ public sealed class LogInClientCredentialsContextGuardTests : IDisposable
     }
 
     [Fact]
+    public async Task CaseOnlyMatch_FromTheEnvironmentVariable_Refuses()
+    {
+        // OCTO_CLI_CONTEXT goes through the same startup path as --context: ContextSelection (trimmed), then SelectContext.
+        var manager = StoreContext(interactiveLogin: true);
+        var selection = ContextSelection.Resolve(["octo-cli", "-c", "LogInClientCredentials"],
+            name => name == "OCTO_CLI_CONTEXT" ? " local_octosystem " : null);
+        manager.SelectContext(selection.Name!);
+        var command = NewCommand(manager, new RecordingLogger<LogInClientCredentialsCommand>());
+        command.CommandArgumentValue.ParseLayer(["-id", "ci"]);
+
+        var exception = await Assert.ThrowsAsync<ToolException>(command.Execute);
+
+        Assert.Contains("'local_octosystem' matched the existing context 'local_OctoSystem' only by case",
+            exception.Message);
+        AssertNothingChanged();
+    }
+
+    [Fact]
     public async Task CaseOnlyMatch_OverAClientCredentialsLogin_Refuses()
     {
         var manager = StoreContext(interactiveLogin: false);

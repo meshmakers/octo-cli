@@ -504,8 +504,11 @@ The CLI supports multiple authentication methods:
      `local_OctoSystem`). `--replace-login` (`-rl`) replaces the login anyway; the usual alternative is a separate context
      for the client. Re-running the login on a client-credentials context with the exact name is unchanged. The rule is
      `Services/LoginReplacementGuard`; `IContextManager.RequestedContextName` keeps the name as typed next to the stored
-     one. Reading commands keep matching names case-insensitively. Tests: `LogInClientCredentialsContextGuardTests`
-     (real `ContextManager` in a throwaway directory).
+     one. Reading commands keep matching names case-insensitively. The automatic fallback of AB#4754 (refresh token
+     rejected, client-credentials env vars set) still re-acquires a client-credentials token, because the interactive login
+     is already dead there; it now logs a WARN that names the context and the `LogIn` to restore it. Tests:
+     `LogInClientCredentialsContextGuardTests` (real `ContextManager` in a throwaway directory; `--context` and
+     `OCTO_CLI_CONTEXT` paths).
 
 ### Token Storage & Context Management
 

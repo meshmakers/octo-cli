@@ -10,7 +10,9 @@ All notable changes to octo-cli are listed here. Newest first.
   case-insensitively, so `--context local_octosystem` selected the stored context `local_OctoSystem` and its device-code login
   was overwritten by a client-credentials token. The command now refuses, names the matched context and changes nothing when the
   context holds an interactive login or the requested name matched the stored one only by case; `--replace-login` (`-rl`)
-  replaces the login explicitly. Re-running the login on a client-credentials context with its exact name works as before.
+  replaces the login explicitly. Re-running the login on a client-credentials context with its exact name works as before. When a rejected refresh
+  token is replaced through the client-credentials environment variables (AB#4754 fallback), octo-cli now warns and names the
+  context instead of logging an info line.
 
 - **AB#9103 — SetKnowledgePageStatus writes its version under the tenant key `<slug>@t<n>`.** `<slug>@<n>` belongs to the
   blueprint seed (decision Odin 2026-11-16, same rule as the knowledge tools of octo-mcp-service). Before, a status version
