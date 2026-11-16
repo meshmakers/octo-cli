@@ -4,6 +4,14 @@ All notable changes to octo-cli are listed here. Newest first.
 
 ## Unreleased
 
+### Fixed
+
+- **AB#9103 — SetKnowledgePageStatus writes its version under the tenant key `<slug>@t<n>`.** `<slug>@<n>` belongs to the
+  blueprint seed (decision Odin 2026-11-16, same rule as the knowledge tools of octo-mcp-service). Before, a status version
+  could take the key of the blueprint's next version, and UpdateBlueprint then kept the tenant entity: the platform update
+  was lost without a PlatformUpdateAvailable finding. The number continues the page's one sequence (history query
+  `^<slug>@t?[0-9]+$`); existing plain tenant keys are counted as before.
+
 ### Added
 
 - **AB#8966 — `UninstallBlueprint --dry-run` and the kept entities.** `--dry-run` (`-dr`) lists the entities an uninstall would
