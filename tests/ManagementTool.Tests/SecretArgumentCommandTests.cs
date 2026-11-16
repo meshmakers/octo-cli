@@ -366,7 +366,7 @@ public sealed class SecretArgumentCommandTests
                 A<IEnumerable<string>?>._, A<string?>._, A<string?>._))
             .Returns(new AuthenticationData());
         var command = new LogInClientCredentialsCommand(logger, _options, authenticator,
-            A.Fake<IAuthenticationService>(), new SecretInput(console));
+            A.Fake<IAuthenticationService>(), new SecretInput(console), A.Fake<IContextManager>());
         return (command, authenticator);
     }
 

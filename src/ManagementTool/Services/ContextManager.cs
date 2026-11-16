@@ -34,6 +34,11 @@ public class ContextManager : IContextManager
     // Null means "use the persisted active context". Selecting a context never writes.
     private string? _selectedContextName;
 
+    // The name exactly as the caller asked for it (--context / OCTO_CLI_CONTEXT), before the
+    // case-insensitive lookup resolved it to the stored key. Commands that replace a context's
+    // login compare both to catch a case-only match (AB#9063).
+    private string? _requestedContextName;
+
     public ContextManager()
         : this(ResolveBaseDirectory())
     {
@@ -59,6 +64,9 @@ public class ContextManager : IContextManager
 
     /// <inheritdoc />
     public bool IsContextOverridden => _selectedContextName != null;
+
+    /// <inheritdoc />
+    public string? RequestedContextName => _requestedContextName;
 
     // OCTO_CLI_HOME points at the parent of the ".octo-cli" folder, matching the
     // baseDirectory parameter above. Giving each parallel job its own value is the
@@ -131,6 +139,7 @@ public class ContextManager : IContextManager
         }
 
         _selectedContextName = storedName;
+        _requestedContextName = name;
     }
 
     private ContextEntry? GetContext(string? name)

@@ -465,7 +465,7 @@ longer in the global NuGet cache.
 
 ### Key Components
 
-- **ContextManager** (`Services/ContextManager.cs`): Manages named contexts stored in `~/.octo-cli/contexts.json`. Each context holds its own `OctoToolOptions` (service URIs, tenant) and `OctoToolAuthenticationOptions` (tokens). Supports migration from legacy `settings.json`. **Context names are matched case-insensitively** (`StringComparer.OrdinalIgnoreCase`), so `UseContext`/`RemoveContext` accept any casing; the active context is persisted using the stored key's canonical casing. Because System.Text.Json deserializes the `Contexts` dictionary with the ordinal comparer, `Load()` rebuilds it with `OrdinalIgnoreCase` after reading the file. Distinguishes the **active** context (persisted) from the **effective** one (`SelectContext` / `GetEffectiveContext`, chosen per invocation by `--context`), and serialises every write behind a cross-process lock — see [Per-invocation context override](#per-invocation-context-override---context).
+- **ContextManager** (`Services/ContextManager.cs`): Manages named contexts stored in `~/.octo-cli/contexts.json`. Each context holds its own `OctoToolOptions` (service URIs, tenant) and `OctoToolAuthenticationOptions` (tokens). Supports migration from legacy `settings.json`. **Context names are matched case-insensitively** (`StringComparer.OrdinalIgnoreCase`), so `UseContext`/`RemoveContext` accept any casing; the active context is persisted using the stored key's canonical casing. `RequestedContextName` keeps the name exactly as passed to `SelectContext`, so a command that replaces a context's login can tell a case-only match (AB#9063, `LogInClientCredentials`). Because System.Text.Json deserializes the `Contexts` dictionary with the ordinal comparer, `Load()` rebuilds it with `OrdinalIgnoreCase` after reading the file. Distinguishes the **active** context (persisted) from the **effective** one (`SelectContext` / `GetEffectiveContext`, chosen per invocation by `--context`), and serialises every write behind a cross-process lock — see [Per-invocation context override](#per-invocation-context-override---context).
 
 - **AuthenticationService** (`Services/AuthenticationService.cs`): Handles OAuth token management. Saves tokens to the *effective* context via `IContextManager` (`SaveEffectiveContext`), so `--context` sends the token to the context the command actually used. Supports both access tokens and refresh tokens.
 
@@ -497,6 +497,15 @@ The CLI supports multiple authentication methods:
    - Tenant comes from the effective context (no `-tid` arg on the login command). Switch contexts with `UseContext`, or target another tenant for one invocation with `--context <name>`.
    - No refresh token is issued. While the env vars remain set, `EnsureAuthenticated` automatically re-acquires the token when it expires; otherwise re-run `LogInClientCredentials`.
    - Token stored in the effective context's `Authentication` block, same path as device flow.
+   - **Never silently over an interactive login (AB#9063).** Before it reads the secret or requests a token, the command
+     refuses (`ToolException`, exit `-5`, nothing changed) and names the stored context when the context holds an
+     interactive login (it has a refresh token, which a client-credentials login never has) or when the name given with
+     `--context` / `OCTO_CLI_CONTEXT` matched the stored context only by case (`--context local_octosystem` selecting
+     `local_OctoSystem`). `--replace-login` (`-rl`) replaces the login anyway; the usual alternative is a separate context
+     for the client. Re-running the login on a client-credentials context with the exact name is unchanged. The rule is
+     `Services/LoginReplacementGuard`; `IContextManager.RequestedContextName` keeps the name as typed next to the stored
+     one. Reading commands keep matching names case-insensitively. Tests: `LogInClientCredentialsContextGuardTests`
+     (real `ContextManager` in a throwaway directory).
 
 ### Token Storage & Context Management
 
