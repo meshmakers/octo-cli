@@ -71,13 +71,15 @@ public class AuthenticationService : IAuthenticationService
                         clientId: fallbackClientId,
                         clientSecret: fallbackClientSecret);
                     SaveAuthenticationData(reacquired);
-                    await ApplyAsync(serviceClientAccessToken, reacquired.AccessToken);
-                    // The interactive login is gone at this point (its refresh token was rejected), but the
+                    // The interactive login is gone at this point (its refresh token was rejected), and the
                     // context now holds a client-credentials session instead: say so loudly, naming the
                     // context, so nobody keeps working under the client's identity unnoticed (AB#9063).
+                    // Logged right after the save, before the token is applied: ApplyAsync can still fail
+                    // (tenant exchange), and the replacement is persisted either way.
                     Logger.Warn(
                         "Refresh token of context '{0}' was rejected; its interactive login was replaced by a client-credentials token from {1}/{2}. Run 'octo-cli --context {0} -c LogIn' to restore the interactive login.",
                         _contextManager.GetEffectiveContextName(), Constants.EnvVarClientId, Constants.EnvVarClientSecret);
+                    await ApplyAsync(serviceClientAccessToken, reacquired.AccessToken);
                     return;
                 }
 
