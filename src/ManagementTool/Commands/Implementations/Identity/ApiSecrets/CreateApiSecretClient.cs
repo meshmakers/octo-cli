@@ -47,7 +47,7 @@ internal class CreateApiSecretClient : ServiceClientOctoCommand<IIdentityService
             ],
             Notes:
             [
-                "Writing API secrets needs the tenant role `SecretManagement`. `TenantManagement` or `UserManagement` are only enough while the identity cluster runs with `SecretManagementRoleEnforcement=Warn`. A refused call (HTTP 403) prints the message of the identity service, which names the missing role; without a message the generic access-denied text is shown.",
+                "Writing API secrets needs the tenant role `SecretManagement`. `TenantManagement` or `UserManagement` still pass while the identity cluster runs with `SecretManagementRoleEnforcement=Warn` or `RoleEnforcement=Warn`; they are refused only when `SecretManagementRoleEnforcement=Enforce` and `RoleEnforcement` is not `Warn`. A refused call (HTTP 403) prints the message of the identity service, which names the missing role; without a message the generic access-denied text is shown.",
             ]
         );
 

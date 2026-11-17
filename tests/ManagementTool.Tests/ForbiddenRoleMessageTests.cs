@@ -6,6 +6,7 @@ using Meshmakers.Common.CommandLineParser.Commands;
 using Meshmakers.Common.Shared.Services;
 using Meshmakers.Octo.Frontend.ManagementTool;
 using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Identity.ApiSecrets;
+using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Identity.Clients;
 using Meshmakers.Octo.Frontend.ManagementTool.Services;
 using Meshmakers.Octo.Sdk.ServiceClient;
 using Meshmakers.Octo.Sdk.ServiceClient.IdentityServices;
@@ -159,6 +160,8 @@ public sealed class ForbiddenRoleMessageTests : IDisposable
                 A.Fake<IConsoleService>(), identity, auth),
             new UpdateApiSecretApiResource(NullLogger<UpdateApiSecretApiResource>.Instance, options, identity, auth),
             new DeleteApiSecretApiResource(NullLogger<DeleteApiSecretApiResource>.Instance, options, identity, auth, A.Fake<IConfirmationService>()),
+            new AddClientCredentialsClient(NullLogger<AddClientCredentialsClient>.Instance, options, identity, auth,
+                new SecretInput(A.Fake<ISecretConsole>())),
         };
 
         foreach (var command in documentations)
@@ -166,6 +169,12 @@ public sealed class ForbiddenRoleMessageTests : IDisposable
             var notes = command.GetDocumentation()?.Notes;
             Assert.True(notes != null && notes.Any(n => n.Contains("SecretManagement")),
                 $"{command.GetType().Name} must name the role SecretManagement in its notes.");
+
+            // AB#9266: IdentityApiRoleRequirement.Decide lets TenantManagement/UserManagement through while
+            // SecretManagementRoleEnforcement OR RoleEnforcement is Warn; the help must name both settings.
+            var roleNote = notes!.Single(n => n.Contains("`TenantManagement` or `UserManagement`"));
+            Assert.Contains("`SecretManagementRoleEnforcement=Warn` or `RoleEnforcement=Warn`", roleNote);
+            Assert.Contains("refused only when `SecretManagementRoleEnforcement=Enforce` and `RoleEnforcement` is not `Warn`", roleNote);
         }
     }
 }
