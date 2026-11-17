@@ -6,6 +6,11 @@ All notable changes to octo-cli are listed here. Newest first.
 
 ### Fixed
 
+- **AB#9266 — The help of the API secret commands and `AddClientCredentialsClient` names both role settings.** It said
+  `TenantManagement` or `UserManagement` were only enough while `SecretManagementRoleEnforcement=Warn`; the identity service
+  also lets them through while `RoleEnforcement=Warn` and refuses them only when `SecretManagementRoleEnforcement=Enforce` and
+  `RoleEnforcement` is not `Warn`. Help text only, no behaviour change.
+
 - **AB#9063 — `LogInClientCredentials` no longer replaces an interactive login without a word.** Context names are matched
   case-insensitively, so `--context local_octosystem` selected the stored context `local_OctoSystem` and its device-code login
   was overwritten by a client-credentials token. The command now refuses, names the matched context and changes nothing when the
