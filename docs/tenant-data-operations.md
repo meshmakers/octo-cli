@@ -10,7 +10,7 @@ applies_to: **/Asset/{Tenants,TimeSeries,Operations}/**, ChildTenantAccess.cs
 `Restore` (`Asset/Tenants/RestoreTenant.cs`) and `ImportArchiveData` (`Asset/TimeSeries/ImportArchiveData.cs`) upload through
 the SDK's `RestoreRepositoryWithTusAsync` / `StartImportArchiveDataWithTusAsync`, which send the file in parts of at most
 50 MiB (SDK `BotServiceClientOptions.TusPartSizeBytes`), so a backup of several GB passes the ingress body limit (100 MiB on
-staging-1, prod-1, prod-2; before, one PATCH of the whole file was refused with 413 and the command failed later on an
+the shared environments; before, one PATCH of the whole file was refused with 413 and the command failed later on an
 "empty (0 bytes)" file). MCP uses the same SDK methods.
 
 - **`-ps/--part-size-mib <n>`** (both commands, 1 to 90, default 50) sets the part size for this run. The commands receive
@@ -79,7 +79,7 @@ SDK's `CkOperationsClient` (`octo-sdk/docs/method-clients.md`, "Asynchronous met
   `OperationText`. Both are in `MachineReadableOutput.CommandNames`: standard output carries only the answer, logs (incl.
   the `-w` progress) go to standard error. `-w` waits until final (exit -3 when FAILED). `Runner` maps `CkOperationQueryException`
   (`OPERATION_NOT_FOUND`, `OPERATION_QUERY_REFUSED`) to one error line, exit -3.
-- Tests: `DumpMethodCommandTests` (real SDK `TenantClient` against a local listener with answers recorded on test-2;
+- Tests: `DumpMethodCommandTests` (real SDK `TenantClient` against a local listener with answers recorded on a shared test environment;
   every sent document validated against `Fixtures/asset-repo-schema.test-2-system-bot-3.7.json.gz` with
   `AssetRepositoryGraphQlSchema.ValidateAgainstSystemBotAsync`).
 

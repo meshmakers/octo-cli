@@ -1,6 +1,6 @@
 ---
 description: Output redaction, passwords and secrets never on the command line, credentials only in request bodies.
-applies_to: {ErrorOutputRedactor,RedactedLogOutput,SecretInput,SecretConsole,StandardStreams,SecretMasker}.cs, **/Identity/Users/**
+applies_to: {ErrorOutputRedactor,RedactedLogOutput,SecretInput,SecretConsole,StandardStreams,SecretMasker}.cs, **/Identity/{Users,ApiSecrets}/**
 ---
 
 # Secrets and credentials in input and output
@@ -37,7 +37,7 @@ command + real SDK client against a local listener: method, URL without the valu
 `UpdateApiSecret*` sent `POST` (the create endpoint) instead of `PUT`, so `UpdateApiSecretClient` / `UpdateApiSecretApiResource`
 created an additional secret; fixed in the SDK.
 
-`ResetPassword` used the same REST body form (`POST users/ResetPassword`) and recognized identity services before 3.5.55; it now runs the CK method instead (next section), so that REST path and its older-identity detection are gone.
+`ResetPassword` used the same REST body form (`POST users/ResetPassword`) and recognized identity services before 3.5.55; it now runs the CK method instead ([identity commands](identity-commands.md#createuser-and-resetpassword-run-the-user-password-methods)), so that REST path and its older-identity detection are gone.
 
 ## Passwords and secrets never on the command line
 

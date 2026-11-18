@@ -1,6 +1,6 @@
 ---
 description: Login flows, contexts.json, per-tenant token guard and exchange, the --context override, parallel invocations, token refresh and masking.
-applies_to: **/Services/{Authentication,Context,LoginReplacement}*.cs, **/Implementations/General/**, OctoCommandParser.cs
+applies_to: **/Services/{Authentication,Context,LoginReplacement,SecretMasker}*.cs, **/Implementations/General/**, OctoCommandParser.cs
 ---
 
 # Authentication, contexts and tokens
@@ -77,7 +77,9 @@ root-tenant operator in a child tenant comes **only from explicit provisioning**
 (`octo-cli -c ProvisionCurrentUser -ttid <child>`, per child tenant, also for new tenants); identity gives
 ancestor users no implicit admin role, and octo-cli has no allow-list or exemption.
 
-- `AuthenticationService.ApplyAsync` is the only place that hands a token to the service clients. Token of the
+- `AuthenticationService.ApplyAsync` is the only place that hands the context's token to the injected service clients
+  (clients for a child tenant get their token from `ChildTenantAccess`; a few commands, e.g. `ImportFromCatalog` and
+  `ReconfigureLogLevel`, copy the access token of a client that `ApplyAsync` already set). Token of the
   context's tenant: used as before (no exchange, no extra request). Token of another tenant (a context for a
   child tenant that was signed in on the root tenant): exchanged (RFC 8693, `AuthenticatorClient`, client
   `octo-cli`) for a token of the context's tenant, and **only the exchanged token** reaches the clients. Blank or

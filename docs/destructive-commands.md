@@ -7,8 +7,9 @@ applies_to: *Confirmation*.cs, ToolException.cs
 
 ## Confirmation Dialogs for Destructive Commands
 
-All destructive commands (Delete, Clean, Reset, Remove, and credential-invalidating verbs such as
-Revoke and Rotate) require interactive user confirmation before executing. This prevents accidental
+The commands in the table below (Delete, Clean, Reset, Remove, and credential-invalidating verbs such as
+Revoke and Rotate) require interactive user confirmation before executing. Not every older destructive command is
+covered yet; new and changed destructive commands must use `IConfirmationService` and accept `--yes`/`-y`. This prevents accidental
 data loss — and accidental lockouts — from typos or wrong IDs. "Destructive" here is not only about
 deleting rows: a verb that makes an existing credential stop working belongs in this list too.
 
@@ -16,7 +17,7 @@ deleting rows: a verb that makes an existing credential stop working belongs in 
 
 - **`IConfirmationService`** (`Services/IConfirmationService.cs`): Interface injected into destructive commands.
 - **`ConfirmationService`** (`Services/ConfirmationService.cs`): Prompts the user with `"<message> (y/N): "`. Returns `true` only on "y" or "yes" (case-insensitive). If input is redirected (piped/non-interactive), writes an error to stderr and returns `false`.
-- **`--yes` / `-y` flag**: All destructive commands accept this flag to skip the confirmation prompt, enabling CI/automation use.
+- **`--yes` / `-y` flag**: The commands in the table below accept this flag to skip the confirmation prompt, enabling CI/automation use.
 - **`ToolException.OperationCancelledByUser()`**: Thrown when the user declines confirmation.
 
 ### Commands with Confirmation

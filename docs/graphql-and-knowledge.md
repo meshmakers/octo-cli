@@ -63,7 +63,7 @@ callers are always AI clients, so octo-mcp-service `knowledge_set_status` refuse
   exist there). **Rule:** a page a person verified counts as edited; a newer Blueprint version is reported
   as `PlatformUpdateAvailable` (adopt = `knowledge_restore_version`, keep = `knowledge_dismiss_platform_update`) and never
   switched automatically, while the Blueprint versions in its chain are not reported again. The schema test validates the
-  `baseVersion` write against the ai-sandbox snapshot plus a one-field overlay (`ValidateAgainstSystemAi411Async`) until
+  `baseVersion` write against the sandbox snapshot plus a one-field overlay (`ValidateAgainstSystemAi411Async`) until
   the snapshot is refreshed from a 4.11.0 tenant.
 - **Content hash contract**: `KnowledgePageContent.Render` is a port of octo-mcp-service `KnowledgePages.Render` (markdown
   with version 0; hash = SHA-256 lower-case hex). Both repos pin the same golden hash
@@ -88,9 +88,9 @@ Tests that fake `SendGraphQlAsync` accept any document; the asset repository val
 type 'SimpleScalar'"). Hand-written GraphQL documents are therefore validated in the tests:
 
 - `tests/ManagementTool.Tests/AssetRepositoryGraphQlSchema.cs` builds the schema from an introspection snapshot of a real
-  asset repository (`Fixtures/asset-repo-schema.test-2-ai-sandbox.json.gz`: test-2, tenant `ai-sandbox`, System models
+  asset repository (`Fixtures/asset-repo-schema.test-2-ai-sandbox.json.gz`: a shared test environment, a sandbox tenant, System models
   only, descriptions stripped; `ValidateAgainstSystemBotAsync` uses `Fixtures/asset-repo-schema.test-2-system-bot-3.7.json.gz`,
-  a test-2 scratch tenant with System.Bot 3.7.0 and `runtime.operations`) with **GraphQL.NET 8.8.5, the library and version of the asset repository**, and runs its
+  a scratch tenant with System.Bot 3.7.0 and `runtime.operations`) with **GraphQL.NET 8.8.5, the library and version of the asset repository**, and runs its
   core validation rules on a document **with its variables** (field and argument names, variable types in their
   positions, input object fields and enum values). The repository's own scalars (`SimpleScalar`, `OctoObjectId`,
   `DateTime`, …) accept any value: their value formats are not checked.

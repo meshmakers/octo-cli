@@ -14,14 +14,14 @@ managing tenants, users, roles, clients, identity providers, and other platform 
 | When you change | Read first |
 |---|---|
 | `src/ManagementTool/*.cs`, `**/Services/**`, `*.csproj`, `Octo.Cli.sln`, `devops-build/**` | `docs/architecture.md` |
-| `**/Services/{Authentication,Context,LoginReplacement}*.cs`, `**/Implementations/General/**`, `OctoCommandParser.cs` | `docs/authentication-and-contexts.md` |
+| `**/Services/{Authentication,Context,LoginReplacement,SecretMasker}*.cs`, `**/Implementations/General/**`, `OctoCommandParser.cs` | `docs/authentication-and-contexts.md` |
 | `**/Asset/{CkModelLibraries,Models,Blueprints}/**`, `CkModelFileInspector.cs` | `docs/ck-models-and-blueprints.md` |
 | `src/CommandReferenceGenerator/**`, `tests/CommandReferenceGenerator.Tests/**`, `src/ManagementTool/Commands/*.cs` | `docs/command-help-and-reference.md` |
 | `*Confirmation*.cs`, `ToolException.cs` | `docs/destructive-commands.md` |
 | `**/Asset/{GraphQl,Knowledge}/**`, `MachineReadableOutput.cs`, `**/Fixtures/**` | `docs/graphql-and-knowledge.md` |
 | `**/Implementations/Identity/**`, `{Runner,ForbiddenResponseMessage,CkMethodErrorText,CkMethodFallback}.cs` | `docs/identity-commands.md` |
 | `**/Implementations/{Communication,Ai}/**`, `**/Asset/PlatformFiles/**` | `docs/platform-files-and-communication.md` |
-| `{ErrorOutputRedactor,RedactedLogOutput,SecretInput,SecretConsole,StandardStreams,SecretMasker}.cs`, `**/Identity/Users/**` | `docs/secrets-and-output.md` |
+| `{ErrorOutputRedactor,RedactedLogOutput,SecretInput,SecretConsole,StandardStreams,SecretMasker}.cs`, `**/Identity/{Users,ApiSecrets}/**` | `docs/secrets-and-output.md` |
 | `**/Asset/{Tenants,TimeSeries,Operations}/**`, `ChildTenantAccess.cs` | `docs/tenant-data-operations.md` |
 <!-- <<< end generated: routing -->
 
@@ -66,7 +66,9 @@ real `~/.octo-cli` (`ContextManager(string baseDirectory)`).
     reference pages by hand;
   - authentication or context changes: [docs/authentication-and-contexts.md](docs/authentication-and-contexts.md);
   - configuration, project structure or environment variables: [docs/architecture.md](docs/architecture.md);
-  - behaviour covered by another doc in the table above: that doc.
+  - behaviour covered by another doc in the table above: that doc;
+  - project overview and usage examples: `README.md`;
+  - documentation, code comments and help text stay in English.
 - Run `Test-OctoAgentDocs` (octo-tools) after changing `AGENTS.md` or `docs/`; `Test-OctoAgentDocs -Fix` regenerates
   the routing table. The shim file for Claude Code is generated: edit this file, not the shim.
 - This repository is public: no work item ids, internal hostnames, customer or tenant names, or secrets in `AGENTS.md`,
@@ -81,12 +83,13 @@ real `~/.octo-cli` (`ContextManager(string baseDirectory)`).
 - **Secrets never on the command line.** A command that takes a password or secret reads it through
   `Services/SecretInput` (stdin flag, environment variable, hidden prompt); help samples never show a secret as an
   argument ([docs/secrets-and-output.md](docs/secrets-and-output.md)).
-- **Destructive commands ask first.** Delete, clean, reset, remove, revoke, rotate and other credential-invalidating
-  verbs use `IConfirmationService` and accept `--yes`/`-y`
-  ([docs/destructive-commands.md](docs/destructive-commands.md)).
+- **Destructive commands ask first.** New and changed destructive commands (delete, clean, reset, remove, revoke,
+  rotate and other credential-invalidating verbs) MUST use `IConfirmationService` and accept `--yes`/`-y`; older
+  commands are not all covered yet ([docs/destructive-commands.md](docs/destructive-commands.md)).
 - **One token, one tenant.** A command addressing tenant X never sends a token of another tenant and never falls back to
-  the context's own token; `AuthenticationService.ApplyAsync` is the only place that hands a token to the service
-  clients ([docs/authentication-and-contexts.md](docs/authentication-and-contexts.md)).
+  the context's own token. `AuthenticationService.ApplyAsync` hands the context's token (exchanged when needed) to the
+  injected service clients; clients for a child tenant get theirs from `ChildTenantAccess`
+  ([docs/authentication-and-contexts.md](docs/authentication-and-contexts.md)).
 - **Effective context, atomic writes.** Code acting on "the context in use" uses `GetEffectiveContext()` /
   `SaveEffectiveContext()`, not the active one; every write of `contexts.json` goes through `ContextManager.Mutate`
   ([docs/authentication-and-contexts.md](docs/authentication-and-contexts.md)).
