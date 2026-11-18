@@ -8,8 +8,8 @@ applies_to: **/Asset/{Tenants,TimeSeries,Operations}/**, ChildTenantAccess.cs
 ## Large uploads: Restore and ImportArchiveData
 
 `Restore` (`Asset/Tenants/RestoreTenant.cs`) and `ImportArchiveData` (`Asset/TimeSeries/ImportArchiveData.cs`) upload through
-the SDK's `RestoreRepositoryWithTusAsync` / `StartImportArchiveDataWithTusAsync`, which send the file in parts of at most
-50 MiB (SDK `BotServiceClientOptions.TusPartSizeBytes`), so a backup of several GB passes the ingress body limit (100 MiB on
+the SDK's `RestoreRepositoryWithTusAsync` / `StartImportArchiveDataWithTusAsync`, which send the file in parts of 50 MiB by default
+(up to 90 MiB with `--part-size-mib`; SDK `BotServiceClientOptions.TusPartSizeBytes`), so a backup of several GB passes the ingress body limit (100 MiB on
 the shared environments; before, one PATCH of the whole file was refused with 413 and the command failed later on an
 "empty (0 bytes)" file). MCP uses the same SDK methods.
 

@@ -1,6 +1,6 @@
 ---
 description: Three-level help, command groups, GetDocumentation samples and notes, and the pipeline that publishes the command reference.
-applies_to: src/CommandReferenceGenerator/**, tests/CommandReferenceGenerator.Tests/**, src/ManagementTool/Commands/*.cs
+applies_to: src/CommandReferenceGenerator/**, tests/CommandReferenceGenerator.Tests/**, src/ManagementTool/Commands/**
 ---
 
 # Command help and generated command reference

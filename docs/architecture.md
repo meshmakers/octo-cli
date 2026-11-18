@@ -102,7 +102,7 @@ Environment variables are prefixed with `OCTO_`:
 | Context | addContext, removeContext, useContext, listContexts | Local operations |
 
 > **Tenant-scoped service clients.** The StreamData and Reporting service clients
-> are now tenant-scoped (like Communication): `Program.cs` sets `TenantId` (from the active
+> are now tenant-scoped (like Communication): `Program.cs` sets `TenantId` (from the effective
 > context) on `StreamDataServiceClientOptions` and `ReportingServicesClientOptions`. The SDK
 > routes these to `{tenantId}/v1` and throws `ServiceConfigurationMissingException` if the
 > effective context has no `TenantId`, so `EnableStreamData` / archive / rollup / computed-column

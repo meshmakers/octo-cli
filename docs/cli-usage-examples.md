@@ -23,8 +23,15 @@ octo-cli -c ListContexts -j         # JSON output for scripting (tokens never in
 octo-cli --context prod -c GetUsers
 octo-cli -c GetAdapters --context prod
 export OCTO_CLI_CONTEXT=prod        # same, for a whole subshell
-# Parallel jobs against different environments (this is what the override is for):
+```
+
+Parallel jobs against different environments (this is what the override is for), in PowerShell:
+
+```powershell
 foreach ($c in 'test_a','test_b') { Start-Job { octo-cli --context $using:c -c DeployTriggers } }
+```
+
+```bash
 # Fully isolated configuration per job — no shared contexts.json at all:
 OCTO_CLI_HOME=/tmp/job-$JOB_ID octo-cli -c AddContext -n ci -isu … -tid …
 

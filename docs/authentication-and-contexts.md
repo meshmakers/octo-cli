@@ -173,7 +173,8 @@ before — loses one of them.
 adjust the configuration it is handed but cannot hand back a different instance, because returning
 a wholesale replacement is precisely how a caller would discard a parallel invocation's changes
 unnoticed. The single exception to the re-read is `MigrateIfNeeded`, which writes a whole
-configuration — correct there, since it only runs when `contexts.json` does not exist yet.
+configuration. It checks that `contexts.json` is absent before it takes the lock, so two first-run processes can both
+write, and the later write can replace a change the first one saved in the meantime.
 
 For complete isolation (CI matrix jobs, throwaway environments), point each job at its own
 configuration directory with **`OCTO_CLI_HOME`**: it names the *parent* of the `.octo-cli` folder,

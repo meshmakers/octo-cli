@@ -16,8 +16,8 @@ managing tenants, users, roles, clients, identity providers, and other platform 
 | `src/ManagementTool/*.cs`, `**/Services/**`, `*.csproj`, `Octo.Cli.sln`, `devops-build/**` | `docs/architecture.md` |
 | `**/Services/{Authentication,Context,LoginReplacement,SecretMasker}*.cs`, `**/Implementations/General/**`, `OctoCommandParser.cs` | `docs/authentication-and-contexts.md` |
 | `**/Asset/{CkModelLibraries,Models,Blueprints}/**`, `CkModelFileInspector.cs` | `docs/ck-models-and-blueprints.md` |
-| `src/CommandReferenceGenerator/**`, `tests/CommandReferenceGenerator.Tests/**`, `src/ManagementTool/Commands/*.cs` | `docs/command-help-and-reference.md` |
-| `*Confirmation*.cs`, `ToolException.cs` | `docs/destructive-commands.md` |
+| `src/CommandReferenceGenerator/**`, `tests/CommandReferenceGenerator.Tests/**`, `src/ManagementTool/Commands/**` | `docs/command-help-and-reference.md` |
+| `*Confirmation*.cs`, `ToolException.cs`, `**/Implementations/**/{Delete,Remove,Revoke,Rotate,Clean,Reset,Uninstall,Undeploy,Unprovision}*.cs` | `docs/destructive-commands.md` |
 | `**/Asset/{GraphQl,Knowledge}/**`, `MachineReadableOutput.cs`, `**/Fixtures/**` | `docs/graphql-and-knowledge.md` |
 | `**/Implementations/Identity/**`, `{Runner,ForbiddenResponseMessage,CkMethodErrorText,CkMethodFallback}.cs` | `docs/identity-commands.md` |
 | `**/Implementations/{Communication,Ai}/**`, `**/Asset/PlatformFiles/**` | `docs/platform-files-and-communication.md` |
@@ -83,8 +83,9 @@ real `~/.octo-cli` (`ContextManager(string baseDirectory)`).
   `Services/SecretInput` (stdin flag, environment variable, hidden prompt); help samples never show a secret as an
   argument ([docs/secrets-and-output.md](docs/secrets-and-output.md)).
 - **Destructive commands ask first.** New and changed destructive commands (delete, clean, reset, remove, revoke,
-  rotate and other credential-invalidating verbs) MUST use `IConfirmationService` and accept `--yes`/`-y`; older
-  commands are not all covered yet ([docs/destructive-commands.md](docs/destructive-commands.md)).
+  rotate and other credential-invalidating verbs) MUST use `IConfirmationService` and accept `--yes`/`-y`. Some
+  older destructive commands do not ask; the table in [docs/destructive-commands.md](docs/destructive-commands.md)
+  lists those that do.
 - **One token, one tenant.** A command addressing tenant X never sends a token of another tenant and never falls back to
   the context's own token. `AuthenticationService.ApplyAsync` hands the context's token (exchanged when needed) to the
   injected service clients; clients for a child tenant get theirs from `ChildTenantAccess`
