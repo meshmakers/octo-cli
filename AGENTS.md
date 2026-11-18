@@ -17,7 +17,7 @@ managing tenants, users, roles, clients, identity providers, and other platform 
 | `**/Services/{Authentication,Context,LoginReplacement,SecretMasker}*.cs`, `**/Implementations/General/**`, `OctoCommandParser.cs` | `docs/authentication-and-contexts.md` |
 | `**/Asset/{CkModelLibraries,Models,Blueprints}/**`, `CkModelFileInspector.cs` | `docs/ck-models-and-blueprints.md` |
 | `src/CommandReferenceGenerator/**`, `tests/CommandReferenceGenerator.Tests/**`, `src/ManagementTool/Commands/**` | `docs/command-help-and-reference.md` |
-| `*Confirmation*.cs`, `ToolException.cs`, `{Delete,Remove,Revoke,Rotate,Clean,Reset}*.cs`, `{Un*,Cancel,Move,Reprotect,FixAll,Repair,Restore}*.cs` | `docs/destructive-commands.md` |
+| `*Confirmation*.cs`, `ToolException.cs`, `{Delete,Remove,Revoke,Rotate,Clean,Reset}*.cs`, `{Un*,Cancel,Move,Reprotect,FixAll,Repair,Restore,Clear,Switch}*.cs` | `docs/destructive-commands.md` |
 | `**/Asset/{GraphQl,Knowledge}/**`, `MachineReadableOutput.cs`, `**/Fixtures/**` | `docs/graphql-and-knowledge.md` |
 | `**/Implementations/Identity/**`, `{Runner,ForbiddenResponseMessage,CkMethodErrorText,CkMethodFallback}.cs` | `docs/identity-commands.md` |
 | `**/Implementations/{Communication,Ai}/**`, `**/Asset/PlatformFiles/**` | `docs/platform-files-and-communication.md` |
@@ -75,33 +75,30 @@ real `~/.octo-cli` (`ContextManager(string baseDirectory)`).
 
 ## Rules
 
-- **No credentials in output.** Never print a token, password or client secret, in a log line, an exception text or a
-  response body. Errors pass the central `ErrorOutputRedactor`; do not add per-command redaction and do not write
-  response bodies through `Console`. Mask values with `SecretMasker`
+These rules bind new and changed code. Known exceptions in existing code: `ConfigCommand` reads the active context,
+`Create*ApiSecret*` show a generated secret once on purpose, `MigrateIfNeeded` writes `contexts.json` directly, and some
+older destructive commands do not ask for confirmation.
+
+- **No credentials in output.** New code must not print a token, password or client secret in a log line, an exception
+  text or a response body. Errors pass the central `ErrorOutputRedactor`; add no per-command redaction and write no
+  response body through `Console`. Mask with `SecretMasker` ([docs/secrets-and-output.md](docs/secrets-and-output.md)).
+- **Secrets off the command line.** New commands read a password or secret through `Services/SecretInput` (stdin flag,
+  environment variable, hidden prompt), and help samples show no secret as an argument
   ([docs/secrets-and-output.md](docs/secrets-and-output.md)).
-- **Secrets stay off the command line.** Commands that take a password or secret read it through
-  `Services/SecretInput` (stdin flag, environment variable, hidden prompt); the old arguments (`-p`, `-s`, `-cs`) are
-  deprecated but still work. Help samples never show a secret as an argument
-  ([docs/secrets-and-output.md](docs/secrets-and-output.md)).
-- **Destructive commands ask first.** New and changed destructive commands (delete, clean, reset, remove, revoke,
-  rotate and other credential-invalidating verbs) MUST use `IConfirmationService` and accept `--yes`/`-y`. Some
-  older destructive commands do not ask; the table in [docs/destructive-commands.md](docs/destructive-commands.md)
-  lists examples of commands that do.
-- **One token, one tenant.** A command addressing tenant X does not send a token issued for another tenant (it is
-  exchanged) and does not fall back to the context's own token when the exchange is denied; blank or opaque tokens and
-  contexts without a tenant behave as before. `AuthenticationService.ApplyAsync` hands the context's token (exchanged
-  when needed) to the injected service clients; clients for a child tenant get theirs from `ChildTenantAccess`
+- **Destructive commands ask first.** New and changed destructive commands (delete, clean, reset, remove, revoke, rotate
+  and other credential-invalidating verbs) MUST use `IConfirmationService` and accept `--yes`/`-y`
+  ([docs/destructive-commands.md](docs/destructive-commands.md)).
+- **One token, one tenant.** New code addressing tenant X sends no token issued for another tenant and falls back to no
+  other token when the exchange is denied; get service clients from `AuthenticationService.ApplyAsync`, and clients for
+  a child tenant from `ChildTenantAccess` ([docs/authentication-and-contexts.md](docs/authentication-and-contexts.md)).
+- **Contexts.** New code acting on "the context in use" uses `GetEffectiveContext()` / `SaveEffectiveContext()`, and
+  writes `contexts.json` through `ContextManager.Mutate`
   ([docs/authentication-and-contexts.md](docs/authentication-and-contexts.md)).
-- **Effective context, atomic writes.** Code acting on "the context in use" uses `GetEffectiveContext()` /
-  `SaveEffectiveContext()`; only `ListContexts` and `UseContext` read the active one. Every write of `contexts.json`
-  goes through `ContextManager.Mutate`, except the first-run migration in `MigrateIfNeeded`
+- **Top-level arguments.** A new top-level argument is declared on the parser's top layer and needs the same hoisting
+  treatment as `--context`, which has no short form
   ([docs/authentication-and-contexts.md](docs/authentication-and-contexts.md)).
-- **Top-level arguments.** `--context` is declared on the parser's top layer and has no short form; a new top-level
-  argument needs the same hoisting treatment
-  ([docs/authentication-and-contexts.md](docs/authentication-and-contexts.md)).
-- **GraphQL documents are tested against the schema.** New or changed hand-written GraphQL documents are validated in
-  tests with `AssetRepositoryGraphQlSchema` ([docs/graphql-and-knowledge.md](docs/graphql-and-knowledge.md)).
-- **Public docs come from the command classes.** The command reference is generated from the command classes; write
-  argument help inline in `AddArgument` collection literals (`Constants.*` only inside interpolations)
-  ([docs/command-help-and-reference.md](docs/command-help-and-reference.md),
-  [docs/secrets-and-output.md](docs/secrets-and-output.md)).
+- **GraphQL documents.** Validate new or changed hand-written GraphQL documents in tests with
+  `AssetRepositoryGraphQlSchema` ([docs/graphql-and-knowledge.md](docs/graphql-and-knowledge.md)).
+- **Command reference.** It is generated from the command classes: write argument help inline in `AddArgument`
+  collection literals (`Constants.*` only inside interpolations)
+  ([docs/command-help-and-reference.md](docs/command-help-and-reference.md)).
