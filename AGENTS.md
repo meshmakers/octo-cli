@@ -17,7 +17,7 @@ managing tenants, users, roles, clients, identity providers, and other platform 
 | `**/Services/{Authentication,Context,LoginReplacement,SecretMasker}*.cs`, `**/Implementations/General/**`, `OctoCommandParser.cs` | `docs/authentication-and-contexts.md` |
 | `**/Asset/{CkModelLibraries,Models,Blueprints}/**`, `CkModelFileInspector.cs` | `docs/ck-models-and-blueprints.md` |
 | `src/CommandReferenceGenerator/**`, `tests/CommandReferenceGenerator.Tests/**`, `src/ManagementTool/Commands/**` | `docs/command-help-and-reference.md` |
-| `*Confirmation*.cs`, `ToolException.cs`, `**/Implementations/**/{Delete,Remove,Revoke,Rotate,Clean,Reset,Uninstall,Undeploy,Unprovision}*.cs` | `docs/destructive-commands.md` |
+| `*Confirmation*.cs`, `ToolException.cs`, `{Delete,Remove,Revoke,Rotate,Clean,Reset}*.cs`, `{Un*,Cancel,Move,Reprotect,FixAll,Repair,Restore}*.cs` | `docs/destructive-commands.md` |
 | `**/Asset/{GraphQl,Knowledge}/**`, `MachineReadableOutput.cs`, `**/Fixtures/**` | `docs/graphql-and-knowledge.md` |
 | `**/Implementations/Identity/**`, `{Runner,ForbiddenResponseMessage,CkMethodErrorText,CkMethodFallback}.cs` | `docs/identity-commands.md` |
 | `**/Implementations/{Communication,Ai}/**`, `**/Asset/PlatformFiles/**` | `docs/platform-files-and-communication.md` |
@@ -79,26 +79,29 @@ real `~/.octo-cli` (`ContextManager(string baseDirectory)`).
   response body. Errors pass the central `ErrorOutputRedactor`; do not add per-command redaction and do not write
   response bodies through `Console`. Mask values with `SecretMasker`
   ([docs/secrets-and-output.md](docs/secrets-and-output.md)).
-- **Secrets never on the command line.** A command that takes a password or secret reads it through
-  `Services/SecretInput` (stdin flag, environment variable, hidden prompt); help samples never show a secret as an
-  argument ([docs/secrets-and-output.md](docs/secrets-and-output.md)).
+- **Secrets stay off the command line.** Commands that take a password or secret read it through
+  `Services/SecretInput` (stdin flag, environment variable, hidden prompt); the old arguments (`-p`, `-s`, `-cs`) are
+  deprecated but still work. Help samples never show a secret as an argument
+  ([docs/secrets-and-output.md](docs/secrets-and-output.md)).
 - **Destructive commands ask first.** New and changed destructive commands (delete, clean, reset, remove, revoke,
   rotate and other credential-invalidating verbs) MUST use `IConfirmationService` and accept `--yes`/`-y`. Some
   older destructive commands do not ask; the table in [docs/destructive-commands.md](docs/destructive-commands.md)
-  lists those that do.
-- **One token, one tenant.** A command addressing tenant X never sends a token of another tenant and never falls back to
-  the context's own token. `AuthenticationService.ApplyAsync` hands the context's token (exchanged when needed) to the
-  injected service clients; clients for a child tenant get theirs from `ChildTenantAccess`
+  lists examples of commands that do.
+- **One token, one tenant.** A command addressing tenant X does not send a token issued for another tenant (it is
+  exchanged) and does not fall back to the context's own token when the exchange is denied; blank or opaque tokens and
+  contexts without a tenant behave as before. `AuthenticationService.ApplyAsync` hands the context's token (exchanged
+  when needed) to the injected service clients; clients for a child tenant get theirs from `ChildTenantAccess`
   ([docs/authentication-and-contexts.md](docs/authentication-and-contexts.md)).
 - **Effective context, atomic writes.** Code acting on "the context in use" uses `GetEffectiveContext()` /
-  `SaveEffectiveContext()`, not the active one; every write of `contexts.json` goes through `ContextManager.Mutate`
+  `SaveEffectiveContext()`; only `ListContexts` and `UseContext` read the active one. Every write of `contexts.json`
+  goes through `ContextManager.Mutate`, except the first-run migration in `MigrateIfNeeded`
   ([docs/authentication-and-contexts.md](docs/authentication-and-contexts.md)).
 - **Top-level arguments.** `--context` is declared on the parser's top layer and has no short form; a new top-level
   argument needs the same hoisting treatment
   ([docs/authentication-and-contexts.md](docs/authentication-and-contexts.md)).
-- **GraphQL documents are tested against the schema.** Validate every hand-written GraphQL document with
-  `AssetRepositoryGraphQlSchema` ([docs/graphql-and-knowledge.md](docs/graphql-and-knowledge.md)).
-- **Public docs come from the command classes.** The command reference is generated from the command classes; keep help
-  strings inline in `AddArgument` collection literals
+- **GraphQL documents are tested against the schema.** New or changed hand-written GraphQL documents are validated in
+  tests with `AssetRepositoryGraphQlSchema` ([docs/graphql-and-knowledge.md](docs/graphql-and-knowledge.md)).
+- **Public docs come from the command classes.** The command reference is generated from the command classes; write
+  argument help inline in `AddArgument` collection literals (`Constants.*` only inside interpolations)
   ([docs/command-help-and-reference.md](docs/command-help-and-reference.md),
   [docs/secrets-and-output.md](docs/secrets-and-output.md)).

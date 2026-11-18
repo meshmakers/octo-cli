@@ -1,6 +1,6 @@
 ---
 description: How destructive commands ask for confirmation, the --yes flag, the confirmation messages and the parent scope text.
-applies_to: *Confirmation*.cs, ToolException.cs, **/Implementations/**/{Delete,Remove,Revoke,Rotate,Clean,Reset,Uninstall,Undeploy,Unprovision}*.cs
+applies_to: *Confirmation*.cs, ToolException.cs, {Delete,Remove,Revoke,Rotate,Clean,Reset}*.cs, {Un*,Cancel,Move,Reprotect,FixAll,Repair,Restore}*.cs
 ---
 
 # Confirmation dialogs for destructive commands
