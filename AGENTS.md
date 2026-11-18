@@ -67,7 +67,6 @@ real `~/.octo-cli` (`ContextManager(string baseDirectory)`).
   - authentication or context changes: [docs/authentication-and-contexts.md](docs/authentication-and-contexts.md);
   - configuration, project structure or environment variables: [docs/architecture.md](docs/architecture.md);
   - behaviour covered by another doc in the table above: that doc;
-  - project overview and usage examples: `README.md`;
   - documentation, code comments and help text stay in English.
 - Run `Test-OctoAgentDocs` (octo-tools) after changing `AGENTS.md` or `docs/`; `Test-OctoAgentDocs -Fix` regenerates
   the routing table. The shim file for Claude Code is generated: edit this file, not the shim.
