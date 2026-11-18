@@ -1,6 +1,6 @@
 ---
 description: Login flows, contexts.json, per-tenant token guard and exchange, the --context override, parallel invocations, token refresh and masking.
-applies_to: src/ManagementTool/Services/{Authentication,Context,LoginReplacement,SecretMasker}*.cs, src/ManagementTool/Commands/Implementations/General/**, src/ManagementTool/OctoCommandParser.cs
+applies_to: **/Services/{Authentication,Context,LoginReplacement}*.cs, **/Implementations/General/**, OctoCommandParser.cs
 ---
 
 # Authentication, contexts and tokens
@@ -29,14 +29,14 @@ The CLI supports multiple authentication methods:
    - Tenant comes from the effective context (no `-tid` arg on the login command). Switch contexts with `UseContext`, or target another tenant for one invocation with `--context <name>`.
    - No refresh token is issued. While the env vars remain set, `EnsureAuthenticated` automatically re-acquires the token when it expires; otherwise re-run `LogInClientCredentials`.
    - Token stored in the effective context's `Authentication` block, same path as device flow.
-   - **Never silently over an interactive login (AB#9063).** Before it reads the secret or requests a token, the command
+   - **Never silently over an interactive login.** Before it reads the secret or requests a token, the command
      refuses (`ToolException`, exit `-5`, nothing changed) and names the stored context when the context holds an
      interactive login (it has a refresh token, which a client-credentials login never has) or when the name given with
      `--context` / `OCTO_CLI_CONTEXT` matched the stored context only by case (`--context local_octosystem` selecting
      `local_OctoSystem`). `--replace-login` (`-rl`) replaces the login anyway; the usual alternative is a separate context
      for the client. Re-running the login on a client-credentials context with the exact name is unchanged. The rule is
      `Services/LoginReplacementGuard`; `IContextManager.RequestedContextName` keeps the name as typed next to the stored
-     one. Reading commands keep matching names case-insensitively. The automatic fallback of AB#4754 (refresh token
+     one. Reading commands keep matching names case-insensitively. The automatic fallback (refresh token
      rejected, client-credentials env vars set) still re-acquires a client-credentials token, because the interactive login
      is already dead there; it now logs a WARN that names the context and the `LogIn` to restore it. Tests:
      `LogInClientCredentialsContextGuardTests` (real `ContextManager` in a throwaway directory; `--context` and
@@ -69,7 +69,7 @@ The CLI uses named contexts (similar to `kubectl config use-context`) stored in 
 
 **Migration**: On first run, if `contexts.json` does not exist but `settings.json` does, the CLI automatically imports the legacy settings as a `"default"` context. The original `settings.json` is kept intact.
 
-## Tokens per tenant — guard and exchange (AB#6836)
+## Tokens per tenant — guard and exchange
 
 A command addressing tenant X never sends a token whose `tenant_id` claim is another tenant. The tenant a
 command addresses is the tenant of the effective context (`OctoToolOptions.TenantId`). Authority of a
@@ -130,7 +130,7 @@ Behaviour worth knowing:
   with an argument a future command declares. `CommandReferenceGenerator` only reads command
   classes, so this argument does not appear on any generated command-reference page — it is
   visible in `octo-cli -h all`.
-- **Position independence is done by hoisting (AB#7414).** The parser's top layer cannot hand control
+- **Position independence is done by hoisting.** The parser's top layer cannot hand control
   back to a command layer: an argument the command does not know ends the command layer, so
   `-c FixAll --context x -w` used to fail with "-w is an unknown parameter". `ContextHoistingEnvironmentService`
   (registered as `IEnvironmentService` in `Program`) feeds the parser the line with every
@@ -180,10 +180,10 @@ path in effect is logged on every run and shown by `ListContexts`.
 
 **Note**: Device flow requests `offline_access` scope and receives a refresh token. The `AuthenticationService` handles both cases: if a refresh token is present, it refreshes expired access tokens automatically; if not, it uses the existing access token directly.
 
-**Refresh decision & failure handling (AB#4754).** `EnsureAuthenticated` decides whether to refresh a device/interactive token from the stored `AccessTokenExpiresAt` (with a 30s margin), **not** from a live `/connect/userinfo` probe. A token that is not expiring soon is used as-is — no per-command round-trip to the identity service, and a transient identity-service hiccup no longer forces an unnecessary refresh. Server-side revocation of a not-yet-expired token still surfaces as the target service's own 401. When the refresh itself fails because the **refresh token is expired/revoked** — the typical outcome for a context that has not been used in a while, so it bites hardest when switching between contexts — the tool does one of two things: if `OCTO_CLI_CLIENT_ID` / `OCTO_CLI_CLIENT_SECRET` are set it re-acquires non-interactively via client_credentials; otherwise it fails with an actionable `ToolException` (exit `-5`) naming the effective context and the exact `octo-cli --context <name> -c LogIn` to run, instead of the raw OIDC `invalid_grant`. `AuthStatus` reports the same dead-refresh-token case as an actionable warning rather than letting it bubble up.
+**Refresh decision & failure handling.** `EnsureAuthenticated` decides whether to refresh a device/interactive token from the stored `AccessTokenExpiresAt` (with a 30s margin), **not** from a live `/connect/userinfo` probe. A token that is not expiring soon is used as-is — no per-command round-trip to the identity service, and a transient identity-service hiccup no longer forces an unnecessary refresh. Server-side revocation of a not-yet-expired token still surfaces as the target service's own 401. When the refresh itself fails because the **refresh token is expired/revoked** — the typical outcome for a context that has not been used in a while, so it bites hardest when switching between contexts — the tool does one of two things: if `OCTO_CLI_CLIENT_ID` / `OCTO_CLI_CLIENT_SECRET` are set it re-acquires non-interactively via client_credentials; otherwise it fails with an actionable `ToolException` (exit `-5`) naming the effective context and the exact `octo-cli --context <name> -c LogIn` to run, instead of the raw OIDC `invalid_grant`. `AuthStatus` reports the same dead-refresh-token case as an actionable warning rather than letting it bubble up.
 
-**`AuthStatus` masks secrets by default (AB#5744).** The output of `AuthStatus` lands in scripts, CI logs and AI-agent transcripts (it is the recommended silent-refresh command), so by default it prints only status, claims, expiry and the user-info response; the token signature and the raw access token are replaced by `SecretMasker.Mask` (`Services/SecretMasker.cs`, generic helper: reveals only the length). `--show-token` (`-st`) prints the raw access token, signature and refresh token; use it only interactively. Silent refresh behaves the same with and without the flag. Tests: `AuthStatusCommandTests`.
+**`AuthStatus` masks secrets by default.** The output of `AuthStatus` lands in scripts, CI logs and AI-agent transcripts (it is the recommended silent-refresh command), so by default it prints only status, claims, expiry and the user-info response; the token signature and the raw access token are replaced by `SecretMasker.Mask` (`Services/SecretMasker.cs`, generic helper: reveals only the length). `--show-token` (`-st`) prints the raw access token, signature and refresh token; use it only interactively. Silent refresh behaves the same with and without the flag. Tests: `AuthStatusCommandTests`.
 
-**`GetAdapter` masks credentials by default (AB#6286).** `GetAdapter` printed the adapter configuration and the pipeline configurations verbatim, including passwords (e.g. an EDA adapter). By default every credential-named member (`SecretMasker.IsSecretName`: password, passwd, passphrase, secret, apiKey, privateKey, accessKey, credential(s), connectionString, authorization, bearer, `*token`, `pwd`; status flags such as `ClientSecretIsSet` and names like `tokenEndpoint` stay visible) is replaced by `SecretMasker.Mask` (length only). The adapter configuration (a JSON string), the pipeline configurations (JSON) and the pipeline node definition (YAML/JSON, `key: value` / `key=value` lines) are walked by `SecretMasker.MaskToken` / `MaskText`; the output stays valid JSON. `--show-secrets` (`-ss`) prints the clear text; use it only interactively. Judged by member name only: the DTOs carry no CK secret flag. Other commands: `GetAdapters`, `GetDeploymentSites`, `GetWorkloadsByChart` and `GetAdapterPoolQueue` print status summaries without configuration and are unchanged. Tests: `GetAdapterSecretMaskingTests`.
+**`GetAdapter` masks credentials by default.** `GetAdapter` printed the adapter configuration and the pipeline configurations verbatim, including passwords (e.g. an EDA adapter). By default every credential-named member (`SecretMasker.IsSecretName`: password, passwd, passphrase, secret, apiKey, privateKey, accessKey, credential(s), connectionString, authorization, bearer, `*token`, `pwd`; status flags such as `ClientSecretIsSet` and names like `tokenEndpoint` stay visible) is replaced by `SecretMasker.Mask` (length only). The adapter configuration (a JSON string), the pipeline configurations (JSON) and the pipeline node definition (YAML/JSON, `key: value` / `key=value` lines) are walked by `SecretMasker.MaskToken` / `MaskText`; the output stays valid JSON. `--show-secrets` (`-ss`) prints the clear text; use it only interactively. Judged by member name only: the DTOs carry no CK secret flag. Other commands: `GetAdapters`, `GetDeploymentSites`, `GetWorkloadsByChart` and `GetAdapterPoolQueue` print status summaries without configuration and are unchanged. Tests: `GetAdapterSecretMaskingTests`.
 
-**`Delete`/`Update` `ApiSecret*` never log the secret value (AB#6692).** `DeleteApiSecretClient`, `DeleteApiSecretApiResource`, `UpdateApiSecretClient` and `UpdateApiSecretApiResource` take the secret value (`-s`) as an argument to identify the secret; it is passed to the service but every log line (start, not-found, success) shows only `SecretMasker.Mask(secretValue)` (length only). The `Create*ApiSecret*` commands keep their intentional one-time clear-text console output (AB#6258) and log neither clear text nor hash; `GetApiSecrets*` print the stored (hashed) value list as the identifier users need for `-s`. Tests: `ApiSecretValueLoggingTests`, `CreateApiSecretCommandsTests`.
+**`Delete`/`Update` `ApiSecret*` never log the secret value.** `DeleteApiSecretClient`, `DeleteApiSecretApiResource`, `UpdateApiSecretClient` and `UpdateApiSecretApiResource` take the secret value (`-s`) as an argument to identify the secret; it is passed to the service but every log line (start, not-found, success) shows only `SecretMasker.Mask(secretValue)` (length only). The `Create*ApiSecret*` commands keep their intentional one-time clear-text console output and log neither clear text nor hash; `GetApiSecrets*` print the stored (hashed) value list as the identifier users need for `-s`. Tests: `ApiSecretValueLoggingTests`, `CreateApiSecretCommandsTests`.

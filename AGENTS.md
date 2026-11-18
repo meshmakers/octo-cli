@@ -5,24 +5,29 @@ code it covers.
 
 ## What this repo is
 
-Octo CLI (`octo-cli`) is a .NET 10 command-line management tool for the Octo Mesh Platform. It provides commands for managing tenants, users, roles, clients, identity providers, and other platform resources across all Octo services.
+Octo CLI (`octo-cli`) is a .NET 10 command-line management tool for the Octo Mesh Platform. It provides commands for
+managing tenants, users, roles, clients, identity providers, and other platform resources across all Octo services.
 
 ## Read before you change
 
 <!-- >>> generated: routing -->
 | When you change | Read first |
 |---|---|
-| `src/ManagementTool/*.cs`, `src/ManagementTool/Services/**`, `**/*.csproj`, `Octo.Cli.sln`, `devops-build/**` | `docs/architecture.md` |
-| `src/ManagementTool/Services/{Authentication,Context,LoginReplacement,SecretMasker}*.cs`, `src/ManagementTool/Commands/Implementations/General/**`, `src/ManagementTool/OctoCommandParser.cs` | `docs/authentication-and-contexts.md` |
-| `src/ManagementTool/Commands/Implementations/Asset/{CkModelLibraries,Models,Blueprints}/**`, `src/ManagementTool/Services/CkModelFileInspector.cs` | `docs/ck-models-and-blueprints.md` |
+| `src/ManagementTool/*.cs`, `**/Services/**`, `*.csproj`, `Octo.Cli.sln`, `devops-build/**` | `docs/architecture.md` |
+| `**/Services/{Authentication,Context,LoginReplacement}*.cs`, `**/Implementations/General/**`, `OctoCommandParser.cs` | `docs/authentication-and-contexts.md` |
+| `**/Asset/{CkModelLibraries,Models,Blueprints}/**`, `CkModelFileInspector.cs` | `docs/ck-models-and-blueprints.md` |
 | `src/CommandReferenceGenerator/**`, `tests/CommandReferenceGenerator.Tests/**`, `src/ManagementTool/Commands/*.cs` | `docs/command-help-and-reference.md` |
-| `src/ManagementTool/Services/*Confirmation*.cs`, `src/ManagementTool/ToolException.cs` | `docs/destructive-commands.md` |
-| `src/ManagementTool/Commands/Implementations/Asset/{GraphQl,Knowledge}/**`, `src/ManagementTool/Services/MachineReadableOutput.cs`, `tests/ManagementTool.Tests/Fixtures/**` | `docs/graphql-and-knowledge.md` |
-| `src/ManagementTool/Commands/Implementations/Identity/**`, `src/ManagementTool/{Runner,ForbiddenResponseMessage,CkMethodErrorText,CkMethodFallback}.cs` | `docs/identity-commands.md` |
-| `src/ManagementTool/Commands/Implementations/{Communication,Ai}/**`, `src/ManagementTool/Commands/Implementations/Asset/PlatformFiles/**` | `docs/platform-files-and-communication.md` |
-| `src/ManagementTool/Services/{ErrorOutputRedactor,RedactedLogOutput,SecretInput,SecretConsole,StandardStreams}.cs`, `src/ManagementTool/Commands/Implementations/Identity/**` | `docs/secrets-and-output.md` |
-| `src/ManagementTool/Commands/Implementations/Asset/{Tenants,TimeSeries,Operations}/**`, `src/ManagementTool/Services/ChildTenantAccess.cs` | `docs/tenant-data-operations.md` |
+| `*Confirmation*.cs`, `ToolException.cs` | `docs/destructive-commands.md` |
+| `**/Asset/{GraphQl,Knowledge}/**`, `MachineReadableOutput.cs`, `**/Fixtures/**` | `docs/graphql-and-knowledge.md` |
+| `**/Implementations/Identity/**`, `{Runner,ForbiddenResponseMessage,CkMethodErrorText,CkMethodFallback}.cs` | `docs/identity-commands.md` |
+| `**/Implementations/{Communication,Ai}/**`, `**/Asset/PlatformFiles/**` | `docs/platform-files-and-communication.md` |
+| `{ErrorOutputRedactor,RedactedLogOutput,SecretInput,SecretConsole,StandardStreams,SecretMasker}.cs`, `**/Identity/Users/**` | `docs/secrets-and-output.md` |
+| `**/Asset/{Tenants,TimeSeries,Operations}/**`, `ChildTenantAccess.cs` | `docs/tenant-data-operations.md` |
 <!-- <<< end generated: routing -->
+
+Background, no path trigger: [docs/cli-usage-examples.md](docs/cli-usage-examples.md) holds command examples for
+contexts, login, tenants, blueprints, archives, groups, clients, workloads and AI services; use it for the argument
+forms of a command, and for the exact arguments run `octo-cli -c <command> --help`.
 
 ## Build & test
 
@@ -47,36 +52,50 @@ dotnet test Octo.Cli.sln
 - **Debug/Release**: Standard configurations
 - **DebugL**: Local development mode that sets version to 999.0.0 and uses local NuGet sources from `../nuget`
 
+Build and test locally in `DebugL`; `Release` (used by CI) resolves the service-client packages from the private feed.
+A new project must opt into `DebugL` in its `.csproj` and in `Octo.Cli.sln`
+([docs/architecture.md](docs/architecture.md), "Project Structure"). Tests use a throwaway directory instead of the
+real `~/.octo-cli` (`ContextManager(string baseDirectory)`).
+
 ## Before you commit
 
-### Documentation Guidelines
-
-**CRITICAL REQUIREMENT:** Documentation MUST be updated after EVERY change. This is mandatory, not optional.
-
-#### Language Requirement
-
-All documentation MUST be written in **English**. This includes:
-- README.md files
-- Code comments
-- API documentation
-- This CLAUDE.md file
-
-#### Mandatory Documentation Updates
-
-After making ANY code changes, you MUST update:
-
-1. **For New Commands**: Document command usage, parameters, and examples
-2. **For Bug Fixes**: Update troubleshooting sections if applicable
-3. **For Authentication Changes**: Update the Authentication Flow section above
-4. **For Configuration Changes**: Update the Configuration section
-
-#### Key Files to Update
-
-| File | When to Update |
-|------|----------------|
-| `README.md` | Project overview, usage examples |
-| `CLAUDE.md` | Project structure, architecture changes |
-| Command help text | When command parameters change |
+- Build and all tests are green (`dotnet test Octo.Cli.sln -c DebugL`).
+- The documentation changes with the code, in English:
+  - a new or changed command: its help text and `GetDocumentation()` samples and notes, which are the public command
+    reference ([docs/command-help-and-reference.md](docs/command-help-and-reference.md)); never edit generated
+    reference pages by hand;
+  - authentication or context changes: [docs/authentication-and-contexts.md](docs/authentication-and-contexts.md);
+  - configuration, project structure or environment variables: [docs/architecture.md](docs/architecture.md);
+  - behaviour covered by another doc in the table above: that doc.
+- Run `Test-OctoAgentDocs` (octo-tools) after changing `AGENTS.md` or `docs/`; `Test-OctoAgentDocs -Fix` regenerates
+  the routing table. The shim file for Claude Code is generated: edit this file, not the shim.
+- This repository is public: no work item ids, internal hostnames, customer or tenant names, or secrets in `AGENTS.md`,
+  `docs/`, help text or tests.
 
 ## Rules
 
+- **No credentials in output.** Never print a token, password or client secret, in a log line, an exception text or a
+  response body. Errors pass the central `ErrorOutputRedactor`; do not add per-command redaction and do not write
+  response bodies through `Console`. Mask values with `SecretMasker`
+  ([docs/secrets-and-output.md](docs/secrets-and-output.md)).
+- **Secrets never on the command line.** A command that takes a password or secret reads it through
+  `Services/SecretInput` (stdin flag, environment variable, hidden prompt); help samples never show a secret as an
+  argument ([docs/secrets-and-output.md](docs/secrets-and-output.md)).
+- **Destructive commands ask first.** Delete, clean, reset, remove, revoke, rotate and other credential-invalidating
+  verbs use `IConfirmationService` and accept `--yes`/`-y`
+  ([docs/destructive-commands.md](docs/destructive-commands.md)).
+- **One token, one tenant.** A command addressing tenant X never sends a token of another tenant and never falls back to
+  the context's own token; `AuthenticationService.ApplyAsync` is the only place that hands a token to the service
+  clients ([docs/authentication-and-contexts.md](docs/authentication-and-contexts.md)).
+- **Effective context, atomic writes.** Code acting on "the context in use" uses `GetEffectiveContext()` /
+  `SaveEffectiveContext()`, not the active one; every write of `contexts.json` goes through `ContextManager.Mutate`
+  ([docs/authentication-and-contexts.md](docs/authentication-and-contexts.md)).
+- **Top-level arguments.** `--context` is declared on the parser's top layer and has no short form; a new top-level
+  argument needs the same hoisting treatment
+  ([docs/authentication-and-contexts.md](docs/authentication-and-contexts.md)).
+- **GraphQL documents are tested against the schema.** Validate every hand-written GraphQL document with
+  `AssetRepositoryGraphQlSchema` ([docs/graphql-and-knowledge.md](docs/graphql-and-knowledge.md)).
+- **Public docs come from the command classes.** The command reference is generated from the command classes; keep help
+  strings inline in `AddArgument` collection literals
+  ([docs/command-help-and-reference.md](docs/command-help-and-reference.md),
+  [docs/secrets-and-output.md](docs/secrets-and-output.md)).

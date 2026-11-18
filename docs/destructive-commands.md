@@ -1,6 +1,6 @@
 ---
 description: How destructive commands ask for confirmation, the --yes flag, the confirmation messages and the parent scope text.
-applies_to: src/ManagementTool/Services/*Confirmation*.cs, src/ManagementTool/ToolException.cs
+applies_to: *Confirmation*.cs, ToolException.cs
 ---
 
 # Confirmation dialogs for destructive commands
@@ -60,9 +60,9 @@ pins the scope string for that reason.
 
 ```bash
 # Interactive: prompts for confirmation
-octo-cli tenants Delete -tid my-tenant
+octo-cli -c Delete -tid my-tenant
 
 # Skip confirmation (for scripts/CI)
-octo-cli tenants Delete -tid my-tenant --yes
-octo-cli tenants Delete -tid my-tenant -y
+octo-cli -c Delete -tid my-tenant --yes
+octo-cli -c Delete -tid my-tenant -y
 ```

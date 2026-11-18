@@ -50,34 +50,34 @@ octo-cli -c AuthStatus
 octo-cli -c Config -isu https://localhost:5003/ -asu https://localhost:5001/ -tid meshtest
 
 # List identity providers
-octo-cli identityProviders get
+octo-cli -c GetIdentityProviders
 
 # Add Azure Entra ID provider
 octo-cli -c AddAzureEntryIdIdentityProvider -n "Azure AD" -e true -t <tenantId> -cid <clientId>   # asks for the client secret
 
 # List users
-octo-cli users get
+octo-cli -c GetUsers
 
 # Create tenant (automatically provisions current user as admin)
-octo-cli tenants create -tid mytenant -db mytenant
+octo-cli -c Create -tid mytenant -db mytenant
 
 # Create tenant without admin provisioning
-octo-cli tenants create -tid mytenant -db mytenant --no-provision
+octo-cli -c Create -tid mytenant -db mytenant --no-provision
 
-# Inspect a tenant's durable provisioning lifecycle (Creating/Active/Deleting/Failed) — AB#4348
+# Inspect a tenant's durable provisioning lifecycle (Creating/Active/Deleting/Failed)
 octo-cli -c GetTenantLifecycle -tid mytenant
 # Operator safety valve: re-open a stuck/Failed tenant's setup so the background reconciler finishes it
 octo-cli -c ReRunTenantSetup -tid mytenant
 
 # Show the enabled-state of the active tenant's capabilities (Stream Data, Communication,
-# Reporting, AI Services) — the same flags the tenant delete/detach guard evaluates (AB#4255/AB#4884).
+# Reporting, AI Services) — the same flags the tenant delete/detach guard evaluates.
 # The Stream Data line also notes when stream data is switched off at the instance level.
 octo-cli -c GetTenantFeatures
 
 # Blueprints (asset repository) — initial install path is Phase 1
 octo-cli -c ListBlueprints                                          # list catalog blueprints across all sources (all pages)
 octo-cli -c ListBlueprints -n Samples.Photovoltaics                 # all versions of one blueprint (-s/-t = single page)
-octo-cli -c RefreshBlueprintCatalogs                                # force-refresh all blueprint catalog caches at the asset repo (AB#4309)
+octo-cli -c RefreshBlueprintCatalogs                                # force-refresh all blueprint catalog caches at the asset repo
 octo-cli -c RefreshBlueprintCatalogs -cn PrivateGitHubBlueprintCatalog  # force-refresh a single catalog (case-insensitive name)
 octo-cli -c InstallBlueprint -b MyBlueprint-1.0.0                   # apply blueprint to the active tenant
 octo-cli -c InstallBlueprint -b MyBlueprint-1.0.0 -f                # re-apply seed data via upsert (recovery)
@@ -88,7 +88,7 @@ octo-cli -c ListBlueprintInstallations                              # list bluep
 octo-cli -c UninstallBlueprint -n MyBlueprint                       # uninstall a blueprint (locked owned entities erased)
 octo-cli -c UninstallBlueprint -n MyBlueprint -c                    # cascade: also remove dependents and orphan deps
 octo-cli -c UninstallBlueprint -n MyBlueprint -y                    # skip the confirmation prompt
-octo-cli -c UninstallBlueprint -n MyBlueprint --dry-run             # AB#8966: list what would be erased and kept (reason), change nothing
+octo-cli -c UninstallBlueprint -n MyBlueprint --dry-run             # list what would be erased and kept (reason), change nothing
 
 # Blueprints — update (Phase 2a: operations layer; richer diff/merge in Phase 2b)
 octo-cli -c PreviewBlueprintUpdate -tv MyBlueprint-2.0.0            # preview changes a target version would apply (Merge mode)
@@ -96,29 +96,29 @@ octo-cli -c PreviewBlueprintUpdate -tv MyBlueprint-2.0.0 -m Safe    # preview in
 octo-cli -c UpdateBlueprint -tv MyBlueprint-2.0.0                   # apply update with Merge mode
 octo-cli -c UpdateBlueprint -tv MyBlueprint-2.0.0 -m Full           # apply Full mode
 octo-cli -c UpdateBlueprint -tv MyBlueprint-2.0.0 -dr               # dry-run (no persistent changes)
-# Tenant upgrade guard (AB#6871): the blueprint's CK models are judged against the installed models
+# Tenant upgrade guard: the blueprint's CK models are judged against the installed models
 octo-cli -c PreviewBlueprintUpdate -tv MyBlueprint-2.0.0 -fob       # --failOnBlocked: non-zero exit when the CK models would break an installed model (CI gate)
 octo-cli -c UpdateBlueprint -tv MyBlueprint-2.0.0 -f                # --force (= --forceBreakingUpdate): proceed although installed models break
 octo-cli -c InstallBlueprint -b MyBlueprint-2.0.0 -fbu              # --forceBreakingUpdate (InstallBlueprint -f already means re-apply)
 
-# Blueprint archives (AB#7991): InstallBlueprint and UpdateBlueprint log what happened to the archives of the seed (BlueprintArchiveActivationReport):
+# Blueprint archives: InstallBlueprint and UpdateBlueprint log what happened to the archives of the seed (BlueprintArchiveActivationReport):
 # a summary ("3 Activated, 1 SkippedStreamDataDisabled ...; 1 rollup backfill(s) queued"), the backfill job id per new rollup (follow with ListRecomputeJobs),
 # a warning per skipped archive and per service warning, an error per failed archive. InstallBlueprint also prints the JSON result with archiveActivations.
 # Tenant without stream data: the install succeeds, the archives are left out and a warning says so; re-apply with -f after EnableStreamData.
 
-# Blueprints — blanking protection (AB#6316, server AB#6315). A seed with an empty/omitted attribute would
+# Blueprints — blanking protection. A seed with an empty/omitted attribute would
 # clear a tenant value; the service keeps it unless confirmed. Summaries only, never values.
 octo-cli -c PreviewBlueprintUpdate -tv MyBlueprint-2.0.0            # JSON on stdout; blanking table + hint as warnings (log)
 octo-cli -c PreviewBlueprintUpdate -tv MyBlueprint-2.0.0 -fb        # --failOnBlanking: exit -5 when anything would be blanked (CI gate)
 octo-cli -c UpdateBlueprint -tv MyBlueprint-2.0.0                   # default: tenant values KEPT, kept attributes listed, exit 0
 octo-cli -c UpdateBlueprint -tv MyBlueprint-2.0.0 -cb <rtId>:<attr> -cb <rtId2>:<attr2>  # --confirm-blanking (repeatable): blank exactly these
 octo-cli -c UpdateBlueprint -tv MyBlueprint-2.0.0 -ab               # --allow-blanking: blank EVERY listed attribute (loud warning)
-# Tenant-owned seed entities (rtBlueprintLocked: false, AB#6454, server AB#6383): an edited one is never rewritten by an update;
-# one the tenant never edited receives a changed seed (server AB#8778). Both commands log (info, not warning) the tables
+# Tenant-owned seed entities (rtBlueprintLocked: false): an edited one is never rewritten by an update;
+# one the tenant never edited receives a changed seed. Both commands log (info, not warning) the tables
 # 'tenant-owned, refreshed', 'tenant-owned, skipped', 'tenant-owned, update available' (seed changed, content differs from the installed seed,
 # subset of skipped) and 'deleted by the tenant, stays deleted' (key, type, rtId or '-');
 # nothing when the lists are empty; identity only, no values; --failOnBlanking ignores them. The blanking Reason
-# (SeedEmpty | SeedOmitted | ResetToDefault, AB#6395) is printed as the service reports it.
+# (SeedEmpty | SeedOmitted | ResetToDefault) is printed as the service reports it.
 
 # Stream data lifecycle (asset repository)
 octo-cli -c EnableStreamData
@@ -130,7 +130,7 @@ octo-cli -c DeleteArchive -id 69fda707d47638c68edc7fea          # destructive �
 octo-cli -c DeleteArchive -id 69fda707d47638c68edc7fea -y       # skip confirmation
 octo-cli -c DisableStreamData
 
-# Archive data export / import (AB#4230) — move archive row data between tenants/environments.
+# Archive data export / import — move archive row data between tenants/environments.
 # Export the whole archive to a ZIP (starts a bot job, waits, then downloads the result).
 octo-cli -c ExportArchiveData -tid mytenant -aid 69fda707d47638c68edc7fea -o ./archive-export.zip
 # Export only a half-open time slice [fromUtc, toUtc) (ISO-8601 UTC; omit both for whole archive).
@@ -151,22 +151,22 @@ octo-cli -c UnfreezeRollupArchive -id <rollupRtId>              # clear FrozenUn
 octo-cli -c UnfreezeRollupArchive -id <rollupRtId> -ag          # accept resulting gaps
 octo-cli -c RewindRollupWatermark -id <rollupRtId> -t 2026-05-11T10:00:00Z # re-aggregate from boundary
 
-# Optimistic rollup recompute (AB#4184) — recompute a window range with no-mixed-read swap
+# Optimistic rollup recompute — recompute a window range with no-mixed-read swap
 octo-cli -c RecomputeArchive -id <rollupRtId> -f 2026-05-11T00:00:00Z -t 2026-05-12T00:00:00Z   # recompute [from, to)
 octo-cli -c RecomputeArchive -id <rollupRtId> -f 2026-05-11T00:00:00Z -t 2026-05-12T00:00:00Z -s <rtId>  # scoped to one entity
 octo-cli -c ListRecomputeJobs -id <rollupRtId>                 # recent recompute jobs (debug failures)
-# Backfill a rollup over the ENTIRE history of its source archive (AB#4269 / AB#4286) — no timestamp needed.
+# Backfill a rollup over the ENTIRE history of its source archive — no timestamp needed.
 # Durable background job: enqueues a recompute of [sourceMin, now) and returns the Pending job id
 # immediately (never cancelled by a client HTTP timeout; survives an asset-repo restart).
 octo-cli -c BackfillRollup -id <rollupRtId>                    # queue whole-history backfill, return job id
 octo-cli -c BackfillRollup -id <rollupRtId> -w                # queue, then poll the job until it completes
 
-# Ingested column (AB#7997) — add an attribute column to an Activated archive; history kept, existing rows read null
+# Ingested column — add an attribute column to an Activated archive; history kept, existing rows read null
 octo-cli -c AddArchiveColumn -id <archiveRtId> -p DischargingPower          # -x true to index it; idempotent
 # A blueprint update / ImportRt whose seed adds columns to an Activated archive adds them the same way
 # (computed ones via the backfill job) and lists them in the update result (archiveColumnsAdded).
 
-# Computed columns (AB#4189) — add a formula-derived column to a live archive and backfill it
+# Computed columns — add a formula-derived column to a live archive and backfill it
 octo-cli -c AddComputedColumn -id <archiveRtId> -n powerFactor -f "activePower / apparentPower" -r Double
 octo-cli -c AddComputedColumn -id <archiveRtId> -n flag -f "voltage > 230" -r Boolean -x false  # not indexed
 octo-cli -c RemoveComputedColumn -id <archiveRtId> -n powerFactor    # rejected if another computed column references it
@@ -183,7 +183,7 @@ octo-cli -c RemoveUserFromGroup -id <groupId> -uid <userId>
 octo-cli -c AddGroupToGroup -id <parentGroupId> -cgid <childGroupId>
 octo-cli -c RemoveGroupFromGroup -id <parentGroupId> -cgid <childGroupId>
 
-# Client role / group assignment (AB#4183) — lets a client_credentials client act as a
+# Client role / group assignment — lets a client_credentials client act as a
 # role-protected caller. Roles flow into the client's access token (direct + group-inherited).
 octo-cli -c AddClientToRole -id ci-deploy -r DataAnalyst          # assign a role by name
 octo-cli -c RemoveClientFromRole -id ci-deploy -r DataAnalyst     # remove a role (-y to skip confirm)
@@ -209,13 +209,13 @@ octo-cli -c CreateAdminProvisioningMapping -ttid <targetTenantId> -stid <sourceT
 octo-cli -c ProvisionCurrentUser -ttid <targetTenantId>
 octo-cli -c DeleteAdminProvisioningMapping -ttid <targetTenantId> -mid <mappingId>
 
-# CI/CD workload rollout (Epic 3054, #4053) — chart-version staging + deploy.
+# CI/CD workload rollout — chart-version staging + deploy.
 # List every workload in the active tenant that uses the chart.
 octo-cli -c GetWorkloadsByChart -cn octo-mesh-adapter
 # Set ChartVersion on a workload. Does NOT trigger a deploy.
 octo-cli -c UpdateWorkloadChartVersion -id <workloadRtId> -cv 1.2.3
 # Show / set / clear the typed CPU and memory settings of an adapter or application
-# (System.Communication 4.10.0, AB#7429). Does NOT deploy. A flag without a value clears it.
+# (System.Communication 4.10.0). Does NOT deploy. A flag without a value clears it.
 # Reads and writes through the tenant GraphQL endpoint (the controller has no endpoint for them),
 # checks quantities and request <= limit locally first. GetAdapter shows them under "resources".
 # Precedence at deploy: chart default < these settings < explicit valuesYaml / values[].
@@ -240,7 +240,7 @@ octo-cli -c MovePipelines -ids p1,p2 -aid <newAdapterRtId> -rd
 # -y skips the interactive confirmation prompt.
 octo-cli -c MovePipelines -ids p1 -aid <newAdapterRtId> -y
 
-# Rotate the secret of an adapter's pipeline service account (AB#5032 / AB#5048).
+# Rotate the secret of an adapter's pipeline service account.
 # Destructive: the old secret stops working the moment the controller answers.
 # A blueprint cannot do this — the secret attribute is runtime state — so this is the path.
 octo-cli -c RotateAdapterServiceAccountSecret -id <adapterRtId>
@@ -248,11 +248,11 @@ octo-cli -c RotateAdapterServiceAccountSecret -id <adapterRtId> -y   # skip conf
 # ...then redeploy, or the pipelines keep presenting the withdrawn secret:
 octo-cli -c DeployDataFlow -id <dataFlowRtId>
 
-# Impersonation switch of the tenant's pipeline service accounts (AB#6642): dry run by default.
+# Impersonation switch of the tenant's pipeline service accounts: dry run by default.
 octo-cli -c SwitchServiceAccountsToImpersonation                 # dry run, changes nothing
 octo-cli -c SwitchServiceAccountsToImpersonation -a -y -rdf true # apply, no prompt
 
-# Multi-tenant ClientCredentials mirroring (Epic 3054, #4047)
+# Multi-tenant ClientCredentials mirroring
 # Create a flagged client in octosystem — gets auto-provisioned into every new sub-tenant.
 vault kv get -field=secret <path> | octo-cli -c AddClientCredentialsClient -id ci-deploy -n "CI Deploy" --secret-stdin -apic
 # List the sub-tenants a client has been mirrored into.
@@ -267,7 +267,7 @@ octo-cli -c UnprovisionClientFromTenant -id ci-deploy -ctid acme
 # Note: flipping true does NOT auto-backfill — use ProvisionClientInExistingTenants for that.
 octo-cli -c SetClientAutoProvision -id ci-deploy -e true
 
-# Client overlay URIs (AB#4209 Step 4) — append operator-scoped URIs onto blueprint-managed
+# Client overlay URIs — append operator-scoped URIs onto blueprint-managed
 # clients (e.g. local-dev callbacks on the Refinery Studio client) without modifying the
 # blueprint. Entries are written with Source = "overlay:<OverlayName>" and survive blueprint
 # re-apply via the Step 2a preservation pass. Idempotent — duplicates silently skipped.
@@ -276,12 +276,12 @@ octo-cli -c ApplyClientOverlay -id octo-data-refinery-studio -n local-dev \
   -plr "http://localhost:4200/" \
   -co "http://localhost:4200"
 
-# Strip overlay URIs (AB#4209 Step 5) — destructive cleanup before a sanitised tenant dump.
+# Strip overlay URIs — destructive cleanup before a sanitised tenant dump.
 # Without -n: removes every overlay:* source. With -n: removes only overlay:<name>.
 # Typical workflow before sharing a dump:
 #   octo-cli -c CleanClientOverlays -y && octo-cli -c DumpTenant -tid mytenant ...
 # After dumping, restore the local-dev overlays via the cmdlet (idempotent):
-#   Apply-IdentityOverlay
+#   Invoke-IdentityOverlay
 octo-cli -c CleanClientOverlays                         # strip all overlay:* (prompts)
 octo-cli -c CleanClientOverlays -n local-dev -y         # strip only overlay:local-dev, skip prompt
 
@@ -295,14 +295,14 @@ octo-cli -c AddAzureEntryIdIdentityProvider -n "Azure" -e true -t <tenantId> -ci
 octo-cli -c EnableAi
 octo-cli -c DisableAi
 
-# AI credential bastion flow (#4123) — register an Anthropic subscription token on a tenant.
+# AI credential bastion flow — register an Anthropic subscription token on a tenant.
 #   Two-machine pattern: a tenant admin mints a one-time code via Refinery Studio
 #   ("Issue ticket" panel on the AI Console). The code is handed out-of-band to the
 #   operator on the bastion machine, who has just completed `claude /login`. The
 #   operator then redeems the code together with the freshly minted Anthropic
 #   tokens — anonymously, no OctoMesh user session required. The code is the auth
 #   artefact; it can be redeemed exactly once and expires after a few minutes.
-#   The tokens come from the environment (the -at / -rt arguments are deprecated, AB#8044).
+#   The tokens come from the environment (the -at / -rt arguments are deprecated).
 read -rs OCTO_CLI_AI_ACCESS_TOKEN && read -rs OCTO_CLI_AI_REFRESH_TOKEN && export OCTO_CLI_AI_ACCESS_TOKEN OCTO_CLI_AI_REFRESH_TOKEN
 octo-cli -c RedeemAiTicket \
   -tid meshtest \

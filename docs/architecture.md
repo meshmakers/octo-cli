@@ -1,6 +1,6 @@
 ---
 description: Project structure, key services, configuration files, environment variables and the command categories of octo-cli.
-applies_to: src/ManagementTool/*.cs, src/ManagementTool/Services/**, **/*.csproj, Octo.Cli.sln, devops-build/**
+applies_to: src/ManagementTool/*.cs, **/Services/**, *.csproj, Octo.Cli.sln, devops-build/**
 ---
 
 # Architecture and configuration
@@ -55,7 +55,7 @@ longer in the global NuGet cache.
 
 ## Key Components
 
-- **ContextManager** (`Services/ContextManager.cs`): Manages named contexts stored in `~/.octo-cli/contexts.json`. Each context holds its own `OctoToolOptions` (service URIs, tenant) and `OctoToolAuthenticationOptions` (tokens). Supports migration from legacy `settings.json`. **Context names are matched case-insensitively** (`StringComparer.OrdinalIgnoreCase`), so `UseContext`/`RemoveContext` accept any casing; the active context is persisted using the stored key's canonical casing. `RequestedContextName` keeps the name exactly as passed to `SelectContext`, so a command that replaces a context's login can tell a case-only match (AB#9063, `LogInClientCredentials`). Because System.Text.Json deserializes the `Contexts` dictionary with the ordinal comparer, `Load()` rebuilds it with `OrdinalIgnoreCase` after reading the file. Distinguishes the **active** context (persisted) from the **effective** one (`SelectContext` / `GetEffectiveContext`, chosen per invocation by `--context`), and serialises every write behind a cross-process lock — see [Per-invocation context override](#per-invocation-context-override---context).
+- **ContextManager** (`Services/ContextManager.cs`): Manages named contexts stored in `~/.octo-cli/contexts.json`. Each context holds its own `OctoToolOptions` (service URIs, tenant) and `OctoToolAuthenticationOptions` (tokens). Supports migration from legacy `settings.json`. **Context names are matched case-insensitively** (`StringComparer.OrdinalIgnoreCase`), so `UseContext`/`RemoveContext` accept any casing; the active context is persisted using the stored key's canonical casing. `RequestedContextName` keeps the name exactly as passed to `SelectContext`, so a command that replaces a context's login can tell a case-only match (`LogInClientCredentials`). Because System.Text.Json deserializes the `Contexts` dictionary with the ordinal comparer, `Load()` rebuilds it with `OrdinalIgnoreCase` after reading the file. Distinguishes the **active** context (persisted) from the **effective** one (`SelectContext` / `GetEffectiveContext`, chosen per invocation by `--context`), and serialises every write behind a cross-process lock — see [Per-invocation context override](authentication-and-contexts.md#per-invocation-context-override---context).
 
 - **AuthenticationService** (`Services/AuthenticationService.cs`): Handles OAuth token management. Saves tokens to the *effective* context via `IContextManager` (`SaveEffectiveContext`), so `--context` sends the token to the context the command actually used. Supports both access tokens and refresh tokens.
 
@@ -81,11 +81,11 @@ Environment variables are prefixed with `OCTO_`:
 | `OCTO_CLI_CONTEXT` | Context used for this invocation, like `--context` but for a whole subshell. The argument wins when both are set. |
 | `OCTO_CLI_HOME` | Parent directory of the `.octo-cli` folder. Give parallel jobs different values to get fully separate `contexts.json` files. Trimmed before use — untrimmed whitespace would silently resolve to a different directory rather than fail. |
 | `OCTO_CLI_CLIENT_ID` / `OCTO_CLI_CLIENT_SECRET` | Credentials for `LogInClientCredentials` and for automatic token renewal. |
-| `OCTO_CLI_NEW_PASSWORD` | Password a command sets (`ResetPassword`, `CreateUser`, `Setup`, AB#8044). |
+| `OCTO_CLI_NEW_PASSWORD` | Password a command sets (`ResetPassword`, `CreateUser`, `Setup`). |
 | `OCTO_CLI_NEW_CLIENT_SECRET` | Secret of a client a command creates (`AddClientCredentialsClient`, `AddDeviceCodeClient`). Deliberately not `OCTO_CLI_CLIENT_SECRET`, which is the secret octo-cli itself logs in with. |
 | `OCTO_CLI_IDP_CLIENT_SECRET` | Client secret of an identity provider (`AddOAuthIdentityProvider`, `AddAzureEntryIdIdentityProvider`, `UpdateIdentityProvider`). |
 | `OCTO_CLI_AI_ACCESS_TOKEN` / `OCTO_CLI_AI_REFRESH_TOKEN` | Anthropic tokens for `RedeemAiTicket`. |
-| `OCTO_CLI_CHILD_CLIENT_SECRET` | Optional (AB#7192). Secret of the client's **mirror** in a child tenant, used by `Delete --disable-features` for the child token. Without it `OCTO_CLI_CLIENT_SECRET` is tried in the child, which only works while the child accepts the inherited parent secret (AB#5061). |
+| `OCTO_CLI_CHILD_CLIENT_SECRET` | Optional. Secret of the client's **mirror** in a child tenant, used by `Delete --disable-features` for the child token. Without it `OCTO_CLI_CLIENT_SECRET` is tried in the child, which only works while the child accepts the inherited parent secret. |
 
 ## Command Categories
 
@@ -101,7 +101,7 @@ Environment variables are prefixed with `OCTO_`:
 | General | login, loginClientCredentials, authStatus, config | Local operations |
 | Context | addContext, removeContext, useContext, listContexts | Local operations |
 
-> **AB#4287 — tenant-scoped service clients.** The StreamData and Reporting service clients
+> **Tenant-scoped service clients.** The StreamData and Reporting service clients
 > are now tenant-scoped (like Communication): `Program.cs` sets `TenantId` (from the active
 > context) on `StreamDataServiceClientOptions` and `ReportingServicesClientOptions`. The SDK
 > routes these to `{tenantId}/v1` and throws `ServiceConfigurationMissingException` if the

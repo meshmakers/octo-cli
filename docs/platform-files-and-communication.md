@@ -1,21 +1,21 @@
 ---
 description: Platform file system commands, adapter pool queue, adapters, pipelines, triggers, pools and data flows.
-applies_to: src/ManagementTool/Commands/Implementations/{Communication,Ai}/**, src/ManagementTool/Commands/Implementations/Asset/PlatformFiles/**
+applies_to: **/Implementations/{Communication,Ai}/**, **/Asset/PlatformFiles/**
 ---
 
 # Platform files and communication commands
 
-## Platform file system commands (AB#6182)
+## Platform file system commands
 
 `GetFiles`, `UploadFile` and `DownloadFile` (`Commands/Implementations/Asset/PlatformFiles/`) wrap the typed
-`IAssetServicesClient.Files` client of the SDK (System.Files, AB#6171: bytes over REST `/{tenant}/v1/files`,
+`IAssetServicesClient.Files` client of the SDK (System.Files: bytes over REST `/{tenant}/v1/files`,
 metadata over GraphQL). Files are addressed by root well-known name (default `Files`) plus `/`-separated path,
 `DownloadFile` also by `-id <rtId>`. `UploadFile -c fail|replace|keepBoth` maps to `FileConflictMode`;
 `DownloadFile` streams to a `.part` file and moves it into place, and refuses to overwrite an existing local file
 without `-o`. No tenant feature must be enabled; the MCP counterparts are `list_files`, `upload_file`,
 `download_file` (octo-mcp-service). Their reference pages are generated from the command classes like all others.
 
-## Adapter pool queue (AB#4924 §10)
+## Adapter pool queue
 
 `GetAdapterPoolQueue -id <adapterPoolRtId>` and `CancelQueuedExecution -id <adapterPoolRtId> -eid
 <executionId>` are the CLI third of the queue surface concept §5 asks for — the same view Refinery
@@ -39,14 +39,6 @@ deliberate and must survive future edits:
 Manual (non-pooled) adapters have no queue at all and therefore no equivalent command — that
 asymmetry is intended.
 
-🔴 **`CommandReferenceGenerator.Tests` cannot run from a scratch `-p:BaseOutputPath`.**
-`RoslynExtractorTests.InheritedArgsByBaseClass_does_not_drift_from_JobWithWaitOctoCommand_source`
-walks up from `AppContext.BaseDirectory` looking for `Octo.Cli.sln` and asserts it found it, so an
-assembly built outside the repo fails with `Assert.NotNull() Failure: Value is null` — a red test
-that says nothing about the code. Build *that* project into the repo's own `bin/` (or run
-`dotnet test`) and keep the scratch output path for `ManagementTool.Tests`, which has no such
-dependency.
-
 ## Communication Services Commands
 
 All communication commands accept plain runtime object IDs (e.g. `69cfa838092b710403248acd`). The SDK client internally constructs composite RtEntityId strings where the server requires them.
@@ -56,13 +48,13 @@ All communication commands accept plain runtime object IDs (e.g. `69cfa838092b71
 | Command | Parameters | Description |
 |---------|-----------|-------------|
 | `GetAdapters` | `--json` (optional) | List all adapters for the tenant |
-| `GetAdapter` | `--identifier <rtId>`, `--json`, `--show-secrets` (optional) | Get adapter configuration; credentials masked unless `--show-secrets` (AB#6286) |
+| `GetAdapter` | `--identifier <rtId>`, `--json`, `--show-secrets` (optional) | Get adapter configuration; credentials masked unless `--show-secrets` |
 | `GetAdapterNodes` | | List available pipeline nodes from connected adapters |
 | `GetPipelineSchema` | `--adapterId <rtId>`, `--outputFile` (optional) | Get pipeline JSON schema for an adapter |
 | `RotateAdapterServiceAccountSecret` | `--identifier <rtId>`, `--yes` (optional) | Rotate the secret of the adapter's pipeline service account (destructive — prompts) |
 | `SwitchServiceAccountsToImpersonation` | `--apply` (optional, default dry run), `--redeployDataFlows <true\|false>` (default true), `--yes`, `--json` | Dry-run or apply the switch of the tenant's pipeline service accounts to impersonation (apply is destructive — prompts) |
 
-#### `RotateAdapterServiceAccountSecret` (AB#5032 / AB#5048)
+#### `RotateAdapterServiceAccountSecret`
 
 Backs `POST {tenantId}/v1/adapter/{adapterRtId}/serviceAccount/rotateSecret` via
 `ICommunicationServicesClient.RotateServiceAccountSecretAsync`. Three properties of it are
@@ -82,7 +74,7 @@ deliberate and easy to undo by accident:
 - **No secret is printed**, because the response carries none. Both the controller and
   `Communication.Contracts.Tests` pin that.
 
-#### `SwitchServiceAccountsToImpersonation` (AB#5537 / AB#6642)
+#### `SwitchServiceAccountsToImpersonation`
 
 Backs `POST {tenantId}/v1/serviceAccount/switchToImpersonation` via
 `ICommunicationServicesClient.SwitchServiceAccountsToImpersonationAsync`. Dry run is the default and
@@ -101,13 +93,13 @@ secret or token and the command prints only report fields (pinned by tests).
 | `DeployPipeline` | `--adapterId <rtId>`, `--pipelineId <rtId>`, `--file <path>` | Deploy pipeline definition (YAML/JSON file) |
 | `ExecutePipeline` | `--identifier <rtId>`, `--inputFile <path>` (optional) | Execute a pipeline, returns execution ID |
 | `GetPipelineExecutions` | `--identifier <rtId>`, `--json` (optional) | List pipeline execution history |
-| `GetLatestPipelineExecution` | `--identifier <rtId>`, `--json` (optional) | Get the most recent pipeline execution; `FailureKind` (AB#8156) is shown as `OutcomeUnknown` / `Failed` / `null` |
+| `GetLatestPipelineExecution` | `--identifier <rtId>`, `--json` (optional) | Get the most recent pipeline execution; `FailureKind` is shown as `OutcomeUnknown` / `Failed` / `null` |
 | `GetPipelineDebugPoints` | `--identifier <rtId>`, `--executionId <guid>`, `--json` (optional) | Get debug points for a specific execution |
 | `SetPipelineDebug` | `--identifier <rtId>`, `--enabled <true\|false>` | Enable or disable debug capture for a pipeline |
 | `GetPipelineDebug` | `--identifier <rtId>`, `--json` (optional) | Get the debug state of a pipeline |
 
-`GetPipelineExecutions` and `GetLatestPipelineExecution` print the execution JSON through `PipelineExecutionOutput` (AB#8156):
-`FailureKind` (octo-sdk `PipelineExecutionDataDto`, AB#8037 kind of the controller) appears as its name - `"OutcomeUnknown"` when a
+`GetPipelineExecutions` and `GetLatestPipelineExecution` print the execution JSON through `PipelineExecutionOutput`:
+`FailureKind` (octo-sdk `PipelineExecutionDataDto`, kind of the controller) appears as its name - `"OutcomeUnknown"` when a
 write was not acknowledged and may have taken effect, `"Failed"` for an ordinary failure, `null` otherwise (no failure, an adapter
 that reported no kind, interrupted or offline-buffered executions) - instead of the enum number. Other members keep their
 rendering (`Status` stays the number). Tests: `PipelineExecutionFailureKindOutputTests`.

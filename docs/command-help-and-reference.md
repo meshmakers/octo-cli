@@ -13,28 +13,28 @@ implicit: no command declares it, every command understands it.
 
 > **Top-level arguments.** Besides `-c`/`--command` and the help flag, octo-cli declares one
 > argument on the parser's top layer: `--context` (see
-> [Per-invocation context override](#per-invocation-context-override---context)). It is understood
+> [Per-invocation context override](authentication-and-contexts.md#per-invocation-context-override---context)). It is understood
 > by every command, in any position, and is listed in the full usage output. Commands themselves
 > keep declaring their arguments via `CommandArgumentValue.AddArgument`; a top-level argument is
 > added in `OctoCommandParser`, and only for something that genuinely applies to all commands.
 
-The help has three levels, so nobody has to page through all 176 commands to find one:
+The help has three levels, so nobody has to page through every command to find one:
 
 ```bash
-# 1. Which groups are there? (~19 lines)
+# 1. Which groups are there?
 octo-cli -h
 
-# 2. Which commands are in a group? Verb + description, no arguments (~94 lines for the largest group)
+# 2. Which commands are in a group? Verb + description, no arguments (the largest group has the most lines)
 octo-cli -h "Identity Services"
 octo-cli -h identity          # prefix match, case-insensitive
 octo-cli -h Identity Services # quoting is optional, the words are joined
 octo-cli -h General
 
-# 3. What does one command take? Arguments, samples and notes (~15 lines)
+# 3. What does one command take? Arguments, samples and notes
 octo-cli -c Create --help
 octo-cli -h Create            # a topic that names a command goes straight to its help
 
-# Everything at once, as before (~1210 lines)
+# Everything at once, as before (very long)
 octo-cli -h all
 octo-cli                      # same dump on the error path: the mandatory -c is missing
 ```
@@ -73,7 +73,7 @@ Behaviour worth knowing:
 
 **Groups come from the `base(...)` call**, not from a registry: the first argument of the
 `Command<T>` constructor, in practice one of the `Constants.*Group` values
-(`Constants.cs:13-21`). A command using the constructor overload without a group lands in
+(`src/ManagementTool/Constants.cs`). A command using the constructor overload without a group lands in
 `General`. A new group therefore exists as soon as one command names it — nothing else to
 register, and it shows up in `-h` automatically.
 
@@ -150,7 +150,7 @@ internal class FooCommand : ServiceClientOctoCommand<IFooClient>
 
 ### Where output goes
 
-The generator emits to `bin/Release/documentation/technologyGuide/tools/octo-cli/command-reference/` during CI builds. `octo-cli-pipeline.yml` invokes `createCommandReference.ps1`, and the resulting tree is published as the `_octo-cli` artifact via `handle-artifacts.yml`.
+The generator emits to `bin/Release/documentation/technologyGuide/tools/octo-cli/command-reference/` during CI builds. `azure-pipelines.yml` runs `devops-build/createCommandReference.ps1`, and the resulting tree is published as the `_octo-cli` artifact by the shared `handle-artifacts` template (`apiDocumentationPaths`).
 
 ### End-to-end flow
 
@@ -183,3 +183,13 @@ help string, or a base() description in any command class is the **single**
 step needed to update the public docs site. No manual edits in
 `octo-documentation` — handwritten pages there are limited to `intro.md`
 and `common-workflows.md`.
+
+## Running the generator tests
+
+🔴 **`CommandReferenceGenerator.Tests` cannot run from a scratch `-p:BaseOutputPath`.**
+`RoslynExtractorTests.InheritedArgsByBaseClass_does_not_drift_from_JobWithWaitOctoCommand_source`
+walks up from `AppContext.BaseDirectory` looking for `Octo.Cli.sln` and asserts it found it, so an
+assembly built outside the repo fails with `Assert.NotNull() Failure: Value is null` — a red test
+that says nothing about the code. Build *that* project into the repo's own `bin/` (or run
+`dotnet test`) and keep the scratch output path for `ManagementTool.Tests`, which has no such
+dependency.

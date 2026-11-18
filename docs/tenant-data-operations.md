@@ -1,11 +1,11 @@
 ---
 description: Large uploads, restore outcome, rollup validate and repair, dump through the operation handle, scratch tenants.
-applies_to: src/ManagementTool/Commands/Implementations/Asset/{Tenants,TimeSeries,Operations}/**, src/ManagementTool/Services/ChildTenantAccess.cs
+applies_to: **/Asset/{Tenants,TimeSeries,Operations}/**, ChildTenantAccess.cs
 ---
 
 # Tenant data operations
 
-## Large uploads: Restore and ImportArchiveData (AB#6970, Bug AB#6786)
+## Large uploads: Restore and ImportArchiveData
 
 `Restore` (`Asset/Tenants/RestoreTenant.cs`) and `ImportArchiveData` (`Asset/TimeSeries/ImportArchiveData.cs`) upload through
 the SDK's `RestoreRepositoryWithTusAsync` / `StartImportArchiveDataWithTusAsync`, which send the file in parts of at most
@@ -25,7 +25,7 @@ staging-1, prod-1, prod-2; before, one PATCH of the whole file was refused with 
 - Tests: `TusUploadCommandTests` (fake `IBotServicesClient`: part size option, refusal, progress). The tus test server lives in
   the SDK tests (internal there); the wire behaviour (parts, 413, resume) is tested in the SDK, not repeated here.
 
-## Restore outcome (AB#6969)
+## Restore outcome
 
 `Restore -w` reads the finished job (`JobDto`: `Outcome`, `FailedArchives`, `NotCheckedRollups`, derived `HasWarnings`) and does not print a
 plain "restored" when the restore only partly succeeded. `RestoreOutcome.ThrowIfWarnings` logs every failed archive and every blocking
@@ -34,7 +34,7 @@ M rollup(s) not checked: <id> [Cause]. The tenant is not fully restored.` (`rest
 Informational not-checked rollups (never activated) are logged as `not checked (info)` and do not change the result. A bot without these
 fields (older bot, no `-w`) behaves as before. Tests: `RestoreOutcomeTests`; `RestoreOutcomeContractTests` feeds the wire JSON captured in the bot tests (failed archive, clean, informational) through the real `BotServicesClient` into the command.
 
-## Rollup validate and repair (AB#6968)
+## Rollup validate and repair
 
 `ValidateRollups`, `RepairRollups` and `GetRollupRepairStatus` (`Asset/TimeSeries/`) are the operator check for the rollup state after a
 CrateDB restore (DR runbook: `ValidateRollups`, then `RepairRollups` as a dry run, then `RepairRollups --apply --wait`). They call
@@ -55,19 +55,19 @@ asset repository `streamdata/rollups/validate|repair`).
 - **NotChecked:** a rollup the validator could not check is never printed as OK. A blocking gap (NoLiveTable, SourceMissing; `isBlocking`) is listed in `Not checked (N):` with `[Cause] reason`, the summary says `N NOT CHECKED`, and `-ff` exits -5 (it follows the report's `IsOk`). A never-activated rollup (NeverActivated, informational) has no data: it is listed separately as `Not checked (informational, N):` / `not checked (info)`, the summary adds `N not checked (info)`, and it neither fails the report nor `-ff`. `RepairRollups` (dry run and applied) prints the rollups it skipped under `Skipped, not repaired because they could not be checked:`.
 - Output goes through `RollupConsistencyFormatter` (only report fields are printed). Tests: `RollupConsistencyCommandTests`.
 
-## Dump through the operation handle; GetOperation / ListOperations (AB#8446)
+## Dump through the operation handle; GetOperation / ListOperations
 
 `Dump` (`Asset/Tenants/DumpTenant.cs`) runs, for the tenant of the context, the asynchronous CK method
-`System.Bot/TenantRepository.Dump-1` (System.Bot 3.7.0, bot services AB#8445) through `TenantRepositoryDumpClient` and the
-SDK's `CkOperationsClient` (octo-sdk AB#8446, `docs/method-clients.md` "Asynchronous methods"):
+`System.Bot/TenantRepository.Dump-1` (System.Bot 3.7.0, bot services) through `TenantRepositoryDumpClient` and the
+SDK's `CkOperationsClient` (`octo-sdk/docs/method-clients.md`, "Asynchronous methods"):
 
 - **Flow**: authenticate the tenant client (it has its own token), call `DumpAsync` (handle), log
   `Dump operation '<id>' accepted`, `WaitForOperationAsync` with `OperationProgressLogger` (one line per change: state,
   stage, percent, `jobId`), refresh the token before every read (`BeforeReadAsync`), download the result's `JobId` with
   `IBotServicesClient.DownloadDumpToFileAsync` as before. The wait honours `retryAfterSeconds` (1-30 s), no `Thread.Sleep`.
-- **Fallback to the job API** (`CkMethodFallback`, shared with the user role commands since AB#8838): only when the call
+- **Fallback to the job API** (`CkMethodFallback`, shared with the user role commands): only when the call
   was certainly not executed — every GraphQL error carries `extensions.number` (document rejected by validation: asset
-  repository without AB#8444 or tenant without System.Bot 3.7.0) or the code is `METHOD_HANDLER_NOT_AVAILABLE`; and always for `-tid` other than the context's
+  repository without the Dump support or tenant without System.Bot 3.7.0) or the code is `METHOD_HANDLER_NOT_AVAILABLE`; and always for `-tid` other than the context's
   tenant (the method runs only with a token of its own tenant). `METHOD_FORBIDDEN` and other refusals are thrown (Runner,
   exit -3), no fallback. A failed operation (`DUMP_FAILED`, `DUMP_INTERRUPTED`: `ServiceClientException` with the code, a
   readable text and the parameters; `METHOD_OUTCOME_UNKNOWN`: `CkMethodCallException`) downloads nothing.
@@ -83,7 +83,7 @@ SDK's `CkOperationsClient` (octo-sdk AB#8446, `docs/method-clients.md` "Asynchro
   every sent document validated against `Fixtures/asset-repo-schema.test-2-system-bot-3.7.json.gz` with
   `AssetRepositoryGraphQlSchema.ValidateAgainstSystemBotAsync`).
 
-## Scratch tenants: an agent works in and cleans up what it creates (AB#7192)
+## Scratch tenants: an agent works in and cleans up what it creates
 
 An agent that creates throw-away child tenants with a client-credentials client no longer needs a human device-code login per tenant.
 
@@ -94,7 +94,7 @@ An agent that creates throw-away child tenants with a client-credentials client 
   outside the tenant database and survives the restore; a plain restore writes no scratch record. `GetTenants` shows `isScratch`, `scratchCreatorClientId`,
   `scratchCreatedAtUtc`, `scratchAccessRevoked`.
 - **Working in the child:** a context for the child tenant plus `LogInClientCredentials` with `OCTO_CLI_CLIENT_ID` / `OCTO_CLI_CLIENT_SECRET` of the
-  mirror (its own secret from `RotateMirrorSecret`, or - while AB#5061 keeps the inherited secret - the parent client's secret) gives the usual
+  mirror (its own secret from `RotateMirrorSecret`, or - while the child still accepts the inherited parent secret - the parent client's secret) gives the usual
   child token; all existing verbs and the MCP tools then work in the tenant.
 - **`Delete --disable-features` (`-df`, requires `-y`)** switches off every capability the tenant has enabled - AI Services, Communication, Reporting,
   Stream Data, in that order - with *the caller's token for that child tenant*, prints what it disabled, then deletes the tenant. The capability

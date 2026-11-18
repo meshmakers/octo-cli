@@ -1,11 +1,11 @@
 ---
 description: Tenant upgrade guard for catalog, file and blueprint imports, CK library status, empty-model checks.
-applies_to: src/ManagementTool/Commands/Implementations/Asset/{CkModelLibraries,Models,Blueprints}/**, src/ManagementTool/Services/CkModelFileInspector.cs
+applies_to: **/Asset/{CkModelLibraries,Models,Blueprints}/**, CkModelFileInspector.cs
 ---
 
 # CK models, library status and blueprints
 
-## CK model import and the tenant upgrade guard (AB#6870)
+## CK model import and the tenant upgrade guard
 
 `ImportFromCatalog` and `FixAll` (`Commands/Implementations/Asset/CkModelLibraries/`) import through `ResolveDependenciesBatchAsync` +
 `ImportFromCatalogBatchAsync`. The asset repository judges the whole import set with the tenant upgrade guard and refuses a set that
@@ -20,7 +20,7 @@ would break an installed model with `409 CK_UPGRADE_BLOCKED` (SDK: `CkUpgradeBlo
   the requested models whose tree contains a blocking update are dropped and reported, the set is resolved again and the rest is imported;
   when no model can be left out, or the service refuses anyway, it fails with `ToolException` ("never forces") and imports nothing.
   A blocker can disappear after another update was imported, so `FixAll` may have to be run twice (update `Registration` first).
-- **Joint import of mutually exact-pinned models (AB#7376)**: `ImportFromCatalog -m A,B,C` (comma-separated, like `UpdateClientRoles -rids`)
+- **Joint import of mutually exact-pinned models**: `ImportFromCatalog -m A,B,C` (comma-separated, like `UpdateClientRoles -rids`)
   sends one `ResolveDependenciesBatch` with all roots and one `ImportFromCatalogBatch`; the service judges the list as one post-state, so
   exact pins of replaced versions stop blocking. The service imports ids in request order and concatenates the trees of the roots, so
   `JointImportPlanner.OrderByDependencies` orders the set in the CLI: a model follows every other model of the set whose name appears in
@@ -30,7 +30,7 @@ would break an installed model with `409 CK_UPGRADE_BLOCKED` (SDK: `CkUpgradeBlo
   existing drop loop leaves out only what is still blocked in the joint set. Tests: `JointImportCommandTests` (octo-mesh-energy group of six).
 - Tests: `tests/ManagementTool.Tests/CkUpgradeGuardImportCommandTests.cs`.
 
-## ImportCk rejects empty and missing construction kit files (AB#2615)
+## ImportCk rejects empty and missing construction kit files
 
 `ImportCk` (`Commands/Implementations/Asset/Models/ImportConstructionKitModel.cs`) checks the file with
 `Services/CkModelFileInspector` before anything is uploaded. A CK model is **empty** when none of the top-level
@@ -43,13 +43,12 @@ A **non-existent input file** also fails with `ToolException.FilePathDoesNotExis
 it used to log an error and exit 0.
 Tests: `tests/ManagementTool.Tests/CkModelFileInspectorTests.cs`, `ImportConstructionKitModelTests.cs`.
 
-## CK library status: ACTION terms and the upgrade guard (AB#6869)
+## CK library status: ACTION terms and the upgrade guard
 
 `LibraryStatus` derives the ACTION column per row, first match wins: `Service-Managed`, `Incompatible`
 (incompatible with the installed System models), **`Blocked`**, `Update` / `Fix` (needs action), `Install`, `-`.
 
-- **`Blocked`** means the offered catalog version would break an installed dependent (tenant upgrade guard,
-  AB#6867/AB#6868). The server row has `IsBlocked`, `HasUpdate = true`, `NeedsAction = false`; therefore
+- **`Blocked`** means the offered catalog version would break an installed dependent (tenant upgrade guard). The server row has `IsBlocked`, `HasUpdate = true`, `NeedsAction = false`; therefore
   **`--needs-action` does not list blocked rows** (it follows the server flag). REASON shows the first blocker
   (`<dependent>: <message>`), `(+N more)` and the resolve hint of the first blocker when the server proved one.
 - The summary line appends `, N blocked` only when N > 0; below the table a **`Would break:`** section lists every
@@ -57,14 +56,14 @@ Tests: `tests/ManagementTool.Tests/CkModelFileInspectorTests.cs`, `ImportConstru
 - `CheckUpgrade` appends a `Would break:` section (one line per blocker) after the unchanged fields only when
   `IsBlocked`. **The exit code is unchanged** (0): both commands stay read-only reports; an unblocked update and an
   older server without the members (`IsBlocked`/`Blockers` default to `false`/empty) print exactly as before.
-  The story text of AB#6869 asked for a non-zero exit of `CheckUpgrade`; the CPO lane brief of
-  2026-10-17 says exit code unchanged, so a non-zero exit stays an open point (possible later pre-flight switch).
+  A non-zero exit of `CheckUpgrade` was considered and left out (exit code unchanged); it stays an open point (possible later
+  pre-flight switch).
 - Rendering lives in `UpgradeBlockerFormatter` (null-safe). The commands print through the logger; there is no
   JSON output mode for these two commands. The SDK DTOs carry the new members, so MCP/GraphQL consumers see them.
 - Tests: `LibraryStatusCommandTests`, `CheckUpgradeCommandTests`. The command reference page is generated from the
   `GetDocumentation()` samples.
 
-### Tenant upgrade guard for the file import (CK v2 F2.5, AB#6966)
+### Tenant upgrade guard for the file import (CK v2 F2.5)
 
 `ImportCk -f <file>` is guarded by the service like `ImportFromCatalog`: a file that would break an installed model - a `System` file
 included - is refused with `409 CK_UPGRADE_BLOCKED`, nothing is imported. The command calls the additive SDK overload
@@ -75,13 +74,13 @@ included - is refused with `409 CK_UPGRADE_BLOCKED`, nothing is imported. The co
   `--force` was not reused). It logs a WARN and needs the data model management role (403 otherwise). A CLI without the option against an
   older service behaves as before (the older service does not guard); a new CLI against an older service sends a form member that is ignored.
 - **CheckUpgrade** help now says that "Breaking Changes" is the migration view of the model itself and "Would break" (`isBlocked` /
-  `blockers`) is the tenant upgrade guard; the service judges `System` too since AB#6966 (before, `CheckUpgrade -m System-2.8.0` printed
+  `blockers`) is the tenant upgrade guard; the service judges `System` too (before, `CheckUpgrade -m System-2.8.0` printed
   `Breaking Changes: False` and no blockers for a release that made the tenant unloadable).
 - Tests: `ImportConstructionKitModelTests` (refused -> blockers printed + exit error, override sent + WARN, empty/missing file unchanged).
 
-### Tenant upgrade guard for blueprints (CK v2 F2.5, AB#6871)
+### Tenant upgrade guard for blueprints (CK v2 F2.5)
 
-`InstallBlueprint`, `UpdateBlueprint` and `PreviewBlueprintUpdate` carry the guard of `ImportFromCatalog` (AB#6870) to blueprints:
+`InstallBlueprint`, `UpdateBlueprint` and `PreviewBlueprintUpdate` carry the guard of `ImportFromCatalog` to blueprints:
 the CK models a blueprint installs or raises are judged against the installed models by the asset repository.
 
 - `PreviewBlueprintUpdate` prints the unchanged JSON (now with `isBlocked`, `ckUpdateSet`, `blockers`) and, when blocked, a warning
