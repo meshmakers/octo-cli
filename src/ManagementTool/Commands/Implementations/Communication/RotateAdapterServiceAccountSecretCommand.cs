@@ -1,3 +1,5 @@
+using Meshmakers.Octo.Sdk.ServiceClient.AssetRepositoryServices.Tenants;
+using GraphQlDtos.DataTransferObjects.System.Communication.v4;
 using Meshmakers.Common.CommandLineParser;
 using Meshmakers.Octo.Frontend.ManagementTool.Services;
 using Meshmakers.Octo.Sdk.ServiceClient.CommunicationControllerServices;
@@ -24,13 +26,15 @@ namespace Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Commu
 /// </summary>
 internal class RotateAdapterServiceAccountSecretCommand : ServiceClientOctoCommand<ICommunicationServicesClient>
 {
+    private readonly CommunicationMethodCall _methods;
     private readonly IConfirmationService _confirmationService;
     private readonly IArgument _idArg;
     private readonly IArgument _yesArg;
 
     public RotateAdapterServiceAccountSecretCommand(ILogger<RotateAdapterServiceAccountSecretCommand> logger,
         IOptions<OctoToolOptions> options,
-        ICommunicationServicesClient communicationServicesClient, IAuthenticationService authenticationService,
+        ICommunicationServicesClient communicationServicesClient, ITenantClient tenantClient,
+        IAuthenticationService authenticationService,
         IConfirmationService confirmationService)
         : base(logger, Constants.CommunicationServicesGroup, "RotateAdapterServiceAccountSecret",
             "Rotates the client secret of an adapter's pipeline service account. The previous secret " +
@@ -38,6 +42,7 @@ internal class RotateAdapterServiceAccountSecretCommand : ServiceClientOctoComma
             "afterwards before the new secret takes effect.",
             options, communicationServicesClient, authenticationService)
     {
+        _methods = new CommunicationMethodCall(tenantClient, authenticationService, logger);
         _confirmationService = confirmationService;
         _idArg = CommandArgumentValue.AddArgument("id", "identifier", ["The adapter runtime ID"], true, 1);
         _yesArg = CommandArgumentValue.AddArgument("y", "yes", ["Skip confirmation prompt"], false, 0);
@@ -95,9 +100,14 @@ internal class RotateAdapterServiceAccountSecretCommand : ServiceClientOctoComma
             "'{TenantId}' at '{ServiceClientServiceUri}'",
             adapterRtId, Options.Value.TenantId, ServiceClient.ServiceUri);
 
-        var result = await ServiceClient.RotateServiceAccountSecretAsync(adapterRtId);
+        // The method never returns the secret: it stays in the adapter's service-account configuration.
+        CommunicationMethodCall.RequireObjectId(adapterRtId, "AdapterRtId");
+        var result = await _methods.RunAsync(RtAdapterMethodClient.RotateServiceAccountSecretMethodId,
+                         () => new RtAdapterMethodClient(_methods.TenantClient)
+                             .RotateServiceAccountSecretAsync(adapterRtId))
+                     ?? new RtServiceAccountSecretRotationResultRecordDto();
 
-        if (result.WasCreated)
+        if (result.WasCreated == true)
         {
             Logger.LogInformation(
                 "Adapter '{AdapterRtId}' had no pipeline service account. Client '{ClientId}' " +
@@ -115,7 +125,7 @@ internal class RotateAdapterServiceAccountSecretCommand : ServiceClientOctoComma
         // CLI cannot drift from what the server (and the tenant's audit event) states.
         Logger.LogInformation("{Message}", result.Message);
 
-        if (result.RequiresPipelineRedeploy)
+        if (result.RequiresPipelineRedeploy == true)
         {
             // A warning, not an info line: this is the step people skip, and skipping it leaves every
             // running pipeline authenticating with the secret that was just withdrawn.

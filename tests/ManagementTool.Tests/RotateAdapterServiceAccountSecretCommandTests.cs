@@ -1,8 +1,12 @@
+using FakeItEasy;
+using GraphQL;
+using GraphQlDtos.DataTransferObjects.System.Communication.v4;
 using Meshmakers.Octo.Communication.Contracts.DataTransferObjects;
 using Meshmakers.Octo.Frontend.ManagementTool;
 using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Communication;
 using Meshmakers.Octo.Frontend.ManagementTool.Services;
 using Meshmakers.Octo.Sdk.ServiceClient;
+using Meshmakers.Octo.Sdk.ServiceClient.AssetRepositoryServices.Tenants;
 using Meshmakers.Octo.Sdk.ServiceClient.Authentication;
 using Meshmakers.Octo.Sdk.ServiceClient.CommunicationControllerServices;
 using Microsoft.Extensions.Logging;
@@ -16,22 +20,33 @@ namespace ManagementTool.Tests;
 /// the destructive-verb confirmation gate, and the redeploy hint. Without the hint the operator
 /// walks away from a rotation that has invalidated the credential every running pipeline still
 /// presents, and sees "rotation done, still broken".
+/// The command runs the CK method <c>System.Communication/Adapter.RotateServiceAccountSecret-1</c>; the REST
+/// client is never called for the rotation (its fake throws).
 /// </summary>
 public sealed class RotateAdapterServiceAccountSecretCommandTests
 {
     private const string AdapterRtId = "69cfa838092b710403248acd";
 
+    private readonly ITenantClient _tenant = A.Fake<ITenantClient>();
+    private readonly List<GraphQLRequest> _requests = [];
+
+    private string? RotatedAdapterRtId =>
+        _requests.Count == 0 ? null : MethodFakes.VariablesOf(Assert.Single(_requests)).Contains(AdapterRtId)
+            ? AdapterRtId
+            : "<other>";
+
     [Fact]
     public async Task Rotate_SurfacesTheRedeployRequirementAsAWarning()
     {
-        var client = new FakeCommunicationServicesClient(Rotated());
+        MethodFakes.AnswerMethodCalls(_tenant, _requests, null, result: Rotated());
+        var client = new FakeCommunicationServicesClient();
         var logger = new RecordingLogger<RotateAdapterServiceAccountSecretCommand>();
         var command = NewCommand(client, logger, new FakeConfirmationService(true));
         command.CommandArgumentValue.ParseLayer(["-id", AdapterRtId]);
 
         await command.Execute();
 
-        Assert.Equal(AdapterRtId, client.RotatedAdapterRtId);
+        Assert.Equal(AdapterRtId, RotatedAdapterRtId);
         var warnings = logger.Entries.Where(e => e.Level == LogLevel.Warning).ToList();
         Assert.Single(warnings);
         Assert.Contains("Redeploy required", warnings[0].Message);
@@ -45,7 +60,8 @@ public sealed class RotateAdapterServiceAccountSecretCommandTests
     {
         // Nothing was running under the old credential, so demanding a redeploy here would be noise
         // the operator learns to ignore — exactly how the real warning gets missed later.
-        var client = new FakeCommunicationServicesClient(FirstProvisioning());
+        MethodFakes.AnswerMethodCalls(_tenant, _requests, null, result: FirstProvisioning());
+        var client = new FakeCommunicationServicesClient();
         var logger = new RecordingLogger<RotateAdapterServiceAccountSecretCommand>();
         var command = NewCommand(client, logger, new FakeConfirmationService(true));
         command.CommandArgumentValue.ParseLayer(["-id", AdapterRtId]);
@@ -59,7 +75,8 @@ public sealed class RotateAdapterServiceAccountSecretCommandTests
     [Fact]
     public async Task Rotate_DeclinedConfirmation_NeverCallsTheService()
     {
-        var client = new FakeCommunicationServicesClient(Rotated());
+        MethodFakes.AnswerMethodCalls(_tenant, _requests, null, result: Rotated());
+        var client = new FakeCommunicationServicesClient();
         var confirmation = new FakeConfirmationService(false);
         var command = NewCommand(client, new RecordingLogger<RotateAdapterServiceAccountSecretCommand>(),
             confirmation);
@@ -67,7 +84,7 @@ public sealed class RotateAdapterServiceAccountSecretCommandTests
 
         await Assert.ThrowsAsync<ToolException>(() => command.Execute());
 
-        Assert.Null(client.RotatedAdapterRtId);
+        Assert.Null(RotatedAdapterRtId);
         Assert.Contains("rotate the pipeline service account secret", confirmation.LastMessage);
         // "Yes" is only an informed answer if it says what is lost and what is still owed.
         Assert.Contains("stops working immediately", confirmation.LastMessage);
@@ -77,7 +94,8 @@ public sealed class RotateAdapterServiceAccountSecretCommandTests
     [Fact]
     public async Task Rotate_WithYesFlag_SkipsTheConfirmationPrompt()
     {
-        var client = new FakeCommunicationServicesClient(Rotated());
+        MethodFakes.AnswerMethodCalls(_tenant, _requests, null, result: Rotated());
+        var client = new FakeCommunicationServicesClient();
         // Would decline if asked — so a call reaching the service proves the prompt was skipped.
         var confirmation = new FakeConfirmationService(false);
         var command = NewCommand(client, new RecordingLogger<RotateAdapterServiceAccountSecretCommand>(),
@@ -86,42 +104,49 @@ public sealed class RotateAdapterServiceAccountSecretCommandTests
 
         await command.Execute();
 
-        Assert.Equal(AdapterRtId, client.RotatedAdapterRtId);
+        Assert.Equal(AdapterRtId, RotatedAdapterRtId);
         Assert.Null(confirmation.LastMessage);
     }
 
     [Fact]
     public async Task Rotate_WithoutTenantInContext_DoesNotCallTheService()
     {
-        var client = new FakeCommunicationServicesClient(Rotated());
+        MethodFakes.AnswerMethodCalls(_tenant, _requests, null, result: Rotated());
+        var client = new FakeCommunicationServicesClient();
         var logger = new RecordingLogger<RotateAdapterServiceAccountSecretCommand>();
         var command = NewCommand(client, logger, new FakeConfirmationService(true), tenantId: null);
         command.CommandArgumentValue.ParseLayer(["-id", AdapterRtId]);
 
         await command.Execute();
 
-        Assert.Null(client.RotatedAdapterRtId);
+        Assert.Null(RotatedAdapterRtId);
         Assert.Contains(logger.Entries, e => e.Level == LogLevel.Error && e.Message.Contains("TenantId"));
     }
 
-    private static RotateServiceAccountSecretResultDto Rotated() =>
-        new("octo-pipeline-sa-1", "pipeline-service-account-1", WasCreated: false,
-            RequiresPipelineRedeploy: true,
-            "The client secret of pipeline service account 'octo-pipeline-sa-1' was rotated. " +
-            "Redeploy the pipelines / data flows of this adapter.");
+    private static RtServiceAccountSecretRotationResultRecordDto Rotated() =>
+        new()
+        {
+            ClientId = "octo-pipeline-sa-1", ConfigurationWellKnownName = "pipeline-service-account-1",
+            WasCreated = false, RequiresPipelineRedeploy = true,
+            Message = "The client secret of pipeline service account 'octo-pipeline-sa-1' was rotated. " +
+                      "Redeploy the pipelines / data flows of this adapter."
+        };
 
-    private static RotateServiceAccountSecretResultDto FirstProvisioning() =>
-        new("octo-pipeline-sa-1", "pipeline-service-account-1", WasCreated: true,
-            RequiresPipelineRedeploy: false,
-            "Adapter 'mesh-adapter' had no pipeline service account; 'octo-pipeline-sa-1' was " +
-            "provisioned instead. Nothing was invalidated.");
+    private static RtServiceAccountSecretRotationResultRecordDto FirstProvisioning() =>
+        new()
+        {
+            ClientId = "octo-pipeline-sa-1", ConfigurationWellKnownName = "pipeline-service-account-1",
+            WasCreated = true, RequiresPipelineRedeploy = false,
+            Message = "Adapter 'mesh-adapter' had no pipeline service account; 'octo-pipeline-sa-1' was " +
+                      "provisioned instead. Nothing was invalidated."
+        };
 
-    private static RotateAdapterServiceAccountSecretCommand NewCommand(
+    private RotateAdapterServiceAccountSecretCommand NewCommand(
         ICommunicationServicesClient client,
         ILogger<RotateAdapterServiceAccountSecretCommand> logger,
         IConfirmationService confirmationService,
         string? tenantId = "acme") =>
-        new(logger, Options.Create(new OctoToolOptions { TenantId = tenantId }), client,
+        new(logger, Options.Create(new OctoToolOptions { TenantId = tenantId }), client, _tenant,
             new FakeAuthenticationService(), confirmationService);
 
     private sealed class FakeConfirmationService(bool answer) : IConfirmationService
@@ -157,22 +182,16 @@ public sealed class RotateAdapterServiceAccountSecretCommandTests
     }
 
     /// <summary>
-    /// Only the rotation call is implemented — the rest of the interface exists so the command can be
-    /// constructed. A member that throws is the point: the command must not reach for anything else.
+    /// The interface exists so the command can be constructed. Every member throws: the command must not reach
+    /// for the REST client, the rotation runs as a CK method.
     /// </summary>
-    private sealed class FakeCommunicationServicesClient(RotateServiceAccountSecretResultDto result)
-        : ICommunicationServicesClient
+    private sealed class FakeCommunicationServicesClient : ICommunicationServicesClient
     {
-        public string? RotatedAdapterRtId { get; private set; }
-
         public Task<ServiceAccountImpersonationSwitchReportDto> SwitchServiceAccountsToImpersonationAsync(
             bool apply, bool redeployDataFlows) => throw new NotSupportedException();
 
-        public Task<RotateServiceAccountSecretResultDto> RotateServiceAccountSecretAsync(string adapterRtId)
-        {
-            RotatedAdapterRtId = adapterRtId;
-            return Task.FromResult(result);
-        }
+        public Task<RotateServiceAccountSecretResultDto> RotateServiceAccountSecretAsync(string adapterRtId) =>
+            throw new NotSupportedException();
 
         public IServiceClientAccessToken AccessToken { get; } = new FakeAccessToken();
         public Uri ServiceUri { get; } = new("https://comm.example.com/acme/v1");

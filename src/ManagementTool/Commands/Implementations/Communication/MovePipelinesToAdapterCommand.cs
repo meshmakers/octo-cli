@@ -1,3 +1,6 @@
+using Meshmakers.Octo.Sdk.ServiceClient.AssetRepositoryServices.Tenants.Methods;
+using Meshmakers.Octo.Sdk.ServiceClient.AssetRepositoryServices.Tenants;
+using GraphQlDtos.DataTransferObjects.System.Communication.v4;
 using Meshmakers.Common.CommandLineParser;
 using Meshmakers.Octo.Communication.Contracts.DataTransferObjects;
 using Meshmakers.Octo.Frontend.ManagementTool.Services;
@@ -9,6 +12,7 @@ namespace Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Commu
 
 internal class MovePipelinesToAdapterCommand : ServiceClientOctoCommand<ICommunicationServicesClient>
 {
+    private readonly CommunicationMethodCall _methods;
     private readonly IConfirmationService _confirmationService;
     private readonly IArgument _pipelineRtIds;
     private readonly IArgument _targetAdapterRtId;
@@ -17,7 +21,8 @@ internal class MovePipelinesToAdapterCommand : ServiceClientOctoCommand<ICommuni
 
     public MovePipelinesToAdapterCommand(ILogger<MovePipelinesToAdapterCommand> logger,
         IOptions<OctoToolOptions> options,
-        ICommunicationServicesClient communicationServicesClient, IAuthenticationService authenticationService,
+        ICommunicationServicesClient communicationServicesClient, ITenantClient tenantClient,
+        IAuthenticationService authenticationService,
         IConfirmationService confirmationService)
         : base(logger, Constants.CommunicationServicesGroup, "MovePipelines",
             "Reassigns one or more pipelines from their current adapter to a new target adapter. " +
@@ -25,6 +30,7 @@ internal class MovePipelinesToAdapterCommand : ServiceClientOctoCommand<ICommuni
             "Source and target adapter must share the same CkTypeId.",
             options, communicationServicesClient, authenticationService)
     {
+        _methods = new CommunicationMethodCall(tenantClient, authenticationService, logger);
         _confirmationService = confirmationService;
 
         _pipelineRtIds = CommandArgumentValue.AddArgument("ids", "pipelineRtIds",
@@ -69,12 +75,18 @@ internal class MovePipelinesToAdapterCommand : ServiceClientOctoCommand<ICommuni
             "for tenant '{TenantId}' at '{ServiceClientServiceUri}'",
             pipelineRtIds.Count, targetAdapterRtId, redeploy, Options.Value.TenantId, ServiceClient.ServiceUri);
 
-        var response = await ServiceClient.MovePipelinesToAdapterAsync(
-            new MovePipelinesToAdapterRequestDto(pipelineRtIds, targetAdapterRtId, redeploy));
+        // One method call per pipeline, in the order given; a refused pipeline is reported and the others still move, as
+        // the REST list did.
+        CommunicationMethodCall.RequireObjectId(targetAdapterRtId, "TargetAdapterRtId");
+        var results = new List<MovePipelineResultDto>(pipelineRtIds.Count);
+        foreach (var pipelineRtId in pipelineRtIds)
+        {
+            results.Add(await MoveOneAsync(pipelineRtId, targetAdapterRtId, redeploy));
+        }
 
         var successCount = 0;
         var failureCount = 0;
-        foreach (var result in response.Results)
+        foreach (var result in results)
         {
             if (result.Success)
             {
@@ -99,11 +111,42 @@ internal class MovePipelinesToAdapterCommand : ServiceClientOctoCommand<ICommuni
         }
 
         Logger.LogInformation("Move summary: {Success} succeeded, {Failure} failed (of {Total})",
-            successCount, failureCount, response.Results.Count);
+            successCount, failureCount, results.Count);
 
         if (failureCount > 0)
         {
             throw new ToolException($"{failureCount} pipeline move(s) failed — see log above");
+        }
+    }
+
+    /// <summary>
+    ///     Moves one pipeline through <c>Pipeline.MoveToAdapter-1</c> and returns the line the REST list answered for it:
+    ///     a declared error or an unknown pipeline is a failed item (the other pipelines still move); a refusal of the
+    ///     caller (<c>METHOD_FORBIDDEN</c>) or a service without the method ends the whole command.
+    /// </summary>
+    private async Task<MovePipelineResultDto> MoveOneAsync(string pipelineRtId, string targetAdapterRtId, bool redeploy)
+    {
+        if (!CommunicationMethodCall.IsObjectId(pipelineRtId))
+        {
+            return new MovePipelineResultDto(pipelineRtId, false, null, null,
+                $"PipelineRtId '{pipelineRtId}' is not a valid id");
+        }
+
+        try
+        {
+            var moved = await _methods.InvokeAsync(RtPipelineMethodClient.MoveToAdapterMethodId,
+                () => new RtPipelineMethodClient(_methods.TenantClient)
+                    .MoveToAdapterAsync(pipelineRtId, targetAdapterRtId, redeploy));
+            return moved.IsSuccess
+                ? new MovePipelineResultDto(pipelineRtId, true, moved.Value?.OldAdapterRtId,
+                    moved.Value?.NewAdapterRtId, moved.Value?.Warning)
+                : new MovePipelineResultDto(pipelineRtId, false, null, null,
+                    CkMethodErrorText.Format(moved.Error!));
+        }
+        catch (CkMethodCallException e) when (e.Code == CommunicationMethodCall.TargetNotFoundCode)
+        {
+            return new MovePipelineResultDto(pipelineRtId, false, null, null,
+                $"Pipeline '{pipelineRtId}' was not found");
         }
     }
 }

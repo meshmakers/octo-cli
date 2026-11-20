@@ -1,3 +1,5 @@
+using Meshmakers.Octo.Sdk.ServiceClient.AssetRepositoryServices.Tenants;
+using GraphQlDtos.DataTransferObjects.System.Communication.v4;
 using Meshmakers.Common.CommandLineParser;
 using Meshmakers.Octo.Communication.Contracts.DataTransferObjects;
 using Meshmakers.Octo.Frontend.ManagementTool.Services;
@@ -19,6 +21,7 @@ namespace Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Commu
 /// </remarks>
 internal class CancelQueuedExecutionCommand : ServiceClientOctoCommand<ICommunicationServicesClient>
 {
+    private readonly CommunicationMethodCall _methods;
     private readonly IConfirmationService _confirmationService;
     private readonly IArgument _executionIdArg;
     private readonly IArgument _idArg;
@@ -26,12 +29,14 @@ internal class CancelQueuedExecutionCommand : ServiceClientOctoCommand<ICommunic
 
     public CancelQueuedExecutionCommand(ILogger<CancelQueuedExecutionCommand> logger,
         IOptions<OctoToolOptions> options,
-        ICommunicationServicesClient communicationServicesClient, IAuthenticationService authenticationService,
+        ICommunicationServicesClient communicationServicesClient, ITenantClient tenantClient,
+        IAuthenticationService authenticationService,
         IConfirmationService confirmationService)
         : base(logger, Constants.CommunicationServicesGroup, "CancelQueuedExecution",
             "Cancels one execution that is still waiting in an adapter pool's queue. It never runs.", options,
             communicationServicesClient, authenticationService)
     {
+        _methods = new CommunicationMethodCall(tenantClient, authenticationService, logger);
         _confirmationService = confirmationService;
 
         _idArg = CommandArgumentValue.AddArgument("id", "adapterPoolRtId",
@@ -62,7 +67,9 @@ internal class CancelQueuedExecutionCommand : ServiceClientOctoCommand<ICommunic
             Notes:
             [
                 "Cancels a QUEUE entry, not a running pipeline. An execution that already holds a lease is refused " +
-                "(HTTP 409) — interrupting it is a different operation with different consequences.",
+                "(EXECUTION_ALREADY_LEASED) — interrupting it is a different operation with different consequences.",
+                "Runs the CK method System.Communication/AdapterPool.CancelQueuedExecution-1 and needs the role " +
+                "CommunicationManagement.",
                 "The cancelled execution becomes Cancelled and is never leased; it stays visible in the execution " +
                 "history as a cancelled attempt.",
                 "The tenant of the active context is the LENDING tenant that owns the adapter pool, not the borrowing tenant " +
@@ -96,7 +103,33 @@ internal class CancelQueuedExecutionCommand : ServiceClientOctoCommand<ICommunic
             "'{TenantId}' at '{ServiceClientServiceUri}'",
             executionId, adapterPoolRtId, Options.Value.TenantId, ServiceClient.ServiceUri);
 
-        var result = await ServiceClient.CancelQueuedExecutionAsync(adapterPoolRtId, executionId);
+        // The two refusals of the method are declared errors; the command reports them as outcomes of their own, as it
+        // did with the REST answers 409 and 404 (exit 0).
+        var result = new AdapterPoolQueueCancellationResultDto
+            { Outcome = AdapterPoolQueueCancellationOutcome.Cancelled };
+        CommunicationMethodCall.RequireObjectId(adapterPoolRtId, "AdapterPoolRtId");
+        await _methods.RunAsync(RtAdapterPoolMethodClient.CancelQueuedExecutionMethodId,
+            () => new RtAdapterPoolMethodClient(_methods.TenantClient)
+                .CancelQueuedExecutionAsync(adapterPoolRtId, executionId),
+            error =>
+            {
+                result = error.Code switch
+                {
+                    RtAdapterPoolMethodClient.CancelQueuedExecutionErrors.ExecutionAlreadyLeased =>
+                        new AdapterPoolQueueCancellationResultDto
+                        {
+                            Outcome = AdapterPoolQueueCancellationOutcome.AlreadyLeased, ServerMessage = error.Message
+                        },
+                    RtAdapterPoolMethodClient.CancelQueuedExecutionErrors.QueuedExecutionNotFound =>
+                        new AdapterPoolQueueCancellationResultDto
+                        {
+                            Outcome = AdapterPoolQueueCancellationOutcome.NotFound, ServerMessage = error.Message
+                        },
+                    _ => result
+                };
+                return error.Code is RtAdapterPoolMethodClient.CancelQueuedExecutionErrors.ExecutionAlreadyLeased
+                    or RtAdapterPoolMethodClient.CancelQueuedExecutionErrors.QueuedExecutionNotFound;
+            });
 
         switch (result.Outcome)
         {

@@ -1,3 +1,5 @@
+using Meshmakers.Octo.Sdk.ServiceClient.AssetRepositoryServices.Tenants;
+using GraphQlDtos.DataTransferObjects.System.Communication.v4;
 using Meshmakers.Common.CommandLineParser;
 using Meshmakers.Octo.Frontend.ManagementTool.Services;
 using Meshmakers.Octo.Sdk.ServiceClient.CommunicationControllerServices;
@@ -8,14 +10,17 @@ namespace Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Commu
 
 internal class DeployDataFlowCommand : ServiceClientOctoCommand<ICommunicationServicesClient>
 {
+    private readonly CommunicationMethodCall _methods;
     private readonly IArgument _idArg;
 
     public DeployDataFlowCommand(ILogger<DeployDataFlowCommand> logger, IOptions<OctoToolOptions> options,
-        ICommunicationServicesClient communicationServicesClient, IAuthenticationService authenticationService)
+        ICommunicationServicesClient communicationServicesClient, ITenantClient tenantClient,
+        IAuthenticationService authenticationService)
         : base(logger, Constants.CommunicationServicesGroup, "DeployDataFlow",
             "Deploys a specific data flow.", options,
             communicationServicesClient, authenticationService)
     {
+        _methods = new CommunicationMethodCall(tenantClient, authenticationService, logger);
         _idArg = CommandArgumentValue.AddArgument("id", "identifier", ["The data flow runtime ID"], true, 1);
     }
 
@@ -41,7 +46,9 @@ internal class DeployDataFlowCommand : ServiceClientOctoCommand<ICommunicationSe
             return;
         }
 
-        await ServiceClient.DeployDataFlowAsync(id);
+        CommunicationMethodCall.RequireObjectId(id, "DataFlowRtId");
+        await _methods.RunAsync(RtDataFlowMethodClient.DeployMethodId,
+            () => new RtDataFlowMethodClient(_methods.TenantClient).DeployAsync(id));
 
         Logger.LogInformation("Data flow '{DataFlowId}' deployed successfully for tenant '{TenantId}'",
             id, Options.Value.TenantId);

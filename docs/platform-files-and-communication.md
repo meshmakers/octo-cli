@@ -19,8 +19,8 @@ without `-o`. No tenant feature must be enabled; the MCP counterparts are `list_
 
 `GetAdapterPoolQueue -id <adapterPoolRtId>` and `CancelQueuedExecution -id <adapterPoolRtId> -eid
 <executionId>` are the CLI third of the queue surface concept §5 asks for — the same view Refinery
-Studio and the MCP server show, all three off one endpoint
-(`GET`/`DELETE {tenantId}/v1/adapterPool/{id}/queue[/{executionId}]`). Three things about them are
+Studio and the MCP server show, all three read one endpoint
+(`GET {tenantId}/v1/adapterPool/{id}/queue`; the cancel runs the method `AdapterPool.CancelQueuedExecution-1`). Three things about them are
 deliberate and must survive future edits:
 
 - **There is no global queue position and printing one would be wrong.** The pool serves borrowing
@@ -29,7 +29,7 @@ deliberate and must survive future edits:
   tenant being served now. `AdapterPoolQueueCommandTests` pins that the pair is printed and that the
   word "rank" appears nowhere.
 - **`CancelQueuedExecution` cancels a QUEUE entry, never a running pipeline.** An execution that
-  already holds a lease comes back as `AdapterPoolQueueCancellationOutcome.AlreadyLeased` (HTTP 409)
+  already holds a lease comes back as the declared method error `EXECUTION_ALREADY_LEASED` (REST: 409)
   and is reported as its own case — *nothing was cancelled, interrupting it is a different
   operation* — not as a generic failure and never as a success. Collapsing the two verbs would leave
   the operator unsure which one they just performed.
@@ -42,6 +42,60 @@ asymmetry is intended.
 ## Communication Services Commands
 
 All communication commands accept plain runtime object IDs (e.g. `69cfa838092b710403248acd`). The SDK client internally constructs composite RtEntityId strings where the server requires them.
+
+### Write commands run the System.Communication methods
+
+The write commands below call the CK methods of `System.Communication` through the method clients generated in
+`GraphQlDtos` (`construction-kits.yaml`: `System.Communication-[4.19,5.0)`, together with `System-[2.7,3.0)`, whose
+`Configuration` DTOs the communication types derive from). The call goes to the asset repository of the context's tenant
+(GraphQL mutation `runtime.systemCommunication<Type>s.<method>`), and the communication controller runs the handler. Command
+names, arguments, confirmations and output are unchanged; the reads (`Get*`), `EnableCommunication`,
+`DisableCommunication`, `Get/SetCommunicationLifecycle`, `UpdateWorkloadResources` and
+`SwitchServiceAccountsToImpersonation` stay REST.
+
+| Command | CK method (`System.Communication/…`) | Notes |
+|---|---|---|
+| `DeployPipeline` | `Pipeline.Deploy-1` | target = the pipeline; the definition is a sensitive parameter |
+| `ExecutePipeline` | `Pipeline.Execute-1` | prints the execution id as before |
+| `SetPipelineDebug` | `Pipeline.SetDebugging-1` | |
+| `MovePipelinesToAdapter` | `Pipeline.MoveToAdapter-1`, once per pipeline | each pipeline is reported on its own; a refused or unknown pipeline is a failed item, the rest still move |
+| `DeployDataFlow` / `UndeployDataFlow` | `DataFlow.Deploy-1` / `Undeploy-1` | |
+| `DeployDeploymentSite` / `UndeployDeploymentSite` | `DeploymentSite.Deploy-1` / `Undeploy-1` | |
+| `DeployTriggers` / `UndeployTriggers` | `PipelineTrigger.DeployAll-1` / `UndeployAll-1` | static: every trigger of the tenant |
+| `DeployWorkload` / `UndeployWorkload` | `DeployableWorkload.Deploy-1` / `Undeploy-1` | on the client of the workload's concrete type |
+| `UpdateWorkloadChartVersion` | `DeployableWorkload.SetChartVersion-1` | on the client of the workload's concrete type |
+| `CancelQueuedExecution` | `AdapterPool.CancelQueuedExecution-1` | `EXECUTION_ALREADY_LEASED` / `QUEUED_EXECUTION_NOT_FOUND` are reported as before (warning, exit 0) |
+| `RotateAdapterServiceAccountSecret` | `Adapter.RotateServiceAccountSecret-1` | the result carries no secret |
+
+`CommunicationMethodCall` (in `Commands/Implementations/Communication/`) runs every call:
+
+- **Role.** Every method requires the role `CommunicationManagement` (and the scope `octo_api`). The REST endpoints let any
+  `octo_api` caller through, so a user or client credentials client without the role that used these commands before now
+  gets `METHOD_FORBIDDEN` (exit -3). Grant the role before switching a client (for example a CD client) to this octo-cli
+  version.
+- **Workload type.** The workload methods are declared on the abstract `DeployableWorkload` and run through the client of
+  the concrete type (`Adapter`, `AdapterPool` or `Application`). The command reads the workload's `ckTypeId` first
+  (`GraphQlConstants.GetDeployableWorkloadCkTypeById`) and compares its version-less form: the server answers
+  element-versioned ids such as `System.Communication/Adapter-1`, and a newer model may answer `-2`. An unknown workload
+  ends the command before any write (`Workload '<id>' not found.`).
+- **Runtime ids.** An argument that is no runtime id ends the command before any call (`<Name> '<value>' is not a valid
+  id.`); otherwise the asset repository would refuse the variable in GraphQL validation, which reads like a service
+  without the method.
+- **No REST fallback.** A service without the method (the asset repository rejects the document in GraphQL validation, or
+  `METHOD_HANDLER_NOT_AVAILABLE`) ends the command with a message that names communication controller services with
+  System.Communication 4.19.0. Nothing was changed in that case. Roll out the communication controller with these methods
+  before this octo-cli version.
+- **Errors.** A declared error of the method prints `CODE: message (parameters)` and exits with -3, as the refused REST call
+  did. Platform errors (`METHOD_FORBIDDEN`, `METHOD_VALIDATION_FAILED`, `METHOD_TARGET_NOT_FOUND`, `METHOD_TIMEOUT`) print
+  their code and parameters and exit with -3.
+- **Deployment pipelines.** The workload rollout pipelines run `GetWorkloadsByChart` (REST read, unchanged),
+  `UpdateWorkloadChartVersion` and `DeployWorkload`; they judge the two writes by their exit code and only log their
+  output. Both commands log the same lines as before; the warning a deploy may return (an explicit Helm value overrode a
+  typed sizing setting) is logged at debug level only and stays readable on the workload (`lastDeploymentWarning`).
+
+Tests: `CommunicationWave3MethodCommandTests` (every command: method path, no REST write, refusal, version message,
+workload type with element versions `-1`/`-2`, the log lines of the two CD commands), `AdapterPoolQueueCommandTests`,
+`RotateAdapterServiceAccountSecretCommandTests`.
 
 ### Adapters
 
@@ -56,9 +110,10 @@ All communication commands accept plain runtime object IDs (e.g. `69cfa838092b71
 
 #### `RotateAdapterServiceAccountSecret`
 
-Backs `POST {tenantId}/v1/adapter/{adapterRtId}/serviceAccount/rotateSecret` via
-`ICommunicationServicesClient.RotateServiceAccountSecretAsync`. Three properties of it are
-deliberate and easy to undo by accident:
+Runs the CK method `System.Communication/Adapter.RotateServiceAccountSecret-1` (`RtAdapterMethodClient`, see "Write
+commands run the System.Communication methods" above; it needs the role `CommunicationManagement`). Before, it called
+`POST {tenantId}/v1/adapter/{adapterRtId}/serviceAccount/rotateSecret`, whose facade runs the same handler. Three
+properties of it are deliberate and easy to undo by accident:
 
 - **It is the only supported rotation path.** The secret attribute is runtime state, so a blueprint
   can no longer change a live secret — an attempt fails confusingly. The controller owns both halves

@@ -1,3 +1,5 @@
+using Meshmakers.Octo.Sdk.ServiceClient.AssetRepositoryServices.Tenants;
+using GraphQlDtos.DataTransferObjects.System.Communication.v4;
 using Meshmakers.Common.CommandLineParser;
 using Meshmakers.Octo.Frontend.ManagementTool.Services;
 using Meshmakers.Octo.Sdk.ServiceClient.CommunicationControllerServices;
@@ -8,15 +10,18 @@ namespace Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Commu
 
 internal class SetPipelineDebugCommand : ServiceClientOctoCommand<ICommunicationServicesClient>
 {
+    private readonly CommunicationMethodCall _methods;
     private readonly IArgument _idArg;
     private readonly IArgument _enabledArg;
 
     public SetPipelineDebugCommand(ILogger<SetPipelineDebugCommand> logger, IOptions<OctoToolOptions> options,
-        ICommunicationServicesClient communicationServicesClient, IAuthenticationService authenticationService)
+        ICommunicationServicesClient communicationServicesClient, ITenantClient tenantClient,
+        IAuthenticationService authenticationService)
         : base(logger, Constants.CommunicationServicesGroup, "SetPipelineDebug",
             "Enables or disables debug capture for a pipeline.", options,
             communicationServicesClient, authenticationService)
     {
+        _methods = new CommunicationMethodCall(tenantClient, authenticationService, logger);
         _idArg = CommandArgumentValue.AddArgument("id", "identifier", ["The pipeline runtime ID"], true, 1);
         _enabledArg = CommandArgumentValue.AddArgument("e", "enabled",
             ["true to enable debug capture, false to disable"], true, 1);
@@ -37,9 +42,12 @@ internal class SetPipelineDebugCommand : ServiceClientOctoCommand<ICommunication
             return;
         }
 
-        var result = await ServiceClient.SetPipelineDebuggingAsync(id, enabled);
+        CommunicationMethodCall.RequireObjectId(id, "PipelineRtId");
+        var result = await _methods.RunAsync(RtPipelineMethodClient.SetDebuggingMethodId,
+            () => new RtPipelineMethodClient(_methods.TenantClient).SetDebuggingAsync(id, enabled))
+            ?? new RtPipelineDebugResultRecordDto();
 
-        if (result.AppliedToRunningAdapter)
+        if (result.AppliedToRunningAdapter == true)
         {
             Logger.LogInformation(
                 "Pipeline '{PipelineId}' debugging set to {Enabled} and applied to the running adapter",
