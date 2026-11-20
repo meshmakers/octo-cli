@@ -4,21 +4,26 @@ using Meshmakers.Octo.Frontend.ManagementTool.Services;
 using Meshmakers.Octo.Sdk.ServiceClient.IdentityServices;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using GraphQlDtos.DataTransferObjects.System.Identity.v3;
+using Meshmakers.Octo.Sdk.ServiceClient.AssetRepositoryServices.Tenants;
 
 namespace Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Identity.ApiResources;
 
 internal class UpdateApiResource : ServiceClientOctoCommand<IIdentityServicesClient>
 {
+    private readonly IdentityMethodCall _methods;
     private readonly IArgument _descriptionArg;
     private readonly IArgument _displayNameArg;
     private readonly IArgument _nameArg;
     private readonly IArgument _scopesArg;
 
     public UpdateApiResource(ILogger<UpdateApiResource> logger, IOptions<OctoToolOptions> options,
-        IIdentityServicesClient identityServicesClient, IAuthenticationService authenticationService)
+        IIdentityServicesClient identityServicesClient, ITenantClient tenantClient,
+        IAuthenticationService authenticationService)
         : base(logger, Constants.IdentityServicesGroup, "UpdateApiResource", "Updates an api resource.", options,
             identityServicesClient, authenticationService)
     {
+        _methods = new IdentityMethodCall(tenantClient, authenticationService, logger);
         _nameArg = CommandArgumentValue.AddArgument("n", "name", ["Name of resource, must be unique"],
             true,
             1);
@@ -64,7 +69,13 @@ internal class UpdateApiResource : ServiceClientOctoCommand<IIdentityServicesCli
             ShowInDiscoveryDocument = true
         };
 
-        await ServiceClient.UpdateApiResource(resourceName, apiScopeDto);
+        await _methods.RunAsync(RtApiResourceMethodClient.UpdateApiResourceMethodId,
+            async () => await new RtApiResourceMethodClient(_methods.TenantClient).UpdateApiResourceAsync(
+                await _methods.ResolveApiResourceRtIdAsync(resourceName), resourceName,
+                apiScopeDto.DisplayName, apiScopeDto.Description, apiScopeDto.IsEnabled,
+                apiScopeDto.ShowInDiscoveryDocument, apiScopeDto.RequireResourceIndicator,
+                apiScopeDto.UserClaims?.ToList(), apiScopeDto.Scopes?.ToList(),
+                apiScopeDto.AllowedAccessTokenSigningAlgorithms?.ToList()));
 
         Logger.LogInformation("API resource \'{ResourceName}\' at \'{ServiceClientServiceUri}\' updated", resourceName,
             ServiceClient.ServiceUri);

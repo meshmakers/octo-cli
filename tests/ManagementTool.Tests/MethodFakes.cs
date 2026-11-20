@@ -1,5 +1,9 @@
 using FakeItEasy;
 using GraphQL;
+using GraphQlDtos.DataTransferObjects.System.Identity.v3;
+using Meshmakers.Octo.Communication.Contracts.DataTransferObjects;
+using Meshmakers.Octo.ConstructionKit.Contracts;
+using Meshmakers.Octo.Sdk.ServiceClient.IdentityServices;
 using Meshmakers.Octo.Sdk.ServiceClient;
 using Meshmakers.Octo.Sdk.ServiceClient.AssetRepositoryServices.Tenants;
 
@@ -16,7 +20,8 @@ internal static class MethodFakes
     ///     of the method gateway (extensions <c>code</c> and <c>parameters</c>).
     /// </summary>
     public static void AnswerMethodCalls(ITenantClient tenant, List<GraphQLRequest> requests, string? errorCode,
-        string? message = null, Dictionary<string, object?>? parameters = null, IReadOnlyList<string>? detailCodes = null)
+        string? message = null, Dictionary<string, object?>? parameters = null, IReadOnlyList<string>? detailCodes = null,
+        object? result = null)
     {
         A.CallTo(tenant).Where(c => c.Method.Name == nameof(ITenantClient.SendMutationAsync))
             .WithNonVoidReturnType()
@@ -52,6 +57,13 @@ internal static class MethodFakes
 
                 var response = Activator.CreateInstance(responseType)!;
                 responseType.GetProperty("InvocationId")?.SetValue(response, "inv-1");
+                // The method's result (a record, a created rtId or a secret), when the test gives one of the right type.
+                var resultProperty = responseType.GetProperty("Result");
+                if (result != null && resultProperty != null && resultProperty.PropertyType.IsInstanceOfType(result))
+                {
+                    resultProperty.SetValue(response, result);
+                }
+
                 return typeof(Task).GetMethod(nameof(Task.FromResult))!.MakeGenericMethod(responseType)
                     .Invoke(null, [response])!;
             });
@@ -84,6 +96,46 @@ internal static class MethodFakes
                 return FromException(responseType, error);
             });
     }
+
+    /// <summary>
+    ///     A tenant client of a server without the identity methods (GraphQL validation errors), so a command takes the REST
+    ///     path of earlier identity versions. For the tests of the REST answers that are kept as the fallback.
+    /// </summary>
+    public static ITenantClient TenantWithoutMethods()
+    {
+        var tenant = A.Fake<ITenantClient>();
+        AnswerMethodCallsWithValidationErrors(tenant, [], "SystemIdentityMethodInput", "method");
+        return tenant;
+    }
+
+    /// <summary>The runtime id the faked lookups below answer for every client, API resource and API scope.</summary>
+    public const string TargetRtId = "65f0c0ffee000000000000aa";
+
+    /// <summary>
+    ///     A tenant client of a server with the identity methods: every method call succeeds (recorded in
+    ///     <paramref name="requests" />, answering <paramref name="result" /> when its type fits), and the runtime id lookups
+    ///     of API resources and API scopes answer <see cref="TargetRtId" />.
+    /// </summary>
+    public static ITenantClient IdentityTenant(List<GraphQLRequest> requests, object? result = null)
+    {
+        var tenant = A.Fake<ITenantClient>();
+        AnswerMethodCalls(tenant, requests, null, result: result);
+        A.CallTo(() => tenant.SendQueryAsync<RtApiResourceDto>(A<GraphQLRequest>._)).Returns(
+            Task.FromResult<QlItemsContainer<RtApiResourceDto>?>(new QlItemsContainer<RtApiResourceDto>
+                { Items = [new RtApiResourceDto { RtId = OctoObjectId.Parse(TargetRtId) }] }));
+        A.CallTo(() => tenant.SendQueryAsync<RtApiScopeDto>(A<GraphQLRequest>._)).Returns(
+            Task.FromResult<QlItemsContainer<RtApiScopeDto>?>(new QlItemsContainer<RtApiScopeDto>
+                { Items = [new RtApiScopeDto { RtId = OctoObjectId.Parse(TargetRtId) }] }));
+        return tenant;
+    }
+
+    /// <summary>Lets <c>GetClient</c> of <paramref name="identity" /> answer every client with <see cref="TargetRtId" />.</summary>
+    public static void GiveClientsRuntimeIds(IIdentityServicesClient identity) =>
+        A.CallTo(() => identity.GetClient(A<string>._)).ReturnsLazily((string id) =>
+            Task.FromResult(new ClientDto { ClientId = id, RtId = TargetRtId }));
+
+    /// <summary>The variables of a method call as JSON (where a secret parameter travels).</summary>
+    public static string VariablesOf(GraphQLRequest request) => System.Text.Json.JsonSerializer.Serialize(request.Variables);
 
     private static object FromException(Type responseType, Exception error) =>
         typeof(Task).GetMethod(nameof(Task.FromException), 1, [typeof(Exception)])!

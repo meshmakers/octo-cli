@@ -6,11 +6,14 @@ using Meshmakers.Octo.Frontend.ManagementTool.Services;
 using Meshmakers.Octo.Sdk.ServiceClient.IdentityServices;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using GraphQlDtos.DataTransferObjects.System.Identity.v3;
+using Meshmakers.Octo.Sdk.ServiceClient.AssetRepositoryServices.Tenants;
 
 namespace Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Identity.Clients;
 
 internal class AddDeviceCodeClient : ServiceClientOctoCommand<IIdentityServicesClient>
 {
+    private readonly IdentityMethodCall _methods;
     private readonly IArgument _clientId;
     private readonly IArgument _clientName;
     private readonly IArgument _clientSecret;
@@ -18,12 +21,14 @@ internal class AddDeviceCodeClient : ServiceClientOctoCommand<IIdentityServicesC
     private readonly SecretInput _secretInput;
 
     public AddDeviceCodeClient(ILogger<AddDeviceCodeClient> logger, IOptions<OctoToolOptions> options,
-        IIdentityServicesClient identityServicesClient, IAuthenticationService authenticationService,
+        IIdentityServicesClient identityServicesClient, ITenantClient tenantClient,
+        IAuthenticationService authenticationService,
         SecretInput secretInput)
         : base(logger, Constants.IdentityServicesGroup, "AddDeviceCodeClient",
             "Adds a new client using grant type 'device code'.", options,
             identityServicesClient, authenticationService)
     {
+        _methods = new IdentityMethodCall(tenantClient, authenticationService, logger);
         _secretInput = secretInput;
         _clientId = CommandArgumentValue.AddArgument("id", "clientId", ["ServiceClient ID, must be unique"],
             true,
@@ -84,7 +89,9 @@ internal class AddDeviceCodeClient : ServiceClientOctoCommand<IIdentityServicesC
             IsOfflineAccessEnabled = true
         };
 
-        await ServiceClient.CreateClient(clientDto);
+        await _methods.RunAsync(RtClientMethodClient.CreateClientMethodId,
+            () => ClientMethods.CreateAsync(_methods.TenantClient, clientDto),
+            secret: clientDto.ClientSecret);
 
         Logger.LogInformation("ServiceClient \'{ClientId}\' at \'{ServiceClientServiceUri}\' created", clientId,
             ServiceClient.ServiceUri);

@@ -4,11 +4,14 @@ using Meshmakers.Octo.Frontend.ManagementTool.Services;
 using Meshmakers.Octo.Sdk.ServiceClient.IdentityServices;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using GraphQlDtos.DataTransferObjects.System.Identity.v3;
+using Meshmakers.Octo.Sdk.ServiceClient.AssetRepositoryServices.Tenants;
 
 namespace Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Identity.IdentityProviders;
 
 internal class AddAzureEntryIdIdentityProvider : ServiceClientOctoCommand<IIdentityServicesClient>
 {
+    private readonly IdentityMethodCall _methods;
     private readonly IArgument _allowSelfRegistration;
     private readonly IArgument _clientId;
     private readonly IArgument _clientSecret;
@@ -21,12 +24,14 @@ internal class AddAzureEntryIdIdentityProvider : ServiceClientOctoCommand<IIdent
 
     public AddAzureEntryIdIdentityProvider(ILogger<AddAzureEntryIdIdentityProvider> logger,
         IOptions<OctoToolOptions> options,
-        IIdentityServicesClient identityServicesClient, IAuthenticationService authenticationService,
+        IIdentityServicesClient identityServicesClient, ITenantClient tenantClient,
+        IAuthenticationService authenticationService,
         SecretInput secretInput)
         : base(logger, Constants.IdentityServicesGroup, "AddAzureEntryIdIdentityProvider",
             "Adds a new identity provider for Microsoft Azure Entra ID.", options, identityServicesClient,
             authenticationService)
     {
+        _methods = new IdentityMethodCall(tenantClient, authenticationService, logger);
         _secretInput = secretInput;
         _name = CommandArgumentValue.AddArgument("n", "name", ["Name of identity provider, must be unique"],
             true,
@@ -105,7 +110,9 @@ internal class AddAzureEntryIdIdentityProvider : ServiceClientOctoCommand<IIdent
                 CommandArgumentValue.GetArgumentScalarValue<string>(_defaultGroupRtId);
         }
 
-        await ServiceClient.CreateIdentityProvider(identityProviderDto);
+        await _methods.RunAsync(RtGoogleIdentityProviderMethodClient.CreateIdentityProviderMethodId,
+            () => IdentityProviderMethods.CreateAsync(_methods.TenantClient, identityProviderDto),
+            secret: IdentityProviderMethods.ClientSecretOf(identityProviderDto));
 
         Logger.LogInformation("Identity provider \'{Name}\' at \'{ServiceClientServiceUri}\' created", name,
             ServiceClient.ServiceUri);

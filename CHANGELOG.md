@@ -4,6 +4,17 @@ All notable changes to octo-cli are listed here. Newest first.
 
 ## Unreleased
 
+### Changed
+
+- **AB#9045, AB#9046 — Identity administration commands run the System.Identity methods.** The write commands of groups,
+  clients (create, update, scopes, delete, roles, overlays, mirrors), API secrets, roles, API scopes and resources, data
+  permissions and policies, e-mail domain group rules, external tenant user mappings, admin provisioning and identity providers
+  call the CK methods (method clients generated from `System.Identity-[3.8,4.0)`) instead of the REST endpoints; names,
+  arguments and output are unchanged. A refused call prints the code and message of the method error and exits with -3. A new
+  secret is printed once and never logged. **Requires octo-identity-services with the wave 2 methods (System.Identity 3.8.0); roll
+  out identity before this CLI version.** There is no REST fallback: against an older identity service the commands stop with a
+  message naming the needed version (and, for the secret-carrying commands, `Methods:Identity:EnablePasswordMethods`).
+
 ### Fixed
 
 - **AB#9266 — The help of the API secret commands and `AddClientCredentialsClient` names both role settings.** It said

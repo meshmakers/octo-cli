@@ -107,6 +107,67 @@ fallback below (`#pragma warning disable CS0618` at that one place). Command nam
   unchanged log lines, declared and undeclared refusals, declined confirmation, unknown user, unknown role fails; the validation
   answer of a 3.5.23 server and `METHOD_HANDLER_NOT_AVAILABLE` fall back to REST, a REST refusal is thrown, a refusal never falls back).
 
+## Identity administration commands run the System.Identity methods
+
+The write commands of groups, clients (create, update, `AddScopeToClient`, delete, roles, overlays, mirrors), API secrets of
+clients and API resources, roles, API scopes, API resources, data permissions and policies, e-mail domain group rules, external
+tenant user mappings, admin provisioning and identity providers (create, update, delete) run the CK methods of `System.Identity` through the method clients the source generator emits in **GraphQlDtos** from
+`System.Identity-[3.8,4.0)` (`RtGroupMethodClient`, `RtClientMethodClient`, `RtRoleMethodClient`, `RtApiScopeMethodClient`,
+`RtApiResourceMethodClient`, `RtDataPermissionMethodClient`, `RtDataPolicyMethodClient`, `RtEmailDomainGroupRuleMethodClient`,
+`RtExternalTenantUserMappingMethodClient`, one client per concrete identity provider type; operation map: the octo-sdk
+method client migration guide, "Identity wave 2"). Command names, arguments, confirmations and output are unchanged; the
+reads (`Get*`, `LookupSourceTenantUser`) stay REST.
+
+- **One helper** (`Identity/IdentityMethodCall`): authenticates the tenant client, runs the method, and maps the outcome. The method
+  parameters are the ones the identity service's REST facade passes for the same request (its controllers are the reference), so a
+  command does the same through either path.
+- **Runtime ids**: the methods address their target by runtime id, the commands by name or client id. Clients are looked up with
+  `GetClient` (`ClientDto.RtId`), roles with `GetRoleByName`, data permissions with `GetDataPermissions`, API scopes and resources with a
+  GraphQL query of the tenant (`GraphQlConstants.GetApiScopeRtIdByName` / `GetApiResourceRtIdByName`; the REST DTOs carry no runtime id),
+  identity providers with `GetIdentityProvider` (its concrete type selects the method client). Role ids of `CreateGroup`,
+  `UpdateGroupRoles` and `UpdateClientRoles` are resolved to role names (`GetRoles`); an unknown id ends the command before any write with
+  the REST message `Role with id '…' not found.`. The same holds for an unknown data permission (`Data permission '…' not found.`), an
+  unknown API scope or resource, and an invalid data policy scope or enforcement mode (the REST endpoint's 400 text).
+- **No REST fallback; roll out identity first.** These commands need octo-identity-services with the wave 2 methods
+  (`System.Identity` 3.8.0, `IdentityMethodCall.RequiredSystemIdentityVersion`). When the asset repository rejects the method document
+  in GraphQL validation, no handler is live (`METHOD_HANDLER_NOT_AVAILABLE`), or the identity service sends no runtime id, the command
+  ends with `The service at '…' does not offer the CK method …. It needs identity services with System.Identity 3.8.0 or newer (the
+  identity wave 2 methods)[ with the password methods switched on (Methods:Identity:EnablePasswordMethods)]. Nothing was changed.
+  octo-cli does not fall back to the REST endpoint.` (exit -3). The bracketed part is printed for the secret-carrying methods
+  (client create and update, the secret methods of clients and API resources, identity provider create and update), whose handlers
+  the identity service offers on the method bus only with that switch. Roll out octo-identity-services with System.Identity 3.8.0
+  (and the switch where these commands are used) before this octo-cli version. The user role commands keep their REST fallback.
+- **Refusals**: a declared error (e.g. `GROUP_CYCLE`, `ROLE_ALREADY_EXISTS`, `MAPPING_ALREADY_EXISTS`) is a `ServiceClientException`
+  `CODE: message (parameters)`; `METHOD_FORBIDDEN`, `METHOD_VALIDATION_FAILED` and `METHOD_TARGET_NOT_FOUND` reach the `Runner` as
+  `CkMethodCallException` (code and parameters). Both exit with -3 and never fall back to REST. The declared errors the REST endpoint
+  answered with success stay a success: `MEMBER_ALREADY_IN_GROUP`, `MEMBER_NOT_IN_GROUP`, `MEMBER_NOT_FOUND` (users; clients only for a
+  runtime id), `CHILD_GROUP_ALREADY_IN_GROUP`, `CHILD_GROUP_NOT_IN_GROUP`, `ROLE_NOT_FOUND` of `RemoveClientFromRole`,
+  `PERMISSION_ALREADY_GRANTED`, `PERMISSION_NOT_GRANTED`.
+- **Secrets** (`docs/secrets-and-output.md`): `CreateApiSecretClient` / `CreateApiSecretApiResource` run `AddSecret`; the method
+  generates the secret and returns its clear text once. The command prints it once, in the secret DTO the REST endpoint answered,
+  with the stored value computed as the identity service stores it (Base64 of the SHA-256 of the UTF-8 clear text), and logs neither.
+  The update and delete commands send the stored value only as a method parameter; every text of a refusal is scrubbed of it and
+  thrown without the inner exception. The client secret of `AddClientCredentialsClient`, `AddDeviceCodeClient`,
+  `AddAuthorizationCodeClient` and the identity provider commands travels only in the method's variables (read through `SecretInput`
+  as before). Client create and update take the parameters the REST facade takes from the `ClientDto` (`Clients/ClientMethods`),
+  identity provider create, update and delete call the client of the provider's concrete type (`IdentityProviders/IdentityProviderMethods`).
+- **Output from the method result**: `ApplyClientOverlay`, `CleanClientOverlays`, `ProvisionClientInExistingTenants` and
+  `ProvisionClientInTenant` log the counts of the result record; `CreateExternalTenantUserMapping` prints the mapping the REST endpoint
+  answered, built from `RtAdminProvisioningResultRecordDto` as the identity service builds it; `ProvisionCurrentUser` names the identity
+  of the result record; `CreateDataPolicy` logs the policy runtime id the method returns.
+- Tests: `IdentityWave2MethodCommandTests` (every command: method document and runtime id, no REST write; `METHOD_FORBIDDEN` refused
+  without a REST write and through the `Runner` with exit -3; declared errors with code, message and parameters; the success mappings;
+  the version message without REST write for a server without the methods, without a handler and without a runtime id, the switch only
+  for the secret-carrying methods; refusals echoing a secret value scrubbed; lookups that fail before any write; the outputs above; the
+  GraphQL lookups validated against the asset repository schema). `CreateApiSecretCommandsTests` (no secret in the request, the clear
+  text printed once with the computed stored value, never logged, also not on a refusal), `ApiSecretValueLoggingTests` and
+  `CredentialsInRequestBodyTests` (the stored value only in the method's variables, never in a URL or log line),
+  `SecretArgumentCommandTests` / `SecretCommandsTests` (client and identity provider secrets from prompt, stdin or environment reach
+  the method), `CreateAdminProvisioningMappingConflictTests`, `CrossTenantGrantCommandTests`, `ProvisionCurrentUserOutputTests`
+  (declared errors and results of the mapping methods), `ClientSecretCanaryTests` (real commands, SDK clients and `Runner` against a
+  local identity and GraphQL listener, NLog at Trace: a client secret only in the GraphQL body, also on refusals that echo it; a
+  generated secret exactly once on standard output and in no log line).
+
 ## 403 names the missing role
 
 `Runner` answers a `403` (`ServiceClientResultException`, exit code `-3`) with the `message` of the identity API body

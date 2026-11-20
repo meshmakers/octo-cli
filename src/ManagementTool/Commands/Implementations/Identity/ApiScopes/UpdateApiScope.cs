@@ -3,11 +3,14 @@ using Meshmakers.Octo.Frontend.ManagementTool.Services;
 using Meshmakers.Octo.Sdk.ServiceClient.IdentityServices;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using GraphQlDtos.DataTransferObjects.System.Identity.v3;
+using Meshmakers.Octo.Sdk.ServiceClient.AssetRepositoryServices.Tenants;
 
 namespace Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Identity.ApiScopes;
 
 internal class UpdateApiScope : ServiceClientOctoCommand<IIdentityServicesClient>
 {
+    private readonly IdentityMethodCall _methods;
     private readonly IArgument _descriptionArg;
     private readonly IArgument _displayNameArg;
     private readonly IArgument _isEnabledArg;
@@ -15,11 +18,13 @@ internal class UpdateApiScope : ServiceClientOctoCommand<IIdentityServicesClient
     private readonly IArgument _newNameArg;
 
     public UpdateApiScope(ILogger<UpdateApiScope> logger, IOptions<OctoToolOptions> options,
-        IIdentityServicesClient identityServicesClient, IAuthenticationService authenticationService)
+        IIdentityServicesClient identityServicesClient, ITenantClient tenantClient,
+        IAuthenticationService authenticationService)
         : base(logger, Constants.IdentityServicesGroup, "UpdateApiScope", "Updates an API scope.", options,
             identityServicesClient,
             authenticationService)
     {
+        _methods = new IdentityMethodCall(tenantClient, authenticationService, logger);
         _nameArg = CommandArgumentValue.AddArgument("n", "name", ["Name of scope, must be unique"],
             true,
             1);
@@ -74,7 +79,11 @@ internal class UpdateApiScope : ServiceClientOctoCommand<IIdentityServicesClient
             scopeDto.IsEnabled = CommandArgumentValue.GetArgumentScalarValue<bool>(_isEnabledArg);
         }
 
-        await ServiceClient.UpdateApiScope(scopeName, scopeDto);
+        await _methods.RunAsync(RtApiScopeMethodClient.UpdateApiScopeMethodId,
+            async () => await new RtApiScopeMethodClient(_methods.TenantClient).UpdateApiScopeAsync(
+                await _methods.ResolveApiScopeRtIdAsync(scopeName), scopeDto.Name ?? string.Empty, scopeDto.DisplayName,
+                scopeDto.Description, scopeDto.IsEnabled, scopeDto.ShowInDiscoveryDocument, scopeDto.IsRequired,
+                scopeDto.IsEmphasize, scopeDto.UserClaims?.ToList()));
 
         Logger.LogInformation("API scope \'{ScopeName}\' at \'{ServiceClientServiceUri}\' updated", scopeName,
             ServiceClient.ServiceUri);

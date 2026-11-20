@@ -4,22 +4,27 @@ using Meshmakers.Octo.Frontend.ManagementTool.Services;
 using Meshmakers.Octo.Sdk.ServiceClient.IdentityServices;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using GraphQlDtos.DataTransferObjects.System.Identity.v3;
+using Meshmakers.Octo.Sdk.ServiceClient.AssetRepositoryServices.Tenants;
 
 namespace Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Identity.IdentityProviders;
 
 internal class DeleteIdentityProvider : ServiceClientOctoCommand<IIdentityServicesClient>
 {
+    private readonly IdentityMethodCall _methods;
     private readonly IConfirmationService _confirmationService;
     private readonly IArgument _id;
     private readonly IArgument _yesArg;
 
     public DeleteIdentityProvider(ILogger<DeleteIdentityProvider> logger, IOptions<OctoToolOptions> options,
-        IIdentityServicesClient identityServicesClient, IAuthenticationService authenticationService,
+        IIdentityServicesClient identityServicesClient, ITenantClient tenantClient,
+        IAuthenticationService authenticationService,
         IConfirmationService confirmationService)
         : base(logger, Constants.IdentityServicesGroup, "DeleteIdentityProvider", "Deletes an identity provider.",
             options, identityServicesClient,
             authenticationService)
     {
+        _methods = new IdentityMethodCall(tenantClient, authenticationService, logger);
         _confirmationService = confirmationService;
 
         _id = CommandArgumentValue.AddArgument("id", "identifier", ["ID of identity provider, must be unique"],
@@ -49,7 +54,9 @@ internal class DeleteIdentityProvider : ServiceClientOctoCommand<IIdentityServic
         Logger.LogInformation("Deleting identity provider \'{RtId}\' from \'{ServiceClientServiceUri}\'", rtId,
             ServiceClient.ServiceUri);
 
-        await ServiceClient.DeleteIdentityProvider(rtId);
+        await _methods.RunAsync(RtGoogleIdentityProviderMethodClient.DeleteIdentityProviderMethodId,
+            async () => await IdentityProviderMethods.DeleteAsync(_methods.TenantClient,
+                await ServiceClient.GetIdentityProvider(rtId), rtId.ToString()));
 
         Logger.LogInformation("Identity provider \'{RtId}\' deleted", rtId);
     }

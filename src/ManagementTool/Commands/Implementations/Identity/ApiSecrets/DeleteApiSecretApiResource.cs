@@ -3,23 +3,28 @@ using Meshmakers.Octo.Frontend.ManagementTool.Services;
 using Meshmakers.Octo.Sdk.ServiceClient.IdentityServices;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using GraphQlDtos.DataTransferObjects.System.Identity.v3;
+using Meshmakers.Octo.Sdk.ServiceClient.AssetRepositoryServices.Tenants;
 
 namespace Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Identity.ApiSecrets;
 
 internal class DeleteApiSecretApiResource : ServiceClientOctoCommand<IIdentityServicesClient>
 {
+    private readonly IdentityMethodCall _methods;
     private readonly IConfirmationService _confirmationService;
     private readonly IArgument _nameArg;
     private readonly IArgument _secretValueArg;
     private readonly IArgument _yesArg;
 
     public DeleteApiSecretApiResource(ILogger<DeleteApiSecretApiResource> logger, IOptions<OctoToolOptions> options,
-        IIdentityServicesClient identityServicesClient, IAuthenticationService authenticationService,
+        IIdentityServicesClient identityServicesClient, ITenantClient tenantClient,
+        IAuthenticationService authenticationService,
         IConfirmationService confirmationService)
         : base(logger, Constants.IdentityServicesGroup, "DeleteApiSecretApiResource",
             "Deletes a secret of an API resource.", options, identityServicesClient,
             authenticationService)
     {
+        _methods = new IdentityMethodCall(tenantClient, authenticationService, logger);
         _confirmationService = confirmationService;
 
         _nameArg = CommandArgumentValue.AddArgument("n", "name", ["Name of API resource"],
@@ -67,7 +72,10 @@ internal class DeleteApiSecretApiResource : ServiceClientOctoCommand<IIdentitySe
             name,
             ServiceClient.ServiceUri);
 
-        await ServiceClient.DeleteApiSecretApiResource(name, secretValue);
+        await _methods.RunAsync(RtApiResourceMethodClient.RemoveSecretMethodId,
+            async () => await new RtApiResourceMethodClient(_methods.TenantClient).RemoveSecretAsync(await _methods.ResolveApiResourceRtIdAsync(name),
+                secretValue),
+            secret: secretValue);
 
         Logger.LogInformation("API secret \'{MaskedSecret}\' for API resource \'{Name}\' deleted", maskedSecret, name);
     }

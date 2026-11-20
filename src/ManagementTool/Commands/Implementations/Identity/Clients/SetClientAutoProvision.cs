@@ -3,20 +3,25 @@ using Meshmakers.Octo.Frontend.ManagementTool.Services;
 using Meshmakers.Octo.Sdk.ServiceClient.IdentityServices;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using GraphQlDtos.DataTransferObjects.System.Identity.v3;
+using Meshmakers.Octo.Sdk.ServiceClient.AssetRepositoryServices.Tenants;
 
 namespace Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Identity.Clients;
 
 internal class SetClientAutoProvision : ServiceClientOctoCommand<IIdentityServicesClient>
 {
+    private readonly IdentityMethodCall _methods;
     private readonly IArgument _clientId;
     private readonly IArgument _enabled;
 
     public SetClientAutoProvision(ILogger<SetClientAutoProvision> logger, IOptions<OctoToolOptions> options,
-        IIdentityServicesClient identityServicesClient, IAuthenticationService authenticationService)
+        IIdentityServicesClient identityServicesClient, ITenantClient tenantClient,
+        IAuthenticationService authenticationService)
         : base(logger, Constants.IdentityServicesGroup, "SetClientAutoProvision",
             "Flips the AutoProvisionInChildTenants flag on an existing ClientCredentials client. Flipping to true does not auto-backfill — use ProvisionClientInExistingTenants for that.",
             options, identityServicesClient, authenticationService)
     {
+        _methods = new IdentityMethodCall(tenantClient, authenticationService, logger);
         _clientId = CommandArgumentValue.AddArgument("id", "clientId",
             ["The ClientId on which to set the flag"], true, 1);
         _enabled = CommandArgumentValue.AddArgument("e", "enabled",
@@ -33,7 +38,8 @@ internal class SetClientAutoProvision : ServiceClientOctoCommand<IIdentityServic
             "Setting AutoProvisionInChildTenants={Enabled} for client '{ClientId}' at '{ServiceClientServiceUri}'",
             enabled, clientId, ServiceClient.ServiceUri);
 
-        await ServiceClient.SetClientAutoProvisionInChildTenants(clientId, enabled);
+        await _methods.RunAsync(RtClientMethodClient.SetMirrorAutoProvisionMethodId,
+            async () => await new RtClientMethodClient(_methods.TenantClient).SetMirrorAutoProvisionAsync(await IdentityMethodCall.ResolveClientRtIdAsync(ServiceClient, clientId), enabled));
 
         Logger.LogInformation("AutoProvisionInChildTenants for client '{ClientId}' now {State}",
             clientId, enabled ? "enabled" : "disabled");

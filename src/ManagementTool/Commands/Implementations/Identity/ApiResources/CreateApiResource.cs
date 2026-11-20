@@ -4,21 +4,26 @@ using Meshmakers.Octo.Frontend.ManagementTool.Services;
 using Meshmakers.Octo.Sdk.ServiceClient.IdentityServices;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using GraphQlDtos.DataTransferObjects.System.Identity.v3;
+using Meshmakers.Octo.Sdk.ServiceClient.AssetRepositoryServices.Tenants;
 
 namespace Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Identity.ApiResources;
 
 internal class CreateApiResource : ServiceClientOctoCommand<IIdentityServicesClient>
 {
+    private readonly IdentityMethodCall _methods;
     private readonly IArgument _descriptionArg;
     private readonly IArgument _displayNameArg;
     private readonly IArgument _nameArg;
     private readonly IArgument _scopesArg;
 
     public CreateApiResource(ILogger<CreateApiResource> logger, IOptions<OctoToolOptions> options,
-        IIdentityServicesClient identityServicesClient, IAuthenticationService authenticationService)
+        IIdentityServicesClient identityServicesClient, ITenantClient tenantClient,
+        IAuthenticationService authenticationService)
         : base(logger, Constants.IdentityServicesGroup, "CreateApiResource", "Adds a new api resource.", options,
             identityServicesClient, authenticationService)
     {
+        _methods = new IdentityMethodCall(tenantClient, authenticationService, logger);
         _nameArg = CommandArgumentValue.AddArgument("n", "name", ["Name of resource, must be unique"],
             true,
             1);
@@ -65,7 +70,12 @@ internal class CreateApiResource : ServiceClientOctoCommand<IIdentityServicesCli
             ShowInDiscoveryDocument = true
         };
 
-        await ServiceClient.CreateApiResource(apiScopeDto);
+        await _methods.RunAsync(RtApiResourceMethodClient.CreateApiResourceMethodId,
+            () => new RtApiResourceMethodClient(_methods.TenantClient).CreateApiResourceAsync(resourceName,
+                apiScopeDto.DisplayName, apiScopeDto.Description, apiScopeDto.IsEnabled,
+                apiScopeDto.ShowInDiscoveryDocument, apiScopeDto.RequireResourceIndicator,
+                apiScopeDto.UserClaims?.ToList(), apiScopeDto.Scopes?.ToList(),
+                apiScopeDto.AllowedAccessTokenSigningAlgorithms?.ToList()));
 
         Logger.LogInformation("API resource \'{ResourceName}\' at \'{ServiceClientServiceUri}\' created", resourceName,
             ServiceClient.ServiceUri);

@@ -4,18 +4,23 @@ using Meshmakers.Octo.Frontend.ManagementTool.Services;
 using Meshmakers.Octo.Sdk.ServiceClient.IdentityServices;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using GraphQlDtos.DataTransferObjects.System.Identity.v3;
+using Meshmakers.Octo.Sdk.ServiceClient.AssetRepositoryServices.Tenants;
 
 namespace Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Identity.Groups;
 
 internal class DeleteGroup : ServiceClientOctoCommand<IIdentityServicesClient>
 {
+    private readonly IdentityMethodCall _methods;
     private readonly IArgument _id;
 
     public DeleteGroup(ILogger<DeleteGroup> logger, IOptions<OctoToolOptions> options,
-        IIdentityServicesClient identityServicesClient, IAuthenticationService authenticationService)
+        IIdentityServicesClient identityServicesClient, ITenantClient tenantClient,
+        IAuthenticationService authenticationService)
         : base(logger, Constants.IdentityServicesGroup, "DeleteGroup", "Deletes a group.", options,
             identityServicesClient, authenticationService)
     {
+        _methods = new IdentityMethodCall(tenantClient, authenticationService, logger);
         _id = CommandArgumentValue.AddArgument("id", "identifier", ["ID of the group"], true, 1);
     }
 
@@ -34,7 +39,8 @@ internal class DeleteGroup : ServiceClientOctoCommand<IIdentityServicesClient>
         Logger.LogInformation("Deleting group '{RtId}' from '{ServiceClientServiceUri}'",
             rtId, ServiceClient.ServiceUri);
 
-        await ServiceClient.DeleteGroup(rtId);
+        await _methods.RunAsync(RtGroupMethodClient.DeleteGroupMethodId,
+            () => new RtGroupMethodClient(_methods.TenantClient).DeleteGroupAsync(rtId.ToString()));
 
         Logger.LogInformation("Group '{RtId}' deleted", rtId);
     }

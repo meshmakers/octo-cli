@@ -6,11 +6,14 @@ using Meshmakers.Octo.Sdk.ServiceClient.IdentityServices;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Newtonsoft.Json;
+using GraphQlDtos.DataTransferObjects.System.Identity.v3;
+using Meshmakers.Octo.Sdk.ServiceClient.AssetRepositoryServices.Tenants;
 
 namespace Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Identity.ApiSecrets;
 
 internal class CreateApiSecretApiResource : ServiceClientOctoCommand<IIdentityServicesClient>
 {
+    private readonly IdentityMethodCall _methods;
     private readonly IConsoleService _consoleService;
     private readonly IArgument _descriptionArg;
     private readonly IArgument _expirationArg;
@@ -18,12 +21,14 @@ internal class CreateApiSecretApiResource : ServiceClientOctoCommand<IIdentitySe
 
     public CreateApiSecretApiResource(ILogger<CreateApiSecretApiResource> logger, IOptions<OctoToolOptions> options,
         IConsoleService consoleService,
-        IIdentityServicesClient identityServicesClient, IAuthenticationService authenticationService)
+        IIdentityServicesClient identityServicesClient, ITenantClient tenantClient,
+        IAuthenticationService authenticationService)
         : base(logger, Constants.IdentityServicesGroup, "CreateApiSecretApiResource",
             "Adds new API secret for an API resource.",
             options,
             identityServicesClient, authenticationService)
     {
+        _methods = new IdentityMethodCall(tenantClient, authenticationService, logger);
         _consoleService = consoleService;
 
         _nameArg = CommandArgumentValue.AddArgument("n", "name", ["Name of API resource"],
@@ -65,7 +70,11 @@ internal class CreateApiSecretApiResource : ServiceClientOctoCommand<IIdentitySe
             Description = CommandArgumentValue.GetArgumentScalarValueOrDefault<string>(_descriptionArg)
         };
 
-        var resultSecret = await ServiceClient.CreateApiSecretForApiResource(name, apiSecretDto);
+        var clearText = await _methods.RunAsync(RtApiResourceMethodClient.AddSecretMethodId,
+            async () => await new RtApiResourceMethodClient(_methods.TenantClient).AddSecretAsync(await _methods.ResolveApiResourceRtIdAsync(name),
+                apiSecretDto.Description, apiSecretDto.ExpirationDate));
+        var resultSecret = IdentityMethodCall.ToNewSecretDto(clearText, apiSecretDto.ExpirationDate,
+            apiSecretDto.Description);
 
         // The hash identifies the secret for later updates and is part of the printed result, but neither
         // it nor the clear text is ever written to the log (AB#6258).

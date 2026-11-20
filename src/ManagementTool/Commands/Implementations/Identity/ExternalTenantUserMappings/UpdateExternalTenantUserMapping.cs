@@ -5,20 +5,25 @@ using Meshmakers.Octo.Frontend.ManagementTool.Services;
 using Meshmakers.Octo.Sdk.ServiceClient.IdentityServices;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using GraphQlDtos.DataTransferObjects.System.Identity.v3;
+using Meshmakers.Octo.Sdk.ServiceClient.AssetRepositoryServices.Tenants;
 
 namespace Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Identity.ExternalTenantUserMappings;
 
 internal class UpdateExternalTenantUserMapping : ServiceClientOctoCommand<IIdentityServicesClient>
 {
+    private readonly IdentityMethodCall _methods;
     private readonly IArgument _id;
     private readonly IArgument _roleIds;
 
     public UpdateExternalTenantUserMapping(ILogger<UpdateExternalTenantUserMapping> logger,
         IOptions<OctoToolOptions> options,
-        IIdentityServicesClient identityServicesClient, IAuthenticationService authenticationService)
+        IIdentityServicesClient identityServicesClient, ITenantClient tenantClient,
+        IAuthenticationService authenticationService)
         : base(logger, Constants.IdentityServicesGroup, "UpdateExternalTenantUserMapping",
             "Updates an external tenant user mapping.", options, identityServicesClient, authenticationService)
     {
+        _methods = new IdentityMethodCall(tenantClient, authenticationService, logger);
         _id = CommandArgumentValue.AddArgument("id", "identifier",
             ["ID of the external tenant user mapping"], true, 1);
         _roleIds = CommandArgumentValue.AddArgument("rids", "roleIds",
@@ -57,7 +62,9 @@ internal class UpdateExternalTenantUserMapping : ServiceClientOctoCommand<IIdent
         {
             RoleIds = roleIds
         };
-        await ServiceClient.UpdateExternalTenantUserMapping(rtId, dto);
+        await _methods.RunAsync(RtExternalTenantUserMappingMethodClient.UpdateMappingMethodId,
+            () => new RtExternalTenantUserMappingMethodClient(_methods.TenantClient).UpdateMappingAsync(
+                rtId.ToString(), dto.RoleIds));
 
         Logger.LogInformation("External tenant user mapping '{RtId}' updated", rtId);
     }

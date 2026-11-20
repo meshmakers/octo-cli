@@ -7,11 +7,14 @@ using Meshmakers.Octo.Frontend.ManagementTool.Services;
 using Meshmakers.Octo.Sdk.ServiceClient.IdentityServices;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using GraphQlDtos.DataTransferObjects.System.Identity.v3;
+using Meshmakers.Octo.Sdk.ServiceClient.AssetRepositoryServices.Tenants;
 
 namespace Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Identity.Clients;
 
 internal class AddAuthorizationCodeClient : ServiceClientOctoCommand<IIdentityServicesClient>
 {
+    private readonly IdentityMethodCall _methods;
     private readonly IArgument _clientId;
     private readonly IArgument _clientName;
     private readonly IArgument _clientUri;
@@ -19,11 +22,13 @@ internal class AddAuthorizationCodeClient : ServiceClientOctoCommand<IIdentitySe
     private readonly IArgument _frontChannelLogoutUri;
 
     public AddAuthorizationCodeClient(ILogger<AddAuthorizationCodeClient> logger, IOptions<OctoToolOptions> options,
-        IIdentityServicesClient identityServicesClient, IAuthenticationService authenticationService)
+        IIdentityServicesClient identityServicesClient, ITenantClient tenantClient,
+        IAuthenticationService authenticationService)
         : base(logger, Constants.IdentityServicesGroup, "AddAuthorizationCodeClient",
             "Adds a new client using grant type 'AuthorizationCode'.", options,
             identityServicesClient, authenticationService)
     {
+        _methods = new IdentityMethodCall(tenantClient, authenticationService, logger);
         _clientUri = CommandArgumentValue.AddArgument("u", "clientUri", ["URI of client"],
             true, 1);
         _redirectUri = CommandArgumentValue.AddArgument("ru", "redirectUri",
@@ -89,7 +94,9 @@ internal class AddAuthorizationCodeClient : ServiceClientOctoCommand<IIdentitySe
             clientDto.FrontChannelLogoutSessionRequired = true;
         }
 
-        await ServiceClient.CreateClient(clientDto);
+        await _methods.RunAsync(RtClientMethodClient.CreateClientMethodId,
+            () => ClientMethods.CreateAsync(_methods.TenantClient, clientDto),
+            secret: clientDto.ClientSecret);
 
         Logger.LogInformation(
             "ServiceClient \'{ClientId}\' (URI \'{ClientUri}\') at \'{ServiceClientServiceUri}\' created", clientId,

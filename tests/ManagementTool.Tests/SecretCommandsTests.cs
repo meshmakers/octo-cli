@@ -565,6 +565,9 @@ public sealed class SecretCommandsTests
 
     // ── UpdateIdentityProvider (write-only client secret) ─────────────────
 
+    private static System.Text.Json.JsonElement InputOf(GraphQL.GraphQLRequest call) =>
+        System.Text.Json.JsonSerializer.SerializeToElement(call.Variables).GetProperty("input");
+
     [Fact]
     public async Task UpdateIdentityProvider_WithoutSecret_SendsNullAndKeepsClientId()
     {
@@ -574,20 +577,20 @@ public sealed class SecretCommandsTests
             Name = "Old", TenantId = "azure-tid", Authority = "https://authority/", ClientId = "cid",
             ClientSecretIsSet = true
         });
-        IdentityProviderDto? sent = null;
-        A.CallTo(() => identity.UpdateIdentityProvider(A<OctoObjectId>._, A<IdentityProviderDto>._))
-            .Invokes((OctoObjectId _, IdentityProviderDto dto) => sent = dto);
+        var calls = new List<GraphQL.GraphQLRequest>();
         var command = new UpdateIdentityProvider(new RecordingLogger<UpdateIdentityProvider>(),
-            Options.Create(new OctoToolOptions { TenantId = "acme" }), identity, A.Fake<IAuthenticationService>(),
-            FakeSecretConsole.Empty());
+            Options.Create(new OctoToolOptions { TenantId = "acme" }), identity, MethodFakes.IdentityTenant(calls),
+            A.Fake<IAuthenticationService>(), FakeSecretConsole.Empty());
         command.CommandArgumentValue.ParseLayer(["-id", ProviderId, "-n", "New", "-e", "true"]);
 
         await command.Execute();
 
-        var azure = Assert.IsType<AzureEntraIdProviderDto>(sent);
-        Assert.Null(azure.ClientSecret);
-        Assert.Equal("cid", azure.ClientId);
-        Assert.Equal("azure-tid", azure.TenantId);
+        var call = Assert.Single(calls);
+        Assert.Contains("systemIdentityAzureEntraIdIdentityProviders", call.Query);
+        var input = InputOf(call);
+        Assert.False(input.TryGetProperty("clientSecret", out _));
+        Assert.Equal("cid", input.GetProperty("clientId").GetString());
+        Assert.Equal("azure-tid", input.GetProperty("tenantId").GetString());
     }
 
     [Fact]
@@ -598,19 +601,18 @@ public sealed class SecretCommandsTests
         {
             Name = "Old", ClientId = "cid", ClientSecret = "echoed-by-an-old-server"
         });
-        IdentityProviderDto? sent = null;
-        A.CallTo(() => identity.UpdateIdentityProvider(A<OctoObjectId>._, A<IdentityProviderDto>._))
-            .Invokes((OctoObjectId _, IdentityProviderDto dto) => sent = dto);
+        var calls = new List<GraphQL.GraphQLRequest>();
         var command = new UpdateIdentityProvider(new RecordingLogger<UpdateIdentityProvider>(),
-            Options.Create(new OctoToolOptions { TenantId = "acme" }), identity, A.Fake<IAuthenticationService>(),
-            FakeSecretConsole.Empty());
+            Options.Create(new OctoToolOptions { TenantId = "acme" }), identity, MethodFakes.IdentityTenant(calls),
+            A.Fake<IAuthenticationService>(), FakeSecretConsole.Empty());
         command.CommandArgumentValue.ParseLayer(["-id", ProviderId, "-n", "New", "-e", "true"]);
 
         await command.Execute();
 
-        var google = Assert.IsType<GoogleIdentityProviderDto>(sent);
-        Assert.Null(google.ClientSecret);
-        Assert.Equal("cid", google.ClientId);
+        var input = InputOf(Assert.Single(calls));
+        Assert.False(input.TryGetProperty("clientSecret", out _));
+        Assert.DoesNotContain("echoed-by-an-old-server", MethodFakes.VariablesOf(calls[0]));
+        Assert.Equal("cid", input.GetProperty("clientId").GetString());
     }
 
     [Fact]
@@ -619,17 +621,15 @@ public sealed class SecretCommandsTests
         var identity = A.Fake<IIdentityServicesClient>();
         A.CallTo(() => identity.GetIdentityProvider(A<OctoObjectId>._))
             .Returns(new MicrosoftIdentityProviderDto { Name = "Old", ClientId = "cid" });
-        IdentityProviderDto? sent = null;
-        A.CallTo(() => identity.UpdateIdentityProvider(A<OctoObjectId>._, A<IdentityProviderDto>._))
-            .Invokes((OctoObjectId _, IdentityProviderDto dto) => sent = dto);
+        var calls = new List<GraphQL.GraphQLRequest>();
         var command = new UpdateIdentityProvider(new RecordingLogger<UpdateIdentityProvider>(),
-            Options.Create(new OctoToolOptions { TenantId = "acme" }), identity, A.Fake<IAuthenticationService>(),
-            FakeSecretConsole.Empty());
+            Options.Create(new OctoToolOptions { TenantId = "acme" }), identity, MethodFakes.IdentityTenant(calls),
+            A.Fake<IAuthenticationService>(), FakeSecretConsole.Empty());
         command.CommandArgumentValue.ParseLayer(["-id", ProviderId, "-n", "New", "-e", "true", "-cs", "rotated-test-secret"]);
 
         await command.Execute();
 
-        Assert.Equal("rotated-test-secret", Assert.IsType<MicrosoftIdentityProviderDto>(sent).ClientSecret);
+        Assert.Equal("rotated-test-secret", InputOf(Assert.Single(calls)).GetProperty("clientSecret").GetString());
     }
 
     [Fact]

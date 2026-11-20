@@ -91,7 +91,7 @@ public sealed class ForbiddenRoleMessageTests : IDisposable
             A.Fake<IIdentityServiceClientAccessToken>());
         var command = new CreateApiSecretClient(new RecordingLogger<CreateApiSecretClient>(),
             Options.Create(new OctoToolOptions { TenantId = "octosystem" }), A.Fake<IConsoleService>(), client,
-            A.Fake<IAuthenticationService>());
+            MethodFakes.IdentityTenant([]), A.Fake<IAuthenticationService>());
         command.CommandArgumentValue.ParseLayer(["-cid", "my-client"]);
 
         var parser = A.Fake<ICommandParser>();
@@ -150,17 +150,18 @@ public sealed class ForbiddenRoleMessageTests : IDisposable
     {
         var options = Options.Create(new OctoToolOptions { TenantId = "octosystem" });
         var identity = A.Fake<IIdentityServicesClient>();
+        var tenant = A.Fake<Meshmakers.Octo.Sdk.ServiceClient.AssetRepositoryServices.Tenants.ITenantClient>();
         var auth = A.Fake<IAuthenticationService>();
         var documentations = new Command<OctoToolOptions>[]
         {
-            new CreateApiSecretClient(NullLogger<CreateApiSecretClient>.Instance, options, A.Fake<IConsoleService>(), identity, auth),
-            new UpdateApiSecretClient(NullLogger<UpdateApiSecretClient>.Instance, options, identity, auth),
-            new DeleteApiSecretClient(NullLogger<DeleteApiSecretClient>.Instance, options, identity, auth, A.Fake<IConfirmationService>()),
+            new CreateApiSecretClient(NullLogger<CreateApiSecretClient>.Instance, options, A.Fake<IConsoleService>(), identity, tenant, auth),
+            new UpdateApiSecretClient(NullLogger<UpdateApiSecretClient>.Instance, options, identity, tenant, auth),
+            new DeleteApiSecretClient(NullLogger<DeleteApiSecretClient>.Instance, options, identity, tenant, auth, A.Fake<IConfirmationService>()),
             new CreateApiSecretApiResource(NullLogger<CreateApiSecretApiResource>.Instance, options,
-                A.Fake<IConsoleService>(), identity, auth),
-            new UpdateApiSecretApiResource(NullLogger<UpdateApiSecretApiResource>.Instance, options, identity, auth),
-            new DeleteApiSecretApiResource(NullLogger<DeleteApiSecretApiResource>.Instance, options, identity, auth, A.Fake<IConfirmationService>()),
-            new AddClientCredentialsClient(NullLogger<AddClientCredentialsClient>.Instance, options, identity, auth,
+                A.Fake<IConsoleService>(), identity, tenant, auth),
+            new UpdateApiSecretApiResource(NullLogger<UpdateApiSecretApiResource>.Instance, options, identity, tenant, auth),
+            new DeleteApiSecretApiResource(NullLogger<DeleteApiSecretApiResource>.Instance, options, identity, tenant, auth, A.Fake<IConfirmationService>()),
+            new AddClientCredentialsClient(NullLogger<AddClientCredentialsClient>.Instance, options, identity, tenant, auth,
                 new SecretInput(A.Fake<ISecretConsole>())),
         };
 

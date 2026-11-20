@@ -3,11 +3,14 @@ using Meshmakers.Octo.Frontend.ManagementTool.Services;
 using Meshmakers.Octo.Sdk.ServiceClient.IdentityServices;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using GraphQlDtos.DataTransferObjects.System.Identity.v3;
+using Meshmakers.Octo.Sdk.ServiceClient.AssetRepositoryServices.Tenants;
 
 namespace Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Identity.Clients;
 
 internal class UnprovisionClientFromTenant : ServiceClientOctoCommand<IIdentityServicesClient>
 {
+    private readonly IdentityMethodCall _methods;
     private readonly IConfirmationService _confirmationService;
     private readonly IArgument _clientId;
     private readonly IArgument _childTenantId;
@@ -15,12 +18,14 @@ internal class UnprovisionClientFromTenant : ServiceClientOctoCommand<IIdentityS
 
     public UnprovisionClientFromTenant(ILogger<UnprovisionClientFromTenant> logger,
         IOptions<OctoToolOptions> options,
-        IIdentityServicesClient identityServicesClient, IAuthenticationService authenticationService,
+        IIdentityServicesClient identityServicesClient, ITenantClient tenantClient,
+        IAuthenticationService authenticationService,
         IConfirmationService confirmationService)
         : base(logger, Constants.IdentityServicesGroup, "UnprovisionClientFromTenant",
             "Removes a single client mirror (drops the child-side client + the parent's tracking row).",
             options, identityServicesClient, authenticationService)
     {
+        _methods = new IdentityMethodCall(tenantClient, authenticationService, logger);
         _confirmationService = confirmationService;
 
         _clientId = CommandArgumentValue.AddArgument("id", "clientId",
@@ -47,7 +52,8 @@ internal class UnprovisionClientFromTenant : ServiceClientOctoCommand<IIdentityS
             "Unprovisioning client '{ClientId}' from child tenant '{ChildTenantId}' at '{ServiceClientServiceUri}'",
             clientId, childTenantId, ServiceClient.ServiceUri);
 
-        await ServiceClient.UnprovisionClientFromTenant(clientId, childTenantId);
+        await _methods.RunAsync(RtClientMethodClient.RemoveMirrorMethodId,
+            async () => await new RtClientMethodClient(_methods.TenantClient).RemoveMirrorAsync(await IdentityMethodCall.ResolveClientRtIdAsync(ServiceClient, clientId), childTenantId));
 
         Logger.LogInformation("Mirror for client '{ClientId}' in child '{ChildTenantId}' removed",
             clientId, childTenantId);

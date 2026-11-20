@@ -3,21 +3,26 @@ using Meshmakers.Octo.Frontend.ManagementTool.Services;
 using Meshmakers.Octo.Sdk.ServiceClient.IdentityServices;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using GraphQlDtos.DataTransferObjects.System.Identity.v3;
+using Meshmakers.Octo.Sdk.ServiceClient.AssetRepositoryServices.Tenants;
 
 namespace Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Identity.Roles;
 
 internal class DeleteRole : ServiceClientOctoCommand<IIdentityServicesClient>
 {
+    private readonly IdentityMethodCall _methods;
     private readonly IConfirmationService _confirmationService;
     private readonly IArgument _nameArg;
     private readonly IArgument _yesArg;
 
     public DeleteRole(ILogger<DeleteRole> logger, IOptions<OctoToolOptions> options,
-        IIdentityServicesClient identityServicesClient, IAuthenticationService authenticationService,
+        IIdentityServicesClient identityServicesClient, ITenantClient tenantClient,
+        IAuthenticationService authenticationService,
         IConfirmationService confirmationService)
         : base(logger, Constants.IdentityServicesGroup, "DeleteRole", "Deletes a role", options, identityServicesClient,
             authenticationService)
     {
+        _methods = new IdentityMethodCall(tenantClient, authenticationService, logger);
         _confirmationService = confirmationService;
 
         _nameArg = CommandArgumentValue.AddArgument("n", "name", ["Name of role"], true,
@@ -46,7 +51,9 @@ internal class DeleteRole : ServiceClientOctoCommand<IIdentityServicesClient>
         Logger.LogInformation("Deleting role \'{Name}\' at \'{ServiceClientServiceUri}\'", name,
             ServiceClient.ServiceUri);
 
-        await ServiceClient.DeleteRole(name);
+        await _methods.RunAsync(RtRoleMethodClient.DeleteRoleMethodId,
+            async () => await new RtRoleMethodClient(_methods.TenantClient).DeleteRoleAsync(
+                await IdentityMethodCall.ResolveRoleRtIdAsync(ServiceClient, name)));
 
         Logger.LogInformation("Role \'{Name}\' deleted", name);
     }

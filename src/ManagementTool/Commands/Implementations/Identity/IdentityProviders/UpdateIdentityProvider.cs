@@ -5,11 +5,14 @@ using Meshmakers.Octo.Frontend.ManagementTool.Services;
 using Meshmakers.Octo.Sdk.ServiceClient.IdentityServices;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using GraphQlDtos.DataTransferObjects.System.Identity.v3;
+using Meshmakers.Octo.Sdk.ServiceClient.AssetRepositoryServices.Tenants;
 
 namespace Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Identity.IdentityProviders;
 
 internal class UpdateIdentityProvider : ServiceClientOctoCommand<IIdentityServicesClient>
 {
+    private readonly IdentityMethodCall _methods;
     private readonly IArgument _allowSelfRegistration;
     private readonly IArgument _clientId;
     private readonly IArgument _clientSecret;
@@ -21,12 +24,14 @@ internal class UpdateIdentityProvider : ServiceClientOctoCommand<IIdentityServic
     private readonly IArgument _rtId;
 
     public UpdateIdentityProvider(ILogger<UpdateIdentityProvider> logger, IOptions<OctoToolOptions> options,
-        IIdentityServicesClient identityServicesClient, IAuthenticationService authenticationService,
+        IIdentityServicesClient identityServicesClient, ITenantClient tenantClient,
+        IAuthenticationService authenticationService,
         SecretInput secretInput)
         : base(logger, Constants.IdentityServicesGroup, "UpdateIdentityProvider", "Updates an identity provider.",
             options, identityServicesClient,
             authenticationService)
     {
+        _methods = new IdentityMethodCall(tenantClient, authenticationService, logger);
         _secretInput = secretInput;
         _rtId = CommandArgumentValue.AddArgument("id", "identifier",
             ["ID of identity provider, must be unique"], true,
@@ -204,7 +209,9 @@ internal class UpdateIdentityProvider : ServiceClientOctoCommand<IIdentityServic
                 CommandArgumentValue.GetArgumentScalarValue<string>(_defaultGroupRtId);
         }
 
-        await ServiceClient.UpdateIdentityProvider(rtId, newIdentityProviderDto);
+        await _methods.RunAsync(RtGoogleIdentityProviderMethodClient.UpdateIdentityProviderMethodId,
+            () => IdentityProviderMethods.UpdateAsync(_methods.TenantClient, rtId.ToString(), newIdentityProviderDto),
+            secret: IdentityProviderMethods.ClientSecretOf(newIdentityProviderDto));
 
         Logger.LogInformation("Identity provider \'{Id}\' at \'{ServiceClientServiceUri}\' updated", rtId,
             ServiceClient.ServiceUri);

@@ -4,22 +4,27 @@ using Meshmakers.Octo.Frontend.ManagementTool.Services;
 using Meshmakers.Octo.Sdk.ServiceClient.IdentityServices;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using GraphQlDtos.DataTransferObjects.System.Identity.v3;
+using Meshmakers.Octo.Sdk.ServiceClient.AssetRepositoryServices.Tenants;
 
 namespace Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Identity.ApiScopes;
 
 internal class CreateApiScope : ServiceClientOctoCommand<IIdentityServicesClient>
 {
+    private readonly IdentityMethodCall _methods;
     private readonly IArgument _descriptionArg;
     private readonly IArgument _displayNameArg;
     private readonly IArgument _isEnabledArg;
     private readonly IArgument _nameArg;
 
     public CreateApiScope(ILogger<CreateApiScope> logger, IOptions<OctoToolOptions> options,
-        IIdentityServicesClient identityServicesClient, IAuthenticationService authenticationService)
+        IIdentityServicesClient identityServicesClient, ITenantClient tenantClient,
+        IAuthenticationService authenticationService)
         : base(logger, Constants.IdentityServicesGroup, "CreateApiScope",
             "Creates a new API scope.", options,
             identityServicesClient, authenticationService)
     {
+        _methods = new IdentityMethodCall(tenantClient, authenticationService, logger);
         _nameArg = CommandArgumentValue.AddArgument("n", "name", ["Name of scope, must be unique"],
             true,
             1);
@@ -62,7 +67,11 @@ internal class CreateApiScope : ServiceClientOctoCommand<IIdentityServicesClient
             ShowInDiscoveryDocument = true
         };
 
-        await ServiceClient.CreateApiScope(apiScopeDto);
+        await _methods.RunAsync(RtApiScopeMethodClient.CreateApiScopeMethodId,
+            () => new RtApiScopeMethodClient(_methods.TenantClient).CreateApiScopeAsync(scopeName,
+                apiScopeDto.DisplayName, apiScopeDto.Description, apiScopeDto.IsEnabled,
+                apiScopeDto.ShowInDiscoveryDocument, apiScopeDto.IsRequired, apiScopeDto.IsEmphasize,
+                apiScopeDto.UserClaims?.ToList()));
 
         Logger.LogInformation("API scope \'{ScopeName}\' at \'{ServiceClientServiceUri}\' created", scopeName,
             ServiceClient.ServiceUri);

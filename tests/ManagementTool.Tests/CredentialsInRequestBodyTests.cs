@@ -2,6 +2,8 @@ using System.Net;
 using System.Text;
 using System.Text.Json;
 using FakeItEasy;
+using GraphQL;
+using Meshmakers.Octo.Sdk.ServiceClient.AssetRepositoryServices.Tenants;
 using Meshmakers.Octo.Frontend.ManagementTool;
 using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Identity.ApiSecrets;
 using Meshmakers.Octo.Frontend.ManagementTool.Services;
@@ -27,6 +29,8 @@ public sealed class CredentialsInRequestBodyTests : IDisposable
     private readonly List<(string Method, string PathAndQuery, string Body)> _requests = [];
     private readonly IOptions<OctoToolOptions> _options = Options.Create(new OctoToolOptions { TenantId = "acme" });
     private readonly IConfirmationService _confirm = A.Fake<IConfirmationService>();
+    private readonly List<GraphQLRequest> _methodCalls = [];
+    private readonly ITenantClient _tenant;
 
     public CredentialsInRequestBodyTests()
     {
@@ -34,6 +38,7 @@ public sealed class CredentialsInRequestBodyTests : IDisposable
         // failure is rethrown instead of looping on a closed listener.
         (_listener, _baseUri) = StartListener();
         A.CallTo(() => _confirm.Confirm(A<string>._)).Returns(true);
+        _tenant = MethodFakes.IdentityTenant(_methodCalls);
         _ = Task.Run(Serve);
     }
 
@@ -85,10 +90,13 @@ public sealed class CredentialsInRequestBodyTests : IDisposable
                 _requests.Add((context.Request.HttpMethod, context.Request.Url?.PathAndQuery ?? string.Empty, body));
             }
 
-            // A lookup answers with the secret; every other call with an empty object.
+            // A lookup answers with the secret, a client read with the client's runtime id; every other call with an
+            // empty object.
             var json = context.Request.Url?.AbsolutePath.EndsWith("/lookup", StringComparison.Ordinal) == true
                 ? JsonSerializer.Serialize(new { valueEncrypted = _storedHash, description = "old" })
-                : "{}";
+                : context.Request.HttpMethod == "GET"
+                    ? JsonSerializer.Serialize(new { clientId = "c1", rtId = MethodFakes.TargetRtId })
+                    : "{}";
             var bytes = Encoding.UTF8.GetBytes(json);
             context.Response.StatusCode = 200;
             context.Response.ContentType = "application/json";
@@ -110,22 +118,22 @@ public sealed class CredentialsInRequestBodyTests : IDisposable
         if (kind == "client")
         {
             var command = new DeleteApiSecretClient(new RecordingLogger<DeleteApiSecretClient>(), _options, CreateClient(),
-                A.Fake<IAuthenticationService>(), _confirm);
+                _tenant, A.Fake<IAuthenticationService>(), _confirm);
             command.CommandArgumentValue.ParseLayer(["-cid", "c1", "-s", _storedHash, "-y"]);
             await command.Execute();
         }
         else
         {
             var command = new DeleteApiSecretApiResource(new RecordingLogger<DeleteApiSecretApiResource>(), _options,
-                CreateClient(), A.Fake<IAuthenticationService>(), _confirm);
+                CreateClient(), _tenant, A.Fake<IAuthenticationService>(), _confirm);
             command.CommandArgumentValue.ParseLayer(["-n", "c1", "-s", _storedHash, "-y"]);
             await command.Execute();
         }
 
-        var request = Assert.Single(_requests);
-        Assert.Equal("POST", request.Method);
-        Assert.Equal($"/acme/v1/apiSecrets/{kind}/c1/delete", request.PathAndQuery);
-        AssertValueOnlyInBody(request);
+        // The identity service sees no secret value (at most the client read); the method call carries it in its variables.
+        Assert.All(_requests, r => Assert.Equal("GET", r.Method));
+        Assert.DoesNotContain(_requests, r => r.PathAndQuery.Contains(_storedHash) || r.Body.Contains(_storedHash));
+        AssertValueOnlyInTheMethodVariables("removeSecret");
     }
 
     [Theory]
@@ -136,23 +144,33 @@ public sealed class CredentialsInRequestBodyTests : IDisposable
         if (kind == "client")
         {
             var command = new UpdateApiSecretClient(new RecordingLogger<UpdateApiSecretClient>(), _options, CreateClient(),
-                A.Fake<IAuthenticationService>());
+                _tenant, A.Fake<IAuthenticationService>());
             command.CommandArgumentValue.ParseLayer(["-cid", "c1", "-s", _storedHash, "-d", "new"]);
             await command.Execute();
         }
         else
         {
             var command = new UpdateApiSecretApiResource(new RecordingLogger<UpdateApiSecretApiResource>(), _options,
-                CreateClient(), A.Fake<IAuthenticationService>());
+                CreateClient(), _tenant, A.Fake<IAuthenticationService>());
             command.CommandArgumentValue.ParseLayer(["-n", "c1", "-s", _storedHash, "-d", "new"]);
             await command.Execute();
         }
 
-        Assert.Equal(2, _requests.Count);
-        Assert.Equal(("POST", $"/acme/v1/apiSecrets/{kind}/c1/lookup"), (_requests[0].Method, _requests[0].PathAndQuery));
-        AssertValueOnlyInBody(_requests[0]);
-        Assert.Equal(("PUT", $"/acme/v1/apiSecrets/{kind}/c1"), (_requests[1].Method, _requests[1].PathAndQuery));
-        Assert.Contains("new", _requests[1].Body);
+        var lookup = Assert.Single(_requests, r => r.Method == "POST");
+        Assert.Equal($"/acme/v1/apiSecrets/{kind}/c1/lookup", lookup.PathAndQuery);
+        AssertValueOnlyInBody(lookup);
+        Assert.DoesNotContain(_requests, r => r.Method == "PUT");
+        AssertValueOnlyInTheMethodVariables("updateSecret");
+        Assert.Contains("new", MethodFakes.VariablesOf(_methodCalls[0]));
+    }
+
+    private void AssertValueOnlyInTheMethodVariables(string field)
+    {
+        var call = Assert.Single(_methodCalls);
+        Assert.Contains(field, call.Query, StringComparison.Ordinal);
+        Assert.DoesNotContain(_storedHash, call.Query, StringComparison.Ordinal);
+        Assert.Equal(_storedHash,
+            JsonSerializer.SerializeToElement(call.Variables).GetProperty("input").GetProperty("secretValue").GetString());
     }
 
     private void AssertValueOnlyInBody((string Method, string PathAndQuery, string Body) request)

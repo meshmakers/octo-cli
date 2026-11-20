@@ -3,22 +3,27 @@ using Meshmakers.Octo.Frontend.ManagementTool.Services;
 using Meshmakers.Octo.Sdk.ServiceClient.IdentityServices;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using GraphQlDtos.DataTransferObjects.System.Identity.v3;
+using Meshmakers.Octo.Sdk.ServiceClient.AssetRepositoryServices.Tenants;
 
 namespace Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Identity.ApiSecrets;
 
 internal class UpdateApiSecretApiResource : ServiceClientOctoCommand<IIdentityServicesClient>
 {
+    private readonly IdentityMethodCall _methods;
     private readonly IArgument _descriptionArg;
     private readonly IArgument _expirationArg;
     private readonly IArgument _nameArg;
     private readonly IArgument _secretValueArg;
 
     public UpdateApiSecretApiResource(ILogger<UpdateApiSecretApiResource> logger, IOptions<OctoToolOptions> options,
-        IIdentityServicesClient identityServicesClient, IAuthenticationService authenticationService)
+        IIdentityServicesClient identityServicesClient, ITenantClient tenantClient,
+        IAuthenticationService authenticationService)
         : base(logger, Constants.IdentityServicesGroup, "UpdateApiSecretApiResource", "Updates an API secret for an API resource.",
             options, identityServicesClient,
             authenticationService)
     {
+        _methods = new IdentityMethodCall(tenantClient, authenticationService, logger);
         _nameArg = CommandArgumentValue.AddArgument("n", "name", ["Name of API resource"],
             true,
             1);
@@ -81,7 +86,10 @@ internal class UpdateApiSecretApiResource : ServiceClientOctoCommand<IIdentitySe
             secretDto.Description = CommandArgumentValue.GetArgumentScalarValue<string>(_descriptionArg);
         }
 
-        await ServiceClient.UpdateApiSecretApiResource(name, secretDto);
+        await _methods.RunAsync(RtApiResourceMethodClient.UpdateSecretMethodId,
+            async () => await new RtApiResourceMethodClient(_methods.TenantClient).UpdateSecretAsync(await _methods.ResolveApiResourceRtIdAsync(name),
+                secretDto.ValueEncrypted, secretDto.Description, secretDto.ExpirationDate),
+            secret: secretValue);
 
         Logger.LogInformation(
             "API secret \'{MaskedSecret}\' for API resource \'{Name}\' at \'{ServiceClientServiceUri}\' updated",

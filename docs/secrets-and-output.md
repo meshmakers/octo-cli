@@ -37,6 +37,14 @@ command + real SDK client against a local listener: method, URL without the valu
 `UpdateApiSecret*` sent `POST` (the create endpoint) instead of `PUT`, so `UpdateApiSecretClient` / `UpdateApiSecretApiResource`
 created an additional secret; fixed in the SDK.
 
+Since the identity wave 2 methods the writes run CK methods instead
+([identity commands](identity-commands.md#identity-administration-commands-run-the-systemidentity-methods)): the stored value
+travels only as a parameter in the variables of the GraphQL method call (`RemoveSecret`, `UpdateSecret`); the REST `lookup` of
+`UpdateApiSecret*` still sends it in the body. A refusal is scrubbed of the value. `Create*ApiSecret*` run `AddSecret`: the
+request carries no secret, the method returns the generated clear text once, and the command prints it once in the secret DTO
+(stored value computed as the identity service stores it) and never logs it. `CredentialsInRequestBodyTests`,
+`ApiSecretValueLoggingTests` and `CreateApiSecretCommandsTests` pin this.
+
 `ResetPassword` used the same REST body form (`POST users/ResetPassword`) and recognized identity services before 3.5.55; it now runs the CK method instead ([identity commands](identity-commands.md#createuser-and-resetpassword-run-the-user-password-methods)), so that REST path and its older-identity detection are gone.
 
 ## Passwords and secrets never on the command line
