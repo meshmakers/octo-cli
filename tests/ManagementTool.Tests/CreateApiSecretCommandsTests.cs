@@ -70,6 +70,36 @@ public sealed class CreateApiSecretCommandsTests
         AssertNoRestWrite();
     }
 
+    [Theory]
+    [InlineData("client")]
+    [InlineData("apiResource")]
+    public async Task Create_CallerWithoutTheRole_IsRefused_PrintsNothing_AndWritesNoRest(string owner)
+    {
+        MethodFakes.AnswerMethodCalls(_tenant, _requests, "METHOD_FORBIDDEN", "The caller lacks a role.",
+            new Dictionary<string, object?> { ["reason"] = "role-required", ["requiredRole"] = "SecretManagement" });
+        Func<Task> execute;
+        if (owner == "client")
+        {
+            execute = CreateForClient(new RecordingLogger<CreateApiSecretClient>(), "-cid", "c1").Execute;
+        }
+        else
+        {
+            var command = new CreateApiSecretApiResource(new RecordingLogger<CreateApiSecretApiResource>(),
+                Options.Create(new OctoToolOptions { TenantId = "acme" }), _console, _identity, _tenant,
+                A.Fake<IAuthenticationService>());
+            command.CommandArgumentValue.ParseLayer(["-n", "res"]);
+            execute = command.Execute;
+        }
+
+        var ex = await Assert.ThrowsAsync<Meshmakers.Octo.Sdk.ServiceClient.AssetRepositoryServices.Tenants.Methods.CkMethodCallException>(execute);
+
+        Assert.Equal("METHOD_FORBIDDEN", ex.Code);
+        Assert.Contains("requiredRole=SecretManagement",
+            Meshmakers.Octo.Frontend.ManagementTool.CkMethodErrorText.Format(ex));
+        Assert.Empty(_written);
+        AssertNoRestWrite();
+    }
+
     [Fact]
     public async Task CreateForClient_PublicClient_FailsWithTheDeclaredError_PrintsNothing()
     {

@@ -38,7 +38,8 @@ namespace ManagementTool.Tests;
 ///     generated in GraphQlDtos (<c>System.Identity-[3.8,4.0)</c>): every command sends its method mutation addressed by
 ///     runtime id and calls no REST write; a declared error ends it with code and message (exit -3), a platform refusal
 ///     (<c>METHOD_FORBIDDEN</c>) as well, without a REST write; the declared errors the REST endpoint answered with success
-///     stay a success; a server without the methods gets the REST call; the output is the one of the REST path.
+///     stay a success; a server without the methods ends the command with a message naming the needed identity version
+///     (no REST fallback); the output is the one of the REST path.
 /// </summary>
 public class IdentityWave2MethodCommandTests
 {
@@ -357,6 +358,17 @@ public class IdentityWave2MethodCommandTests
         Assert.Equal("Role with id '65f0c0ffee00000000000fff' not found.", ex.Message);
         Assert.Empty(_requests);
         AssertNoRestWrite();
+    }
+
+    [Fact]
+    public async Task UpdateGroupRoles_ARoleNamedTwice_IsSentOnce()
+    {
+        var command = Create(typeof(UpdateGroupRoles), ["-id", GroupRtId, "-rids", ReaderRoleRtId + "," + ReaderRoleRtId]);
+
+        await command.Execute();
+
+        var variables = Variables(Assert.Single(_requests));
+        Assert.Contains("\"roleNames\":[\"reader\"]", variables);
     }
 
     [Fact]

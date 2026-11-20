@@ -91,8 +91,8 @@ internal static class IdentityProviderMethods
     }
 
     /// <summary>
-    ///     <c>IdentityProvider.DeleteIdentityProvider-1</c> on the concrete type of <paramref name="provider" />. A provider
-    ///     type without a client throws <see cref="RuntimeIdUnavailableException" /> (the version message).
+    ///     <c>IdentityProvider.DeleteIdentityProvider-1</c> on the concrete type of <paramref name="provider" />. An unknown
+    ///     provider type ends the command with <c>Unknown identity provider type.</c>
     /// </summary>
     public static Task<CkMethodResult> DeleteAsync(ITenantClient tenantClient, IdentityProviderDto provider,
         string rtId) => provider switch
@@ -104,6 +104,6 @@ internal static class IdentityProviderMethods
         MicrosoftAdProviderDto => new RtMicrosoftAdIdentityProviderMethodClient(tenantClient).DeleteIdentityProviderAsync(rtId),
         OpenLdapProviderDto => new RtOpenLdapIdentityProviderMethodClient(tenantClient).DeleteIdentityProviderAsync(rtId),
         OctoTenantIdentityProviderDto => new RtOctoTenantIdentityProviderMethodClient(tenantClient).DeleteIdentityProviderAsync(rtId),
-        _ => throw new RuntimeIdUnavailableException()
+        _ => throw new ServiceClientException("Unknown identity provider type.")
     };
 }

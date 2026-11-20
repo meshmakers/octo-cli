@@ -70,8 +70,8 @@ internal partial class CreateExternalTenantUserMapping : ServiceClientOctoComman
             Notes:
             [
                 "Prints the mapping as stored: the user name of the source user record, the source tenant and the group names.",
-                "A source tenant that is neither a registry ancestor nor permits the tenant of the context, or a user it does not have, is refused with HTTP 403, code SourceTenantNotPermitted (one answer for all of these).",
-                "A group ID that is no group of this tenant is refused with HTTP 400, code UnknownGroup (nothing is stored); a second mapping for the same user with HTTP 409, code ExternalTenantUserMappingAlreadyExists.",
+                "A source tenant that is neither a registry ancestor nor permits the tenant of the context, or a user it does not have, is refused with `SOURCE_TENANT_NOT_PERMITTED` (one answer for all of these).",
+                "A group ID that is no group of this tenant is refused with `UNKNOWN_GROUP` (parameter `unknownGroupIds`, nothing is stored); a second mapping for the same user with `MAPPING_ALREADY_EXISTS`.",
                 "Groups need an identity service with AB#8343; older services ignore them."
             ]);
 

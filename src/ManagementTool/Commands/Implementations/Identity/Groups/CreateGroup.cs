@@ -59,7 +59,7 @@ internal class CreateGroup : ServiceClientOctoCommand<IIdentityServicesClient>
         var roleNames = await IdentityMethodCall.ResolveRoleNamesAsync(ServiceClient, dto.RoleIds ?? []);
         await _methods.RunAsync(RtGroupMethodClient.CreateGroupMethodId,
             () => new RtGroupMethodClient(_methods.TenantClient).CreateGroupAsync(name, dto.GroupDescription,
-                dto.RoleIds == null ? null : roleNames));
+                roleNames.Count > 0 ? roleNames : null));
 
         Logger.LogInformation("Group '{Name}' created", name);
     }

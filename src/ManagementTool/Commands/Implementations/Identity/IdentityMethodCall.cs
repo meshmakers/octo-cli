@@ -182,7 +182,8 @@ internal sealed class IdentityMethodCall(
             names.Add(role.Name);
         }
 
-        return names;
+        // As the REST endpoint (a dictionary by role name): a role named twice is set once.
+        return names.Distinct(StringComparer.OrdinalIgnoreCase).ToList();
     }
 
     /// <summary>

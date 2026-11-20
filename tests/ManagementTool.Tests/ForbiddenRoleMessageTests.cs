@@ -17,8 +17,10 @@ using Microsoft.Extensions.Options;
 namespace ManagementTool.Tests;
 
 /// <summary>
-/// AB#8094: identity answers a refused API secret write with <c>403 {"message": "...requires the role 'SecretManagement'..."}</c>
-/// (AB#5861). octo-cli prints that message and exits with -3; a 403 without a message keeps the ProvisionCurrentUser hint.
+/// AB#8094: a 403 of the identity service with <c>{"message": "...requires the role 'SecretManagement'..."}</c> (AB#5861) is
+/// printed verbatim with exit code -3; a 403 without a message keeps the ProvisionCurrentUser hint. The API secret writes run
+/// CK methods since identity wave 2, so the 403 here comes from the identity read before the method call (the client
+/// lookup); a refused secret method (<c>METHOD_FORBIDDEN</c>) is covered by <see cref="CreateApiSecretCommandsTests" />.
 /// The real <see cref="IdentityServicesClient" /> talks to a local HTTP listener, the real <see cref="Runner" /> prints.
 /// </summary>
 public sealed class ForbiddenRoleMessageTests : IDisposable
