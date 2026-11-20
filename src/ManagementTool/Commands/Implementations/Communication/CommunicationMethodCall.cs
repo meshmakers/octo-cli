@@ -49,6 +49,11 @@ internal sealed class CommunicationMethodCall(
     /// <summary>The platform error code of a call whose target entity does not exist (or is of another type).</summary>
     internal const string TargetNotFoundCode = "METHOD_TARGET_NOT_FOUND";
 
+    /// <summary>The platform error code of a refused caller (e.g. without the role <c>CommunicationManagement</c>).</summary>
+    internal const string ForbiddenCode = "METHOD_FORBIDDEN";
+
+    private const string HandlerNotAvailableCode = "METHOD_HANDLER_NOT_AVAILABLE";
+
     /// <summary>The tenant client the generated method clients are created over.</summary>
     public ITenantClient TenantClient => tenantClient;
 
@@ -94,6 +99,16 @@ internal sealed class CommunicationMethodCall(
     }
 
     /// <summary>
+    ///     Runs <paramref name="call" /> of a method that always returns a result record and returns it. A success without
+    ///     a result ends the command (exit -3): the REST call either returned its answer or failed, and the command must not
+    ///     print an empty execution id or a rotation without its message.
+    /// </summary>
+    public async Task<TValue> RunWithResultAsync<TValue>(string methodId, Func<Task<CkMethodResult<TValue?>>> call)
+        where TValue : class =>
+        await RunAsync(methodId, call) ??
+        throw new ServiceClientException($"The CK method {methodId} returned no result.");
+
+    /// <summary>
     ///     Runs <paramref name="call" /> and returns the method result as it is (declared errors included), for commands
     ///     that report each call of a list on its own (the pipeline move). A missing method still ends the command with the
     ///     version message.
@@ -111,7 +126,8 @@ internal sealed class CommunicationMethodCall(
         {
             logger.LogDebug("The CK method {MethodId} is not available: {Reason}", methodId,
                 CkMethodFallback.Describe(e));
-            throw new ServiceClientException(MethodUnavailableMessage(methodId, tenantClient.ServiceUri?.ToString()));
+            throw new ServiceClientException(MethodUnavailableMessage(methodId, tenantClient.ServiceUri?.ToString(),
+                string.Equals(e.Code, HandlerNotAvailableCode, StringComparison.Ordinal)));
         }
     }
 
@@ -128,10 +144,18 @@ internal sealed class CommunicationMethodCall(
         IsObjectId(value) ? value : throw new ServiceClientException($"{name} '{value}' is not a valid id.");
 
     /// <summary>The message of a command whose method the service does not offer; names the needed version.</summary>
-    internal static string MethodUnavailableMessage(string methodId, string? serviceUri) =>
+    /// <param name="methodId">The qualified id of the CK method.</param>
+    /// <param name="serviceUri">The asset repository the call went to.</param>
+    /// <param name="noHandler">
+    ///     The cause was <c>METHOD_HANDLER_NOT_AVAILABLE</c>: the model declares the method but no handler is live, which
+    ///     also happens while the communication controller restarts.
+    /// </param>
+    internal static string MethodUnavailableMessage(string methodId, string? serviceUri, bool noHandler = false) =>
         $"The service at '{serviceUri}' does not offer the CK method {methodId}. It needs communication controller " +
         $"services with System.Communication {RequiredSystemCommunicationVersion} or newer (the communication wave 3 " +
-        "methods). Nothing was changed. octo-cli does not fall back to the REST endpoint.";
+        "methods)" +
+        (noHandler ? ", or no handler of the method is running right now (communication controller restarting?). " : ". ") +
+        "Nothing was changed. octo-cli does not fall back to the REST endpoint.";
 
     /// <summary>
     ///     The concrete workload type of <paramref name="workloadRtId" /> (<c>Adapter</c>, <c>AdapterPool</c> or

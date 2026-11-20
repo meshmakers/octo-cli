@@ -120,9 +120,11 @@ internal class MovePipelinesToAdapterCommand : ServiceClientOctoCommand<ICommuni
     }
 
     /// <summary>
-    ///     Moves one pipeline through <c>Pipeline.MoveToAdapter-1</c> and returns the line the REST list answered for it:
-    ///     a declared error or an unknown pipeline is a failed item (the other pipelines still move); a refusal of the
-    ///     caller (<c>METHOD_FORBIDDEN</c>) or a service without the method ends the whole command.
+    ///     Moves one pipeline through <c>Pipeline.MoveToAdapter-1</c> and returns the line the REST list answered for it,
+    ///     as the controller's facade maps it: a declared error, an unknown pipeline and every other method error (e.g.
+    ///     <c>METHOD_TIMEOUT</c>, <c>METHOD_HANDLER_FAILED</c>) is a failed item and the other pipelines still move; only a
+    ///     refusal of the caller (<c>METHOD_FORBIDDEN</c>, the same for every pipeline) or a service without the method
+    ///     ends the whole command.
     /// </summary>
     private async Task<MovePipelineResultDto> MoveOneAsync(string pipelineRtId, string targetAdapterRtId, bool redeploy)
     {
@@ -147,6 +149,10 @@ internal class MovePipelinesToAdapterCommand : ServiceClientOctoCommand<ICommuni
         {
             return new MovePipelineResultDto(pipelineRtId, false, null, null,
                 $"Pipeline '{pipelineRtId}' was not found");
+        }
+        catch (CkMethodCallException e) when (e.Code != CommunicationMethodCall.ForbiddenCode)
+        {
+            return new MovePipelineResultDto(pipelineRtId, false, null, null, CkMethodErrorText.Format(e));
         }
     }
 }

@@ -43,9 +43,8 @@ internal class SetPipelineDebugCommand : ServiceClientOctoCommand<ICommunication
         }
 
         CommunicationMethodCall.RequireObjectId(id, "PipelineRtId");
-        var result = await _methods.RunAsync(RtPipelineMethodClient.SetDebuggingMethodId,
-            () => new RtPipelineMethodClient(_methods.TenantClient).SetDebuggingAsync(id, enabled))
-            ?? new RtPipelineDebugResultRecordDto();
+        var result = await _methods.RunWithResultAsync(RtPipelineMethodClient.SetDebuggingMethodId,
+            () => new RtPipelineMethodClient(_methods.TenantClient).SetDebuggingAsync(id, enabled));
 
         if (result.AppliedToRunningAdapter == true)
         {

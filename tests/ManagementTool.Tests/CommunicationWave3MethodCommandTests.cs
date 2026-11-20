@@ -102,7 +102,13 @@ public class CommunicationWave3MethodCommandTests
                         : [new WorkloadTypeDto { RtId = WorkloadRtId, CkTypeId = _workloadCkTypeId }]
                 });
             });
-        MethodFakes.AnswerMethodCalls(_tenant, _requests, null);
+        // The methods that always answer a result record get one; the others answer none.
+        MethodFakes.AnswerMethodCalls(_tenant, _requests, null, results:
+        [
+            new RtPipelineExecutionStartResultRecordDto { ExecutionId = "4f6a6f0c-0000-4000-8000-000000000009" },
+            new RtPipelineDebugResultRecordDto { Enabled = true, AppliedToRunningAdapter = true },
+            new RtServiceAccountSecretRotationResultRecordDto { ClientId = "sa", Message = "Rotated." }
+        ]);
     }
 
     [Theory]
@@ -411,6 +417,73 @@ public class CommunicationWave3MethodCommandTests
         Assert.Single(_requests);
         Assert.Contains(logger.Entries, e => e.Message.Contains($"Pipeline '{PipelineRtId}' was not found"));
         Assert.Contains(logger.Entries, e => e.Message.Contains("PipelineRtId 'not-an-id' is not a valid id"));
+    }
+
+    [Theory]
+    [InlineData("METHOD_TIMEOUT")]
+    [InlineData("METHOD_HANDLER_FAILED")]
+    [InlineData("METHOD_VALIDATION_FAILED")]
+    public async Task MovePipelinesToAdapter_APlatformErrorOfOnePipeline_IsAFailedItem_AndTheRestStillMove(
+        string code)
+    {
+        const string thirdPipelineRtId = "65f0c0ffee00000000000108";
+        MethodFakes.AnswerMethodCalls(_tenant, _requests, null,
+            result: new RtPipelineMoveResultRecordDto { OldAdapterRtId = "old", NewAdapterRtId = AdapterRtId });
+        MethodFakes.AnswerMethodCalls(_tenant, _requests, code, "The second move failed.", once: true);
+        MethodFakes.AnswerMethodCalls(_tenant, _requests, null,
+            result: new RtPipelineMoveResultRecordDto { OldAdapterRtId = "old", NewAdapterRtId = AdapterRtId },
+            once: true);
+        var logger = new RecordingLogger<MovePipelinesToAdapterCommand>();
+
+        var ex = await Assert.ThrowsAsync<ToolException>(() => Create(typeof(MovePipelinesToAdapterCommand),
+            ["-ids", $"{PipelineRtId},{SecondPipelineRtId},{thirdPipelineRtId}", "-aid", AdapterRtId, "-y"], logger)
+            .Execute());
+
+        Assert.Equal("1 pipeline move(s) failed — see log above", ex.Message);
+        Assert.Equal(3, _requests.Count);
+        Assert.Contains(thirdPipelineRtId, Variables(_requests[2]), StringComparison.Ordinal);
+        Assert.Contains(logger.Entries, e => e.Message == $"Pipeline {PipelineRtId} moved old -> {AdapterRtId}");
+        Assert.Contains(logger.Entries, e => e.Level == LogLevel.Error &&
+                                             e.Message.Contains(SecondPipelineRtId) && e.Message.Contains(code));
+        Assert.Contains(logger.Entries, e => e.Message == $"Pipeline {thirdPipelineRtId} moved old -> {AdapterRtId}");
+        Assert.Equal("Move summary: 2 succeeded, 1 failed (of 3)", logger.Entries.Last().Message);
+    }
+
+    [Theory]
+    [InlineData("ExecutePipeline")]
+    [InlineData("SetPipelineDebug")]
+    [InlineData("RotateAdapterServiceAccountSecret")]
+    public async Task ASuccessWithoutTheResultRecord_EndsTheCommand_InsteadOfPrintingAnEmptyAnswer(string name)
+    {
+        var (type, args, _, _) = Cases[name];
+        MethodFakes.AnswerMethodCalls(_tenant, _requests, null);
+
+        var ex = await Assert.ThrowsAsync<ServiceClientException>(() => Create(type, args).Execute());
+
+        Assert.EndsWith("returned no result.", ex.Message);
+        Assert.Empty(_consoleLines);
+    }
+
+    [Fact]
+    public async Task NoHandlerOfTheMethod_AlsoNamesAControllerRestart()
+    {
+        MethodFakes.AnswerMethodCalls(_tenant, _requests, "METHOD_HANDLER_NOT_AVAILABLE");
+
+        var ex = await Assert.ThrowsAsync<ServiceClientException>(() =>
+            Create(typeof(DeployWorkloadCommand), ["-id", WorkloadRtId]).Execute());
+
+        Assert.Contains("restarting", ex.Message);
+    }
+
+    [Fact]
+    public async Task AServerWithoutTheMethodInItsSchema_DoesNotNameARestart()
+    {
+        MethodFakes.AnswerMethodCallsWithValidationErrors(_tenant, _requests, "SystemCommunicationMethodInput", "method");
+
+        var ex = await Assert.ThrowsAsync<ServiceClientException>(() =>
+            Create(typeof(DeployWorkloadCommand), ["-id", WorkloadRtId]).Execute());
+
+        Assert.DoesNotContain("restarting", ex.Message);
     }
 
     [Fact]

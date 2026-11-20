@@ -1,3 +1,4 @@
+using Meshmakers.Octo.Sdk.ServiceClient;
 using Meshmakers.Octo.Sdk.ServiceClient.AssetRepositoryServices.Tenants;
 using GraphQlDtos.DataTransferObjects.System.Communication.v4;
 using Meshmakers.Common.CommandLineParser;
@@ -65,9 +66,12 @@ internal class ExecutePipelineCommand : ServiceClientOctoCommand<ICommunicationS
         }
 
         CommunicationMethodCall.RequireObjectId(id, "PipelineRtId");
-        var started = await _methods.RunAsync(RtPipelineMethodClient.ExecuteMethodId,
+        var started = await _methods.RunWithResultAsync(RtPipelineMethodClient.ExecuteMethodId,
             () => new RtPipelineMethodClient(_methods.TenantClient).ExecuteAsync(id, input, isDryRun: false));
-        var executionId = started?.ExecutionId ?? string.Empty;
+        var executionId = string.IsNullOrWhiteSpace(started.ExecutionId)
+            ? throw new ServiceClientException(
+                $"The CK method {RtPipelineMethodClient.ExecuteMethodId} returned no execution id.")
+            : started.ExecutionId;
 
         _consoleService.WriteLine(executionId);
     }

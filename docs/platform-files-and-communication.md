@@ -58,7 +58,7 @@ names, arguments, confirmations and output are unchanged; the reads (`Get*`), `E
 | `DeployPipeline` | `Pipeline.Deploy-1` | target = the pipeline; the definition is a sensitive parameter |
 | `ExecutePipeline` | `Pipeline.Execute-1` | prints the execution id as before |
 | `SetPipelineDebug` | `Pipeline.SetDebugging-1` | |
-| `MovePipelinesToAdapter` | `Pipeline.MoveToAdapter-1`, once per pipeline | each pipeline is reported on its own; a refused or unknown pipeline is a failed item, the rest still move |
+| `MovePipelinesToAdapter` | `Pipeline.MoveToAdapter-1`, once per pipeline | each pipeline is reported on its own; a declared or platform error of one pipeline (unknown pipeline, `METHOD_TIMEOUT`, ...) is a failed item and the rest still move; only `METHOD_FORBIDDEN` (the caller) ends the command |
 | `DeployDataFlow` / `UndeployDataFlow` | `DataFlow.Deploy-1` / `Undeploy-1` | |
 | `DeployDeploymentSite` / `UndeployDeploymentSite` | `DeploymentSite.Deploy-1` / `Undeploy-1` | |
 | `DeployTriggers` / `UndeployTriggers` | `PipelineTrigger.DeployAll-1` / `UndeployAll-1` | static: every trigger of the tenant |
@@ -84,10 +84,12 @@ names, arguments, confirmations and output are unchanged; the reads (`Get*`), `E
 - **No REST fallback.** A service without the method (the asset repository rejects the document in GraphQL validation, or
   `METHOD_HANDLER_NOT_AVAILABLE`) ends the command with a message that names communication controller services with
   System.Communication 4.19.0. Nothing was changed in that case. Roll out the communication controller with these methods
-  before this octo-cli version.
+  before this octo-cli version. With `METHOD_HANDLER_NOT_AVAILABLE` the message also names a controller restart: the
+  handler is missing for a moment while the communication controller restarts.
 - **Errors.** A declared error of the method prints `CODE: message (parameters)` and exits with -3, as the refused REST call
   did. Platform errors (`METHOD_FORBIDDEN`, `METHOD_VALIDATION_FAILED`, `METHOD_TARGET_NOT_FOUND`, `METHOD_TIMEOUT`) print
-  their code and parameters and exit with -3.
+  their code and parameters and exit with -3. A success without the result record of `ExecutePipeline`,
+  `SetPipelineDebug` or `RotateAdapterServiceAccountSecret` ends with -3 too (`returned no result`).
 - **Deployment pipelines.** The workload rollout pipelines run `GetWorkloadsByChart` (REST read, unchanged),
   `UpdateWorkloadChartVersion` and `DeployWorkload`; they judge the two writes by their exit code and only log their
   output. Both commands log the same lines as before; the warning a deploy may return (an explicit Helm value overrode a

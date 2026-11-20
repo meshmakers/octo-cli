@@ -102,10 +102,8 @@ internal class RotateAdapterServiceAccountSecretCommand : ServiceClientOctoComma
 
         // The method never returns the secret: it stays in the adapter's service-account configuration.
         CommunicationMethodCall.RequireObjectId(adapterRtId, "AdapterRtId");
-        var result = await _methods.RunAsync(RtAdapterMethodClient.RotateServiceAccountSecretMethodId,
-                         () => new RtAdapterMethodClient(_methods.TenantClient)
-                             .RotateServiceAccountSecretAsync(adapterRtId))
-                     ?? new RtServiceAccountSecretRotationResultRecordDto();
+        var result = await _methods.RunWithResultAsync(RtAdapterMethodClient.RotateServiceAccountSecretMethodId,
+            () => new RtAdapterMethodClient(_methods.TenantClient).RotateServiceAccountSecretAsync(adapterRtId));
 
         if (result.WasCreated == true)
         {
