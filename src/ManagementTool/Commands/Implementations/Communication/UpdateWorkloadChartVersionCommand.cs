@@ -1,3 +1,5 @@
+using Meshmakers.Octo.Sdk.ServiceClient.AssetRepositoryServices.Tenants;
+using GraphQlDtos.DataTransferObjects.System.Communication.v4;
 using Meshmakers.Common.CommandLineParser;
 using Meshmakers.Octo.Frontend.ManagementTool.Services;
 using Meshmakers.Octo.Sdk.ServiceClient.CommunicationControllerServices;
@@ -8,16 +10,19 @@ namespace Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Commu
 
 internal class UpdateWorkloadChartVersionCommand : ServiceClientOctoCommand<ICommunicationServicesClient>
 {
+    private readonly CommunicationMethodCall _methods;
     private readonly IArgument _workloadRtId;
     private readonly IArgument _chartVersion;
 
     public UpdateWorkloadChartVersionCommand(ILogger<UpdateWorkloadChartVersionCommand> logger,
         IOptions<OctoToolOptions> options,
-        ICommunicationServicesClient communicationServicesClient, IAuthenticationService authenticationService)
+        ICommunicationServicesClient communicationServicesClient, ITenantClient tenantClient,
+        IAuthenticationService authenticationService)
         : base(logger, Constants.CommunicationServicesGroup, "UpdateWorkloadChartVersion",
             "Sets ChartVersion on a single workload. Does NOT trigger a deploy — call DeployWorkload afterwards if needed.",
             options, communicationServicesClient, authenticationService)
     {
+        _methods = new CommunicationMethodCall(tenantClient, authenticationService, logger);
         _workloadRtId = CommandArgumentValue.AddArgument("id", "workloadRtId",
             ["The workload's runtime object ID"], true, 1);
         _chartVersion = CommandArgumentValue.AddArgument("cv", "chartVersion",
@@ -33,7 +38,7 @@ internal class UpdateWorkloadChartVersionCommand : ServiceClientOctoCommand<ICom
             "Setting chart version of workload '{WorkloadRtId}' to '{ChartVersion}' for tenant '{TenantId}' at '{ServiceClientServiceUri}'",
             workloadRtId, chartVersion, Options.Value.TenantId, ServiceClient.ServiceUri);
 
-        await ServiceClient.UpdateWorkloadChartVersionAsync(workloadRtId, chartVersion);
+        await _methods.SetWorkloadChartVersionAsync(workloadRtId, chartVersion);
 
         Logger.LogInformation(
             "Chart version for workload '{WorkloadRtId}' updated to '{ChartVersion}'. Deploy is NOT triggered — run DeployWorkload separately if needed.",

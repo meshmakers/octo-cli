@@ -42,6 +42,24 @@ public static class GraphQlConstants
         }
       }";
 
+    /// <summary>
+    ///     The CK type of a workload by runtime id: the workload methods of <c>System.Communication</c> are declared on the
+    ///     abstract <c>DeployableWorkload</c> and run through the method client of the concrete type (Adapter, AdapterPool
+    ///     or Application).
+    /// </summary>
+    public const string GetDeployableWorkloadCkTypeById = @"
+      query getDeployableWorkloadCkTypeById($rtId: OctoObjectId!) {
+        runtime {
+          systemCommunicationDeployableWorkload(rtId: $rtId) {
+            totalCount
+            items {
+              rtId
+              ckTypeId
+            }
+          }
+        }
+      }";
+
     public const string GetNotifications = @"query getNotifications(
           $after: String
           $first: Int

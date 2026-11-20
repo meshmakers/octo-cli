@@ -1,3 +1,6 @@
+using Meshmakers.Octo.Sdk.ServiceClient;
+using Meshmakers.Octo.Sdk.ServiceClient.AssetRepositoryServices.Tenants;
+using GraphQlDtos.DataTransferObjects.System.Communication.v4;
 using Meshmakers.Common.CommandLineParser;
 using Meshmakers.Common.Shared.Services;
 using Meshmakers.Octo.Frontend.ManagementTool.Services;
@@ -9,17 +12,20 @@ namespace Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Commu
 
 internal class ExecutePipelineCommand : ServiceClientOctoCommand<ICommunicationServicesClient>
 {
+    private readonly CommunicationMethodCall _methods;
     private readonly IConsoleService _consoleService;
     private readonly IArgument _idArg;
     private readonly IArgument _inputFileArg;
 
     public ExecutePipelineCommand(ILogger<ExecutePipelineCommand> logger, IOptions<OctoToolOptions> options,
         IConsoleService consoleService,
-        ICommunicationServicesClient communicationServicesClient, IAuthenticationService authenticationService)
+        ICommunicationServicesClient communicationServicesClient, ITenantClient tenantClient,
+        IAuthenticationService authenticationService)
         : base(logger, Constants.CommunicationServicesGroup, "ExecutePipeline",
             "Executes a pipeline and returns the execution ID.", options,
             communicationServicesClient, authenticationService)
     {
+        _methods = new CommunicationMethodCall(tenantClient, authenticationService, logger);
         _consoleService = consoleService;
         _idArg = CommandArgumentValue.AddArgument("id", "identifier", ["The pipeline runtime object ID"], true, 1);
         _inputFileArg = CommandArgumentValue.AddArgument("f", "inputFile", ["Path to pipeline input file"], false, 1);
@@ -59,7 +65,13 @@ internal class ExecutePipelineCommand : ServiceClientOctoCommand<ICommunicationS
             input = await File.ReadAllTextAsync(inputFilePath);
         }
 
-        var executionId = await ServiceClient.ExecutePipelineAsync(id, input);
+        CommunicationMethodCall.RequireObjectId(id, "PipelineRtId");
+        var started = await _methods.RunWithResultAsync(RtPipelineMethodClient.ExecuteMethodId,
+            () => new RtPipelineMethodClient(_methods.TenantClient).ExecuteAsync(id, input, isDryRun: false));
+        var executionId = string.IsNullOrWhiteSpace(started.ExecutionId)
+            ? throw new ServiceClientException(
+                $"The CK method {RtPipelineMethodClient.ExecuteMethodId} returned no execution id.")
+            : started.ExecutionId;
 
         _consoleService.WriteLine(executionId);
     }

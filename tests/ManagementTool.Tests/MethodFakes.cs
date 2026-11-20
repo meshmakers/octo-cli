@@ -17,13 +17,15 @@ internal static class MethodFakes
 {
     /// <summary>
     ///     Success (a response with an invocation id) when <paramref name="errorCode" /> is null, otherwise the GraphQL error
-    ///     of the method gateway (extensions <c>code</c> and <c>parameters</c>).
+    ///     of the method gateway (extensions <c>code</c> and <c>parameters</c>). With <paramref name="once" /> the answer
+    ///     applies to the next call only and the earlier configuration answers the calls after it. <paramref name="results" />
+    ///     are candidates for several commands: each call answers the first one of its result type.
     /// </summary>
     public static void AnswerMethodCalls(ITenantClient tenant, List<GraphQLRequest> requests, string? errorCode,
         string? message = null, Dictionary<string, object?>? parameters = null, IReadOnlyList<string>? detailCodes = null,
-        object? result = null)
+        object? result = null, bool once = false, IReadOnlyList<object>? results = null)
     {
-        A.CallTo(tenant).Where(c => c.Method.Name == nameof(ITenantClient.SendMutationAsync))
+        var answer = A.CallTo(tenant).Where(c => c.Method.Name == nameof(ITenantClient.SendMutationAsync))
             .WithNonVoidReturnType()
             .ReturnsLazily(call =>
             {
@@ -59,14 +61,19 @@ internal static class MethodFakes
                 responseType.GetProperty("InvocationId")?.SetValue(response, "inv-1");
                 // The method's result (a record, a created rtId or a secret), when the test gives one of the right type.
                 var resultProperty = responseType.GetProperty("Result");
-                if (result != null && resultProperty != null && resultProperty.PropertyType.IsInstanceOfType(result))
+                var answered = result ?? results?.FirstOrDefault(r => resultProperty?.PropertyType.IsInstanceOfType(r) == true);
+                if (answered != null && resultProperty != null && resultProperty.PropertyType.IsInstanceOfType(answered))
                 {
-                    resultProperty.SetValue(response, result);
+                    resultProperty.SetValue(response, answered);
                 }
 
                 return typeof(Task).GetMethod(nameof(Task.FromResult))!.MakeGenericMethod(responseType)
                     .Invoke(null, [response])!;
             });
+        if (once)
+        {
+            answer.Once();
+        }
     }
 
     /// <summary>

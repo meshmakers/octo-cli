@@ -6,6 +6,16 @@ All notable changes to octo-cli are listed here. Newest first.
 
 ### Changed
 
+- **AB#9053 — Communication write commands run the System.Communication methods.** `DeployPipeline`, `ExecutePipeline`,
+  `SetPipelineDebug`, `MovePipelinesToAdapter`, `Deploy/UndeployDataFlow`, `Deploy/UndeployDeploymentSite`,
+  `Deploy/UndeployTriggers`, `Deploy/UndeployWorkload`, `UpdateWorkloadChartVersion`, `CancelQueuedExecution` and
+  `RotateAdapterServiceAccountSecret` call the CK methods (method clients generated from `System.Communication-[4.19,5.0)`)
+  instead of the REST endpoints; names, arguments and output are unchanged, the reads stay REST. A refused call prints the
+  code and message of the method error and exits with -3. **Requires communication controller services with System.Communication
+  4.19.0; roll them out before this CLI version.** **Every one of these commands now needs the role `CommunicationManagement`**
+  (REST accepted any `octo_api` caller): grant it to the users and client credentials clients that run them, including the
+  CD deploy clients, before they use this version. There is no REST fallback: against an older communication controller the
+  commands stop with a message naming the needed version.
 - **AB#9045, AB#9046 — Identity administration commands run the System.Identity methods.** The write commands of groups,
   clients (create, update, scopes, delete, roles, overlays, mirrors), API secrets, roles, API scopes and resources, data
   permissions and policies, e-mail domain group rules, external tenant user mappings, admin provisioning and identity providers

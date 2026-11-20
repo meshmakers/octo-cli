@@ -1,9 +1,12 @@
+using FakeItEasy;
+using GraphQL;
 using Meshmakers.Common.Shared.Services;
 using Meshmakers.Octo.Communication.Contracts.DataTransferObjects;
 using Meshmakers.Octo.Frontend.ManagementTool;
 using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Communication;
 using Meshmakers.Octo.Frontend.ManagementTool.Services;
 using Meshmakers.Octo.Sdk.ServiceClient;
+using Meshmakers.Octo.Sdk.ServiceClient.AssetRepositoryServices.Tenants;
 using Meshmakers.Octo.Sdk.ServiceClient.Authentication;
 using Meshmakers.Octo.Sdk.ServiceClient.CommunicationControllerServices;
 using Microsoft.Extensions.Logging;
@@ -28,6 +31,18 @@ namespace ManagementTool.Tests;
 public sealed class AdapterPoolQueueCommandTests
 {
     private const string PoolRtId = "670000000000000000000001";
+
+    private readonly ITenantClient _tenant = A.Fake<ITenantClient>();
+    private readonly List<GraphQLRequest> _requests = [];
+
+    /// <summary>The pool and execution id the cancel method was called with (the method runs on the tenant client).</summary>
+    private (string, string)? CancelledEntry(string executionId) =>
+        _requests.Count == 0
+            ? null
+            : MethodFakes.VariablesOf(Assert.Single(_requests)) is var v && v.Contains(PoolRtId) &&
+              v.Contains(executionId)
+                ? (PoolRtId, executionId)
+                : ("<other>", "<other>");
 
     // ── GetAdapterPoolQueue ─────────────────────────────────────────────────
 
@@ -119,17 +134,15 @@ public sealed class AdapterPoolQueueCommandTests
     [Fact]
     public async Task Cancel_WaitingEntry_IsCancelled()
     {
-        var client = new FakeQueueClient([], new AdapterPoolQueueCancellationResultDto
-        {
-            Outcome = AdapterPoolQueueCancellationOutcome.Cancelled
-        });
+        MethodFakes.AnswerMethodCalls(_tenant, _requests, null);
+        var client = new FakeQueueClient([]);
         var logger = new RecordingLogger<CancelQueuedExecutionCommand>();
         var command = NewCancelCommand(client, logger, new FakeConfirmationService(true));
         command.CommandArgumentValue.ParseLayer(["-id", PoolRtId, "-eid", "e-a2"]);
 
         await command.Execute();
 
-        Assert.Equal((PoolRtId, "e-a2"), client.CancelledEntry);
+        Assert.Equal((PoolRtId, "e-a2"), CancelledEntry("e-a2"));
         Assert.Contains(logger.Entries, e => e.Level == LogLevel.Information && e.Message.Contains("was cancelled"));
         Assert.DoesNotContain(logger.Entries, e => e.Level >= LogLevel.Warning);
     }
@@ -137,11 +150,10 @@ public sealed class AdapterPoolQueueCommandTests
     [Fact]
     public async Task Cancel_AlreadyLeased_SaysInterruptingIsADifferentOperation()
     {
-        var client = new FakeQueueClient([], new AdapterPoolQueueCancellationResultDto
-        {
-            Outcome = AdapterPoolQueueCancellationOutcome.AlreadyLeased,
-            ServerMessage = "Execution 'e-run' already holds a lease and is no longer queued."
-        });
+        // The method answers the declared error EXECUTION_ALREADY_LEASED (REST: 409).
+        MethodFakes.AnswerMethodCalls(_tenant, _requests, "EXECUTION_ALREADY_LEASED",
+            "Execution 'e-run' already holds a lease and is no longer queued.");
+        var client = new FakeQueueClient([]);
         var logger = new RecordingLogger<CancelQueuedExecutionCommand>();
         var command = NewCancelCommand(client, logger, new FakeConfirmationService(true));
         command.CommandArgumentValue.ParseLayer(["-id", PoolRtId, "-eid", "e-run"]);
@@ -160,11 +172,10 @@ public sealed class AdapterPoolQueueCommandTests
     [Fact]
     public async Task Cancel_UnknownEntry_IsReportedAsNotFoundAndNotAsCancelled()
     {
-        var client = new FakeQueueClient([], new AdapterPoolQueueCancellationResultDto
-        {
-            Outcome = AdapterPoolQueueCancellationOutcome.NotFound,
-            ServerMessage = "No queued execution 'e-gone' belongs to adapter pool."
-        });
+        // The method answers the declared error QUEUED_EXECUTION_NOT_FOUND (REST: 404).
+        MethodFakes.AnswerMethodCalls(_tenant, _requests, "QUEUED_EXECUTION_NOT_FOUND",
+            "No queued execution 'e-gone' belongs to adapter pool.");
+        var client = new FakeQueueClient([]);
         var logger = new RecordingLogger<CancelQueuedExecutionCommand>();
         var command = NewCancelCommand(client, logger, new FakeConfirmationService(true));
         command.CommandArgumentValue.ParseLayer(["-id", PoolRtId, "-eid", "e-gone"]);
@@ -178,6 +189,7 @@ public sealed class AdapterPoolQueueCommandTests
     [Fact]
     public async Task Cancel_DeclinedConfirmation_NeverCallsTheService()
     {
+        MethodFakes.AnswerMethodCalls(_tenant, _requests, null);
         var client = new FakeQueueClient([]);
         var confirmation = new FakeConfirmationService(false);
         var command = NewCancelCommand(client, new RecordingLogger<CancelQueuedExecutionCommand>(), confirmation);
@@ -185,7 +197,7 @@ public sealed class AdapterPoolQueueCommandTests
 
         await Assert.ThrowsAsync<ToolException>(() => command.Execute());
 
-        Assert.Null(client.CancelledEntry);
+        Assert.Empty(_requests);
         // The prompt has to say what the verb does NOT do, or "yes" is not an informed answer.
         Assert.Contains("never run", confirmation.LastMessage);
         Assert.Contains("different operation", confirmation.LastMessage);
@@ -194,6 +206,7 @@ public sealed class AdapterPoolQueueCommandTests
     [Fact]
     public async Task Cancel_WithYesFlag_SkipsTheConfirmationPrompt()
     {
+        MethodFakes.AnswerMethodCalls(_tenant, _requests, null);
         var client = new FakeQueueClient([]);
         var confirmation = new FakeConfirmationService(false);
         var command = NewCancelCommand(client, new RecordingLogger<CancelQueuedExecutionCommand>(), confirmation);
@@ -201,7 +214,7 @@ public sealed class AdapterPoolQueueCommandTests
 
         await command.Execute();
 
-        Assert.Equal((PoolRtId, "e-a2"), client.CancelledEntry);
+        Assert.Equal((PoolRtId, "e-a2"), CancelledEntry("e-a2"));
         Assert.Null(confirmation.LastMessage);
     }
 
@@ -248,11 +261,11 @@ public sealed class AdapterPoolQueueCommandTests
             Options.Create(new OctoToolOptions { TenantId = tenantId }), consoleService, client,
             new FakeAuthenticationService());
 
-    private static CancelQueuedExecutionCommand NewCancelCommand(ICommunicationServicesClient client,
+    private CancelQueuedExecutionCommand NewCancelCommand(ICommunicationServicesClient client,
         ILogger<CancelQueuedExecutionCommand> logger,
         IConfirmationService confirmationService,
         string? tenantId = "lender") =>
-        new(logger, Options.Create(new OctoToolOptions { TenantId = tenantId }), client,
+        new(logger, Options.Create(new OctoToolOptions { TenantId = tenantId }), client, _tenant,
             new FakeAuthenticationService(), confirmationService);
 
     private sealed class RecordingConsoleService : IConsoleService
@@ -318,16 +331,13 @@ public sealed class AdapterPoolQueueCommandTests
     }
 
     /// <summary>
-    ///     Only the two queue calls are implemented — everything else throws, so a command reaching
-    ///     for anything but the queue endpoint fails the test instead of passing quietly.
+    ///     Only the queue read is implemented — everything else throws, so a command reaching
+    ///     for anything but the queue endpoint fails the test instead of passing quietly. The cancel runs as the CK
+    ///     method <c>AdapterPool.CancelQueuedExecution-1</c> on the tenant client, never through this REST client.
     /// </summary>
-    private sealed class FakeQueueClient(
-        List<AdapterPoolQueueEntryDto> queue,
-        AdapterPoolQueueCancellationResultDto? cancellation = null)
-        : ICommunicationServicesClient
+    private sealed class FakeQueueClient(List<AdapterPoolQueueEntryDto> queue) : ICommunicationServicesClient
     {
         public string? QueriedPoolRtId { get; private set; }
-        public (string PoolRtId, string ExecutionId)? CancelledEntry { get; private set; }
 
         public Task<IReadOnlyList<AdapterPoolQueueEntryDto>> GetAdapterPoolQueueAsync(string adapterPoolRtId)
         {
@@ -336,14 +346,7 @@ public sealed class AdapterPoolQueueCommandTests
         }
 
         public Task<AdapterPoolQueueCancellationResultDto> CancelQueuedExecutionAsync(string adapterPoolRtId,
-            string executionId)
-        {
-            CancelledEntry = (adapterPoolRtId, executionId);
-            return Task.FromResult(cancellation ?? new AdapterPoolQueueCancellationResultDto
-            {
-                Outcome = AdapterPoolQueueCancellationOutcome.Cancelled
-            });
-        }
+            string executionId) => throw new NotSupportedException();
 
         public IServiceClientAccessToken AccessToken { get; } = new FakeAccessToken();
         public Uri ServiceUri { get; } = new("https://comm.example.com/lender/v1");

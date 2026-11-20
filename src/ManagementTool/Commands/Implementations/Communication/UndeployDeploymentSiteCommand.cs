@@ -1,3 +1,5 @@
+using Meshmakers.Octo.Sdk.ServiceClient.AssetRepositoryServices.Tenants;
+using GraphQlDtos.DataTransferObjects.System.Communication.v4;
 using Meshmakers.Common.CommandLineParser;
 using Meshmakers.Octo.Frontend.ManagementTool.Services;
 using Meshmakers.Octo.Sdk.ServiceClient.CommunicationControllerServices;
@@ -8,17 +10,20 @@ namespace Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Commu
 
 internal class UndeployDeploymentSiteCommand : ServiceClientOctoCommand<ICommunicationServicesClient>
 {
+    private readonly CommunicationMethodCall _methods;
     private readonly IConfirmationService _confirmationService;
     private readonly IArgument _deploymentSiteRtId;
     private readonly IArgument _yesArg;
 
     public UndeployDeploymentSiteCommand(ILogger<UndeployDeploymentSiteCommand> logger, IOptions<OctoToolOptions> options,
-        ICommunicationServicesClient communicationServicesClient, IAuthenticationService authenticationService,
+        ICommunicationServicesClient communicationServicesClient, ITenantClient tenantClient,
+        IAuthenticationService authenticationService,
         IConfirmationService confirmationService)
         : base(logger, Constants.CommunicationServicesGroup, "UndeployDeploymentSite",
             "Undeploys a deployment site through the Communication Operator. Undeploy the deployment site's workloads first (UndeployWorkload); Cloud deployment sites release their operator resources.",
             options, communicationServicesClient, authenticationService)
     {
+        _methods = new CommunicationMethodCall(tenantClient, authenticationService, logger);
         _confirmationService = confirmationService;
 
         _deploymentSiteRtId = CommandArgumentValue.AddArgument("id", "deploymentSiteRtId",
@@ -71,7 +76,9 @@ internal class UndeployDeploymentSiteCommand : ServiceClientOctoCommand<ICommuni
             "Undeploying deployment site '{PoolRtId}' for tenant '{TenantId}' at '{ServiceClientServiceUri}'",
             deploymentSiteRtId, Options.Value.TenantId, ServiceClient.ServiceUri);
 
-        await ServiceClient.UndeployDeploymentSiteAsync(deploymentSiteRtId);
+        CommunicationMethodCall.RequireObjectId(deploymentSiteRtId, "DeploymentSiteRtId");
+        await _methods.RunAsync(RtDeploymentSiteMethodClient.UndeployMethodId,
+            () => new RtDeploymentSiteMethodClient(_methods.TenantClient).UndeployAsync(deploymentSiteRtId));
 
         Logger.LogInformation("Deployment site '{PoolRtId}' undeploy triggered", deploymentSiteRtId);
     }

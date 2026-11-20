@@ -1,3 +1,5 @@
+using Meshmakers.Octo.Sdk.ServiceClient.AssetRepositoryServices.Tenants;
+using GraphQlDtos.DataTransferObjects.System.Communication.v4;
 using Meshmakers.Common.CommandLineParser;
 using Meshmakers.Octo.Frontend.ManagementTool.Services;
 using Meshmakers.Octo.Sdk.ServiceClient.CommunicationControllerServices;
@@ -8,16 +10,19 @@ namespace Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Commu
 
 internal class DeployPipelineCommand : ServiceClientOctoCommand<ICommunicationServicesClient>
 {
+    private readonly CommunicationMethodCall _methods;
     private readonly IArgument _adapterIdArg;
     private readonly IArgument _pipelineIdArg;
     private readonly IArgument _fileArg;
 
     public DeployPipelineCommand(ILogger<DeployPipelineCommand> logger, IOptions<OctoToolOptions> options,
-        ICommunicationServicesClient communicationServicesClient, IAuthenticationService authenticationService)
+        ICommunicationServicesClient communicationServicesClient, ITenantClient tenantClient,
+        IAuthenticationService authenticationService)
         : base(logger, Constants.CommunicationServicesGroup, "DeployPipeline",
             "Deploys a pipeline definition to the corresponding adapter.", options,
             communicationServicesClient, authenticationService)
     {
+        _methods = new CommunicationMethodCall(tenantClient, authenticationService, logger);
         _adapterIdArg = CommandArgumentValue.AddArgument("aid", "adapterId", ["The adapter runtime ID"], true, 1);
         _pipelineIdArg = CommandArgumentValue.AddArgument("pid", "pipelineId", ["The pipeline runtime ID"], true, 1);
         _fileArg = CommandArgumentValue.AddArgument("f", "file", ["Path to pipeline definition file (YAML/JSON)"], true, 1);
@@ -52,9 +57,13 @@ internal class DeployPipelineCommand : ServiceClientOctoCommand<ICommunicationSe
             return;
         }
 
+        CommunicationMethodCall.RequireObjectId(adapterId, "AdapterRtId");
+        CommunicationMethodCall.RequireObjectId(pipelineId, "PipelineRtId");
         var pipelineDefinition = await File.ReadAllTextAsync(filePath);
 
-        await ServiceClient.DeployPipelineAsync(adapterId, pipelineId, pipelineDefinition);
+        await _methods.RunAsync(RtPipelineMethodClient.DeployMethodId,
+            () => new RtPipelineMethodClient(_methods.TenantClient).DeployAsync(pipelineId, adapterId,
+                pipelineDefinition));
 
         Logger.LogInformation("Pipeline deployed successfully");
     }
