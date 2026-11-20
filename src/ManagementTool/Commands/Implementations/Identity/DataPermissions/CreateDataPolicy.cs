@@ -4,11 +4,15 @@ using Meshmakers.Octo.Frontend.ManagementTool.Services;
 using Meshmakers.Octo.Sdk.ServiceClient.IdentityServices;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using GraphQlDtos.DataTransferObjects.System.Identity.v3;
+using Meshmakers.Octo.Sdk.ServiceClient;
+using Meshmakers.Octo.Sdk.ServiceClient.AssetRepositoryServices.Tenants;
 
 namespace Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Identity.DataPermissions;
 
 internal class CreateDataPolicy : ServiceClientOctoCommand<IIdentityServicesClient>
 {
+    private readonly IdentityMethodCall _methods;
     private readonly IArgument _permissionIdArg;
     private readonly IArgument _targetsArg;
     private readonly IArgument _actionsArg;
@@ -16,11 +20,13 @@ internal class CreateDataPolicy : ServiceClientOctoCommand<IIdentityServicesClie
     private readonly IArgument _modeArg;
 
     public CreateDataPolicy(ILogger<CreateDataPolicy> logger, IOptions<OctoToolOptions> options,
-        IIdentityServicesClient identityServicesClient, IAuthenticationService authenticationService)
+        IIdentityServicesClient identityServicesClient, ITenantClient tenantClient,
+        IAuthenticationService authenticationService)
         : base(logger, Constants.IdentityServicesGroup, "CreateDataPolicy",
             "Creates a policy bound to a data permission (AB#4972)", options, identityServicesClient,
             authenticationService)
     {
+        _methods = new IdentityMethodCall(tenantClient, authenticationService, logger);
         _permissionIdArg = CommandArgumentValue.AddArgument("pid", "permissionId",
             ["Dot-namespaced permission id"], true, 1);
         _targetsArg = CommandArgumentValue.AddArgument("t", "targetCkTypeIds",
@@ -59,7 +65,24 @@ internal class CreateDataPolicy : ServiceClientOctoCommand<IIdentityServicesClie
                 : "Enforce"
         };
 
-        var policyRtId = await ServiceClient.CreateDataPolicy(permissionId, dto);
+        if (dto.TargetCkTypeIds.Count == 0)
+        {
+            throw new ServiceClientException("TargetCkTypeIds must not be empty.");
+        }
+
+        if (!Enum.TryParse<RtDataPolicyScopeEnum>(dto.Scope, true, out var scope) ||
+            !Enum.TryParse<RtDataPolicyEnforcementModeEnum>(dto.EnforcementMode, true, out var enforcementMode))
+        {
+            // The REST endpoint's answer, before any write.
+            throw new ServiceClientException("Scope must be All|OwnedOnly, EnforcementMode must be Enforce|AuditOnly.");
+        }
+
+        string? policyRtId = null;
+        var value = await _methods.RunAsync(RtDataPermissionMethodClient.CreatePolicyMethodId,
+            async () => await new RtDataPermissionMethodClient(_methods.TenantClient).CreatePolicyAsync(
+                await IdentityMethodCall.ResolveDataPermissionRtIdAsync(ServiceClient, permissionId),
+                dto.TargetCkTypeIds, scope, enforcementMode, dto.Actions));
+        policyRtId = value;
         Logger.LogInformation("Data policy '{PolicyRtId}' created for permission '{PermissionId}'",
             policyRtId, permissionId);
     }

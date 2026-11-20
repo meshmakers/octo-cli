@@ -2,6 +2,46 @@ namespace GraphQlDtos;
 
 public static class GraphQlConstants
 {
+    /// <summary>
+    ///     The runtime id of an API scope by name: the CK methods of <c>System.Identity/ApiScope</c> address the scope by
+    ///     runtime id, the identity REST DTO carries none.
+    /// </summary>
+    public const string GetApiScopeRtIdByName = @"
+      query getApiScopeRtIdByName($name: SimpleScalar!) {
+        runtime {
+          systemIdentityApiScope(
+            fieldFilter: [
+              { attributePath: ""name"", operator: EQUALS, comparisonValue: $name }
+            ]
+          ) {
+            totalCount
+            items {
+              rtId
+            }
+          }
+        }
+      }";
+
+    /// <summary>
+    ///     The runtime id of an API resource by name: the CK methods of <c>System.Identity/ApiResource</c> address the
+    ///     resource by runtime id, the identity REST DTO carries none.
+    /// </summary>
+    public const string GetApiResourceRtIdByName = @"
+      query getApiResourceRtIdByName($name: SimpleScalar!) {
+        runtime {
+          systemIdentityApiResource(
+            fieldFilter: [
+              { attributePath: ""name"", operator: EQUALS, comparisonValue: $name }
+            ]
+          ) {
+            totalCount
+            items {
+              rtId
+            }
+          }
+        }
+      }";
+
     public const string GetNotifications = @"query getNotifications(
           $after: String
           $first: Int

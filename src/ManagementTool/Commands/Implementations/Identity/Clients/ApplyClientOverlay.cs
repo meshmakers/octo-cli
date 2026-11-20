@@ -4,11 +4,14 @@ using Meshmakers.Octo.Frontend.ManagementTool.Services;
 using Meshmakers.Octo.Sdk.ServiceClient.IdentityServices;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using GraphQlDtos.DataTransferObjects.System.Identity.v3;
+using Meshmakers.Octo.Sdk.ServiceClient.AssetRepositoryServices.Tenants;
 
 namespace Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Identity.Clients;
 
 internal class ApplyClientOverlay : ServiceClientOctoCommand<IIdentityServicesClient>
 {
+    private readonly IdentityMethodCall _methods;
     private readonly IArgument _clientId;
     private readonly IArgument _overlayName;
     private readonly IArgument _redirectUris;
@@ -16,7 +19,8 @@ internal class ApplyClientOverlay : ServiceClientOctoCommand<IIdentityServicesCl
     private readonly IArgument _allowedCorsOrigins;
 
     public ApplyClientOverlay(ILogger<ApplyClientOverlay> logger, IOptions<OctoToolOptions> options,
-        IIdentityServicesClient identityServicesClient, IAuthenticationService authenticationService)
+        IIdentityServicesClient identityServicesClient, ITenantClient tenantClient,
+        IAuthenticationService authenticationService)
         : base(logger, Constants.IdentityServicesGroup, "ApplyClientOverlay",
             "Applies an overlay URI set (RedirectUris / PostLogoutRedirectUris / AllowedCorsOrigins) " +
             "to a blueprint-managed client. New entries are written with Source = 'overlay:<OverlayName>', " +
@@ -24,6 +28,7 @@ internal class ApplyClientOverlay : ServiceClientOctoCommand<IIdentityServicesCl
             "silently skipped (any source). At least one of the three URI lists must be provided.",
             options, identityServicesClient, authenticationService)
     {
+        _methods = new IdentityMethodCall(tenantClient, authenticationService, logger);
         _clientId = CommandArgumentValue.AddArgument("id", "clientId",
             ["The ClientId to apply the overlay to. Must already exist."], true, 1);
         _overlayName = CommandArgumentValue.AddArgument("n", "overlayName",
@@ -100,18 +105,27 @@ internal class ApplyClientOverlay : ServiceClientOctoCommand<IIdentityServicesCl
             "Applying overlay '{OverlayName}' to client '{ClientId}' at '{ServiceClientServiceUri}'",
             overlayName, clientId, ServiceClient.ServiceUri);
 
-        var result = await ServiceClient.ApplyClientOverlay(clientId, dto);
+        var value = await _methods.RunAsync(RtClientMethodClient.ApplyOverlayUrisMethodId,
+            async () => await new RtClientMethodClient(_methods.TenantClient).ApplyOverlayUrisAsync(
+                await IdentityMethodCall.ResolveClientRtIdAsync(ServiceClient, clientId), overlayName, redirectUris,
+                postLogoutRedirectUris, allowedCorsOrigins));
+        LogApplied(value?.OverlayName ?? overlayName, value?.ClientId ?? clientId,
+            value?.RedirectUrisAdded ?? 0, value?.RedirectUrisSkipped ?? 0,
+            value?.PostLogoutRedirectUrisAdded ?? 0, value?.PostLogoutRedirectUrisSkipped ?? 0,
+            value?.AllowedCorsOriginsAdded ?? 0, value?.AllowedCorsOriginsSkipped ?? 0);
+    }
 
+    private void LogApplied(string? overlayName, string? clientId, long redirectAdded, long redirectSkipped,
+        long postLogoutAdded, long postLogoutSkipped, long corsAdded, long corsSkipped) =>
         Logger.LogInformation(
             "Overlay '{OverlayName}' on '{ClientId}' applied: " +
             "RedirectUris={RAdd} added / {RSkip} skipped, " +
             "PostLogoutRedirectUris={PLAdd} added / {PLSkip} skipped, " +
             "AllowedCorsOrigins={COAdd} added / {COSkip} skipped",
-            result.OverlayName, result.ClientId,
-            result.RedirectUris.Added, result.RedirectUris.SkippedDuplicate,
-            result.PostLogoutRedirectUris.Added, result.PostLogoutRedirectUris.SkippedDuplicate,
-            result.AllowedCorsOrigins.Added, result.AllowedCorsOrigins.SkippedDuplicate);
-    }
+            overlayName, clientId,
+            redirectAdded, redirectSkipped,
+            postLogoutAdded, postLogoutSkipped,
+            corsAdded, corsSkipped);
 
     private List<string>? ParseCommaSeparatedList(IArgument argument)
     {

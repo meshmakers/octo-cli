@@ -3,22 +3,27 @@ using Meshmakers.Octo.Frontend.ManagementTool.Services;
 using Meshmakers.Octo.Sdk.ServiceClient.IdentityServices;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using GraphQlDtos.DataTransferObjects.System.Identity.v3;
+using Meshmakers.Octo.Sdk.ServiceClient.AssetRepositoryServices.Tenants;
 
 namespace Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Identity.ApiSecrets;
 
 internal class UpdateApiSecretApiResource : ServiceClientOctoCommand<IIdentityServicesClient>
 {
+    private readonly IdentityMethodCall _methods;
     private readonly IArgument _descriptionArg;
     private readonly IArgument _expirationArg;
     private readonly IArgument _nameArg;
     private readonly IArgument _secretValueArg;
 
     public UpdateApiSecretApiResource(ILogger<UpdateApiSecretApiResource> logger, IOptions<OctoToolOptions> options,
-        IIdentityServicesClient identityServicesClient, IAuthenticationService authenticationService)
+        IIdentityServicesClient identityServicesClient, ITenantClient tenantClient,
+        IAuthenticationService authenticationService)
         : base(logger, Constants.IdentityServicesGroup, "UpdateApiSecretApiResource", "Updates an API secret for an API resource.",
             options, identityServicesClient,
             authenticationService)
     {
+        _methods = new IdentityMethodCall(tenantClient, authenticationService, logger);
         _nameArg = CommandArgumentValue.AddArgument("n", "name", ["Name of API resource"],
             true,
             1);
@@ -44,7 +49,7 @@ internal class UpdateApiSecretApiResource : ServiceClientOctoCommand<IIdentitySe
             ],
             Notes:
             [
-                "Writing API secrets needs the tenant role `SecretManagement`. `TenantManagement` or `UserManagement` still pass while the identity cluster runs with `SecretManagementRoleEnforcement=Warn` or `RoleEnforcement=Warn`; they are refused only when `SecretManagementRoleEnforcement=Enforce` and `RoleEnforcement` is not `Warn`. A refused call (HTTP 403) prints the message of the identity service, which names the missing role; without a message the generic access-denied text is shown.",
+                "Writing API secrets needs the tenant role `SecretManagement`. `TenantManagement` or `UserManagement` still pass while the identity cluster runs with `SecretManagementRoleEnforcement=Warn` or `RoleEnforcement=Warn`; they are refused only when `SecretManagementRoleEnforcement=Enforce` and `RoleEnforcement` is not `Warn`. A refused call prints `METHOD_FORBIDDEN` with the reason the identity service sends (e.g. `requiredRole=SecretManagement`) and exits with a non-zero code.",
                 "-s is the stored hash as GetApiSecretsApiResource lists it. It is sent in the request body, never in the request URL. Requires an identity service of the later 3.5.x update or newer (an older one answers 405).",
             ]
         );
@@ -81,7 +86,10 @@ internal class UpdateApiSecretApiResource : ServiceClientOctoCommand<IIdentitySe
             secretDto.Description = CommandArgumentValue.GetArgumentScalarValue<string>(_descriptionArg);
         }
 
-        await ServiceClient.UpdateApiSecretApiResource(name, secretDto);
+        await _methods.RunAsync(RtApiResourceMethodClient.UpdateSecretMethodId,
+            async () => await new RtApiResourceMethodClient(_methods.TenantClient).UpdateSecretAsync(await _methods.ResolveApiResourceRtIdAsync(name),
+                secretDto.ValueEncrypted, secretDto.Description, secretDto.ExpirationDate),
+            secret: secretValue);
 
         Logger.LogInformation(
             "API secret \'{MaskedSecret}\' for API resource \'{Name}\' at \'{ServiceClientServiceUri}\' updated",

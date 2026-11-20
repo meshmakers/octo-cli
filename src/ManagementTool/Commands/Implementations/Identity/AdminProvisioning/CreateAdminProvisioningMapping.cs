@@ -4,11 +4,14 @@ using Meshmakers.Octo.Frontend.ManagementTool.Services;
 using Meshmakers.Octo.Sdk.ServiceClient.IdentityServices;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using GraphQlDtos.DataTransferObjects.System.Identity.v3;
+using Meshmakers.Octo.Sdk.ServiceClient.AssetRepositoryServices.Tenants;
 
 namespace Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Identity.AdminProvisioning;
 
 internal class CreateAdminProvisioningMapping : ServiceClientOctoCommand<IIdentityServicesClient>
 {
+    private readonly IdentityMethodCall _methods;
     private readonly IArgument _roleIds;
     private readonly IArgument _sourceTenantId;
     private readonly IArgument _sourceUserId;
@@ -17,11 +20,13 @@ internal class CreateAdminProvisioningMapping : ServiceClientOctoCommand<IIdenti
 
     public CreateAdminProvisioningMapping(ILogger<CreateAdminProvisioningMapping> logger,
         IOptions<OctoToolOptions> options,
-        IIdentityServicesClient identityServicesClient, IAuthenticationService authenticationService)
+        IIdentityServicesClient identityServicesClient, ITenantClient tenantClient,
+        IAuthenticationService authenticationService)
         : base(logger, Constants.IdentityServicesGroup, "CreateAdminProvisioningMapping",
             "Creates an admin provisioning mapping in a target tenant.", options, identityServicesClient,
             authenticationService)
     {
+        _methods = new IdentityMethodCall(tenantClient, authenticationService, logger);
         _targetTenantId = CommandArgumentValue.AddArgument("ttid", "targetTenantId",
             ["Target tenant ID"], true, 1);
         _sourceTenantId = CommandArgumentValue.AddArgument("stid", "sourceTenantId",
@@ -50,7 +55,7 @@ internal class CreateAdminProvisioningMapping : ServiceClientOctoCommand<IIdenti
             Notes:
             [
                 "All admin provisioning commands must be run from the **system tenant context**.",
-                "A mapping is unique per source tenant and source user. Creating a second one fails with HTTP 409 (`ExternalTenantUserMappingAlreadyExists`) and a non-zero exit code; use `UpdateExternalTenantUserMapping` to change the roles of the existing mapping.",
+                "A mapping is unique per source tenant and source user. Creating a second one fails with `MAPPING_ALREADY_EXISTS` (parameter `existingMappingId`) and a non-zero exit code; use `UpdateExternalTenantUserMapping` to change the roles of the existing mapping.",
             ]
         );
 
@@ -78,7 +83,9 @@ internal class CreateAdminProvisioningMapping : ServiceClientOctoCommand<IIdenti
             SourceUserName = sourceUserName,
             RoleIds = roleIds
         };
-        await ServiceClient.CreateAdminProvisioningMapping(targetTenantId, dto);
+        await _methods.RunAsync(RtExternalTenantUserMappingMethodClient.ProvisionAdminMethodId,
+            () => new RtExternalTenantUserMappingMethodClient(_methods.TenantClient).ProvisionAdminAsync(
+                targetTenantId, dto.SourceTenantId, dto.SourceUserId, dto.SourceUserName, dto.RoleIds));
 
         Logger.LogInformation("Admin provisioning mapping for '{SourceUserName}' created in target tenant '{TargetTenantId}'",
             sourceUserName, targetTenantId);

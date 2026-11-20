@@ -9,11 +9,14 @@ using Meshmakers.Octo.Sdk.ServiceClient.IdentityServices;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Newtonsoft.Json;
+using GraphQlDtos.DataTransferObjects.System.Identity.v3;
+using Meshmakers.Octo.Sdk.ServiceClient.AssetRepositoryServices.Tenants;
 
 namespace Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Identity.ExternalTenantUserMappings;
 
 internal partial class CreateExternalTenantUserMapping : ServiceClientOctoCommand<IIdentityServicesClient>
 {
+    private readonly IdentityMethodCall _methods;
     private readonly IConsoleService _consoleService;
     private readonly IArgument _groups;
     private readonly IArgument _roleIds;
@@ -23,11 +26,13 @@ internal partial class CreateExternalTenantUserMapping : ServiceClientOctoComman
 
     public CreateExternalTenantUserMapping(ILogger<CreateExternalTenantUserMapping> logger,
         IOptions<OctoToolOptions> options, IConsoleService consoleService,
-        IIdentityServicesClient identityServicesClient, IAuthenticationService authenticationService)
+        IIdentityServicesClient identityServicesClient, ITenantClient tenantClient,
+        IAuthenticationService authenticationService)
         : base(logger, Constants.IdentityServicesGroup, "CreateExternalTenantUserMapping",
             "Creates an external tenant user mapping: grants a user of another tenant (registry ancestor or a sibling tenant that permits this one) access to the tenant of the context, with roles and/or groups.",
             options, identityServicesClient, authenticationService)
     {
+        _methods = new IdentityMethodCall(tenantClient, authenticationService, logger);
         _consoleService = consoleService;
         _sourceTenantId = CommandArgumentValue.AddArgument("stid", "sourceTenantId",
             ["Source tenant ID"], true, 1);
@@ -65,8 +70,8 @@ internal partial class CreateExternalTenantUserMapping : ServiceClientOctoComman
             Notes:
             [
                 "Prints the mapping as stored: the user name of the source user record, the source tenant and the group names.",
-                "A source tenant that is neither a registry ancestor nor permits the tenant of the context, or a user it does not have, is refused with HTTP 403, code SourceTenantNotPermitted (one answer for all of these).",
-                "A group ID that is no group of this tenant is refused with HTTP 400, code UnknownGroup (nothing is stored); a second mapping for the same user with HTTP 409, code ExternalTenantUserMappingAlreadyExists.",
+                "A source tenant that is neither a registry ancestor nor permits the tenant of the context, or a user it does not have, is refused with `SOURCE_TENANT_NOT_PERMITTED` (one answer for all of these).",
+                "A group ID that is no group of this tenant is refused with `UNKNOWN_GROUP` (parameter `unknownGroupIds`, nothing is stored); a second mapping for the same user with `MAPPING_ALREADY_EXISTS`.",
                 "Groups need an identity service with AB#8343; older services ignore them."
             ]);
 
@@ -98,10 +103,14 @@ internal partial class CreateExternalTenantUserMapping : ServiceClientOctoComman
             RoleIds = roleIds,
             GroupIds = groupIds
         };
-        var mapping = await ServiceClient.GrantExternalTenantUser(dto);
+        ExternalTenantUserMappingDto? mapping = null;
+        var record = await _methods.RunAsync(RtExternalTenantUserMappingMethodClient.CreateMappingMethodId,
+            () => new RtExternalTenantUserMappingMethodClient(_methods.TenantClient).CreateMappingAsync(
+                dto.SourceTenantId, dto.SourceUserId, dto.SourceUserName, dto.RoleIds, dto.GroupIds));
+        mapping = IdentityMethodCall.ToMappingDto(record);
 
         Logger.LogInformation("External tenant user mapping '{MappingId}' for '{SourceUserName}' of tenant '{SourceTenantId}' created",
-            mapping.Id, mapping.SourceUserName, mapping.SourceTenantId);
+            mapping!.Id, mapping.SourceUserName, mapping.SourceTenantId);
         _consoleService.WriteLine(JsonConvert.SerializeObject(mapping, Formatting.Indented));
     }
 

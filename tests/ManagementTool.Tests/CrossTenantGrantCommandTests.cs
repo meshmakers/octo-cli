@@ -27,6 +27,9 @@ public sealed class CrossTenantGrantCommandTests : IDisposable
     private readonly HttpListener _listener = new();
     private readonly string _baseUri;
     private readonly List<(string Method, string Path, string Body, string? IfMatch)> _requests = [];
+    private readonly List<GraphQL.GraphQLRequest> _methodCalls = [];
+    private readonly Meshmakers.Octo.Sdk.ServiceClient.AssetRepositoryServices.Tenants.ITenantClient _methodTenant =
+        A.Fake<Meshmakers.Octo.Sdk.ServiceClient.AssetRepositoryServices.Tenants.ITenantClient>();
     private Func<string, string, (int Status, string Body)> _answer = (_, _) => (200, "{}");
 
     public CrossTenantGrantCommandTests()
@@ -138,7 +141,7 @@ public sealed class CrossTenantGrantCommandTests : IDisposable
         var logger = new RecordingLogger<CreateExternalTenantUserMapping>();
         var lines = new List<string>();
         var command = new CreateExternalTenantUserMapping(logger, Options("customer"), RecordingConsole(lines),
-            Client("customer"), A.Fake<IAuthenticationService>());
+            Client("customer"), _methodTenant, A.Fake<IAuthenticationService>());
         command.CommandArgumentValue.ParseLayer(
             ["-stid", "meshmakers", "-suid", "686a6215fd3e5972ff5693fd", "-sun", "alice", .. extra]);
         return await RunThroughRunner(command.Execute, logger.Entries, lines);
@@ -224,18 +227,24 @@ public sealed class CrossTenantGrantCommandTests : IDisposable
         {
             ("GET", var p) when p.EndsWith("/groups/names/Operators") =>
                 (200, "{\"id\":\"6a1b2c3d4e5f60718293a4b5\",\"groupName\":\"Operators\"}"),
-            ("POST", var p) when p.EndsWith("/externalTenantUserMappings") =>
-                (201, "{\"id\":\"6a1b2c3d4e5f60718293a4c0\",\"sourceTenantId\":\"meshmakers\"," +
-                      "\"sourceUserId\":\"686a6215fd3e5972ff5693fd\",\"sourceUserName\":\"alice\"," +
-                      "\"roleIds\":[],\"groupNames\":[\"Operators\",\"Viewers\"]}"),
             _ => (500, "{}")
         };
+        MethodFakes.AnswerMethodCalls(_methodTenant, _methodCalls, null,
+            result: new GraphQlDtos.DataTransferObjects.System.Identity.v3.RtAdminProvisioningResultRecordDto
+            {
+                MappingRtId = "6a1b2c3d4e5f60718293a4c0", SourceTenantId = "meshmakers",
+                SourceUserId = "686a6215fd3e5972ff5693fd", SourceUserName = "alice", RoleIds = [],
+                GroupNames = ["Operators", "Viewers"], Outcome = "created"
+            });
 
         var run = await Grant("-g", "Operators, 6a1b2c3d4e5f60718293a4b6");
 
         Assert.Equal(0, run.ExitCode);
-        var post = Assert.Single(_requests, r => r.Method == "POST");
-        Assert.Contains("\"groupIds\":[\"6a1b2c3d4e5f60718293a4b5\",\"6a1b2c3d4e5f60718293a4b6\"]", post.Body);
+        Assert.DoesNotContain(_requests, r => r.Method == "POST");
+        var call = Assert.Single(_methodCalls);
+        Assert.Contains("createMapping(", call.Query);
+        Assert.Contains("\"groupIds\":[\"6a1b2c3d4e5f60718293a4b5\",\"6a1b2c3d4e5f60718293a4b6\"]",
+            MethodFakes.VariablesOf(call));
         var output = Assert.Single(run.Console);
         Assert.Contains("\"SourceTenantId\": \"meshmakers\"", output);
         Assert.Contains("\"Operators\"", output);
@@ -255,14 +264,15 @@ public sealed class CrossTenantGrantCommandTests : IDisposable
     }
 
     [Theory]
-    [InlineData(403, "{\"status\":403,\"title\":\"Source tenant not permitted\",\"code\":\"SourceTenantNotPermitted\"}",
-        "Source tenant not permitted (HTTP 403, code SourceTenantNotPermitted)")]
-    [InlineData(400, "{\"status\":400,\"title\":\"Unknown group\",\"code\":\"UnknownGroup\",\"unknownGroupIds\":[\"6a1b2c3d4e5f60718293a4b6\"]}",
-        "Unknown group (HTTP 400, code UnknownGroup). Unknown group ids: 6a1b2c3d4e5f60718293a4b6")]
-    public async Task Grant_Refused_PrintsOneReadableLine_WithoutTheProvisionHint(int status, string body,
-        string expected)
+    [InlineData("SOURCE_TENANT_NOT_PERMITTED", "Source tenant not permitted.", null,
+        "SOURCE_TENANT_NOT_PERMITTED: Source tenant not permitted.")]
+    [InlineData("UNKNOWN_GROUP", "Unknown group.", "6a1b2c3d4e5f60718293a4b6",
+        "UNKNOWN_GROUP: Unknown group. (unknownGroupIds=6a1b2c3d4e5f60718293a4b6)")]
+    public async Task Grant_Refused_PrintsOneReadableLine_WithoutTheProvisionHint(string code, string message,
+        string? unknownGroupIds, string expected)
     {
-        _answer = (_, _) => (status, body);
+        MethodFakes.AnswerMethodCalls(_methodTenant, _methodCalls, code, message,
+            unknownGroupIds == null ? null : new Dictionary<string, object?> { ["unknownGroupIds"] = unknownGroupIds });
 
         var run = await Grant("-g", "6a1b2c3d4e5f60718293a4b6");
 

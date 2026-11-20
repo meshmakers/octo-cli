@@ -4,11 +4,14 @@ using Meshmakers.Octo.Frontend.ManagementTool.Services;
 using Meshmakers.Octo.Sdk.ServiceClient.IdentityServices;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using GraphQlDtos.DataTransferObjects.System.Identity.v3;
+using Meshmakers.Octo.Sdk.ServiceClient.AssetRepositoryServices.Tenants;
 
 namespace Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Identity.Clients;
 
 internal class UpdateClient : ServiceClientOctoCommand<IIdentityServicesClient>
 {
+    private readonly IdentityMethodCall _methods;
     private readonly IArgument _clientId;
     private readonly IArgument _clientName;
     private readonly IArgument _clientUri;
@@ -16,10 +19,12 @@ internal class UpdateClient : ServiceClientOctoCommand<IIdentityServicesClient>
     private readonly IArgument _frontChannelLogoutUri;
 
     public UpdateClient(ILogger<UpdateClient> logger, IOptions<OctoToolOptions> options,
-        IIdentityServicesClient identityServicesClient, IAuthenticationService authenticationService)
+        IIdentityServicesClient identityServicesClient, ITenantClient tenantClient,
+        IAuthenticationService authenticationService)
         : base(logger, Constants.IdentityServicesGroup, "UpdateClient", "Updates an existing client.", options,
             identityServicesClient, authenticationService)
     {
+        _methods = new IdentityMethodCall(tenantClient, authenticationService, logger);
         _clientUri = CommandArgumentValue.AddArgument("u", "clientUri", ["URI of client"], false, 1);
         _redirectUri = CommandArgumentValue.AddArgument("ru", "redirectUri",
             ["Redirect URI for login procedure"], false, 1);
@@ -83,7 +88,11 @@ internal class UpdateClient : ServiceClientOctoCommand<IIdentityServicesClient>
             clientDto.FrontChannelLogoutSessionRequired = true;
         }
 
-        await ServiceClient.UpdateClient(clientId, clientDto);
+        await _methods.RunAsync(RtClientMethodClient.UpdateClientMethodId,
+            () => ClientMethods.UpdateAsync(_methods.TenantClient,
+                string.IsNullOrWhiteSpace(clientDto.RtId) ? throw new RuntimeIdUnavailableException() : clientDto.RtId,
+                clientDto),
+            secret: clientDto.ClientSecret);
 
         Logger.LogInformation("ServiceClient \'{ClientId}\' at \'{ServiceClientServiceUri}\' updated", clientId,
             ServiceClient.ServiceUri);

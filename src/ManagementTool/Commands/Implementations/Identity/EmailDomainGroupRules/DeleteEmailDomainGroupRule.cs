@@ -4,18 +4,23 @@ using Meshmakers.Octo.Frontend.ManagementTool.Services;
 using Meshmakers.Octo.Sdk.ServiceClient.IdentityServices;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using GraphQlDtos.DataTransferObjects.System.Identity.v3;
+using Meshmakers.Octo.Sdk.ServiceClient.AssetRepositoryServices.Tenants;
 
 namespace Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Identity.EmailDomainGroupRules;
 
 internal class DeleteEmailDomainGroupRule : ServiceClientOctoCommand<IIdentityServicesClient>
 {
+    private readonly IdentityMethodCall _methods;
     private readonly IArgument _id;
 
     public DeleteEmailDomainGroupRule(ILogger<DeleteEmailDomainGroupRule> logger, IOptions<OctoToolOptions> options,
-        IIdentityServicesClient identityServicesClient, IAuthenticationService authenticationService)
+        IIdentityServicesClient identityServicesClient, ITenantClient tenantClient,
+        IAuthenticationService authenticationService)
         : base(logger, Constants.IdentityServicesGroup, "DeleteEmailDomainGroupRule",
             "Deletes an email domain group rule.", options, identityServicesClient, authenticationService)
     {
+        _methods = new IdentityMethodCall(tenantClient, authenticationService, logger);
         _id = CommandArgumentValue.AddArgument("id", "identifier",
             ["ID of the email domain group rule"], true, 1);
     }
@@ -36,7 +41,9 @@ internal class DeleteEmailDomainGroupRule : ServiceClientOctoCommand<IIdentitySe
             "Deleting email domain group rule '{RtId}' from '{ServiceClientServiceUri}'",
             rtId, ServiceClient.ServiceUri);
 
-        await ServiceClient.DeleteEmailDomainGroupRule(rtId);
+        await _methods.RunAsync(RtEmailDomainGroupRuleMethodClient.DeleteEmailDomainGroupRuleMethodId,
+            () => new RtEmailDomainGroupRuleMethodClient(_methods.TenantClient).DeleteEmailDomainGroupRuleAsync(
+                rtId.ToString()));
 
         Logger.LogInformation("Email domain group rule '{RtId}' deleted", rtId);
     }

@@ -4,19 +4,24 @@ using Meshmakers.Octo.Frontend.ManagementTool.Services;
 using Meshmakers.Octo.Sdk.ServiceClient.IdentityServices;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using GraphQlDtos.DataTransferObjects.System.Identity.v3;
+using Meshmakers.Octo.Sdk.ServiceClient.AssetRepositoryServices.Tenants;
 
 namespace Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Identity.AdminProvisioning;
 
 internal class ProvisionCurrentUser : ServiceClientOctoCommand<IIdentityServicesClient>
 {
+    private readonly IdentityMethodCall _methods;
     private readonly IArgument _targetTenantId;
 
     public ProvisionCurrentUser(ILogger<ProvisionCurrentUser> logger, IOptions<OctoToolOptions> options,
-        IIdentityServicesClient identityServicesClient, IAuthenticationService authenticationService)
+        IIdentityServicesClient identityServicesClient, ITenantClient tenantClient,
+        IAuthenticationService authenticationService)
         : base(logger, Constants.IdentityServicesGroup, "ProvisionCurrentUser",
             "Provisions the current user in a target tenant.", options, identityServicesClient,
             authenticationService)
     {
+        _methods = new IdentityMethodCall(tenantClient, authenticationService, logger);
         _targetTenantId = CommandArgumentValue.AddArgument("ttid", "targetTenantId",
             ["Target tenant ID"], true, 1);
     }
@@ -42,7 +47,11 @@ internal class ProvisionCurrentUser : ServiceClientOctoCommand<IIdentityServices
             "Provisioning current user in target tenant '{TargetTenantId}' at '{ServiceClientServiceUri}'",
             targetTenantId, ServiceClient.ServiceUri);
 
-        var mapping = await ServiceClient.ProvisionCurrentUser(targetTenantId);
+        ExternalTenantUserMappingDto? mapping = null;
+        var record = await _methods.RunAsync(RtExternalTenantUserMappingMethodClient.ProvisionCurrentUserMethodId,
+            () => new RtExternalTenantUserMappingMethodClient(_methods.TenantClient).ProvisionCurrentUserAsync(
+                targetTenantId));
+        mapping = IdentityMethodCall.ToMappingDto(record);
 
         LogProvisioned(Logger, targetTenantId, mapping);
     }

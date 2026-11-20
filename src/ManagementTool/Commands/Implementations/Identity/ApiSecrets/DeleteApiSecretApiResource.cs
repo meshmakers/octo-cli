@@ -3,23 +3,28 @@ using Meshmakers.Octo.Frontend.ManagementTool.Services;
 using Meshmakers.Octo.Sdk.ServiceClient.IdentityServices;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using GraphQlDtos.DataTransferObjects.System.Identity.v3;
+using Meshmakers.Octo.Sdk.ServiceClient.AssetRepositoryServices.Tenants;
 
 namespace Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Identity.ApiSecrets;
 
 internal class DeleteApiSecretApiResource : ServiceClientOctoCommand<IIdentityServicesClient>
 {
+    private readonly IdentityMethodCall _methods;
     private readonly IConfirmationService _confirmationService;
     private readonly IArgument _nameArg;
     private readonly IArgument _secretValueArg;
     private readonly IArgument _yesArg;
 
     public DeleteApiSecretApiResource(ILogger<DeleteApiSecretApiResource> logger, IOptions<OctoToolOptions> options,
-        IIdentityServicesClient identityServicesClient, IAuthenticationService authenticationService,
+        IIdentityServicesClient identityServicesClient, ITenantClient tenantClient,
+        IAuthenticationService authenticationService,
         IConfirmationService confirmationService)
         : base(logger, Constants.IdentityServicesGroup, "DeleteApiSecretApiResource",
             "Deletes a secret of an API resource.", options, identityServicesClient,
             authenticationService)
     {
+        _methods = new IdentityMethodCall(tenantClient, authenticationService, logger);
         _confirmationService = confirmationService;
 
         _nameArg = CommandArgumentValue.AddArgument("n", "name", ["Name of API resource"],
@@ -43,7 +48,7 @@ internal class DeleteApiSecretApiResource : ServiceClientOctoCommand<IIdentitySe
             ],
             Notes:
             [
-                "Writing API secrets needs the tenant role `SecretManagement`. `TenantManagement` or `UserManagement` still pass while the identity cluster runs with `SecretManagementRoleEnforcement=Warn` or `RoleEnforcement=Warn`; they are refused only when `SecretManagementRoleEnforcement=Enforce` and `RoleEnforcement` is not `Warn`. A refused call (HTTP 403) prints the message of the identity service, which names the missing role; without a message the generic access-denied text is shown.",
+                "Writing API secrets needs the tenant role `SecretManagement`. `TenantManagement` or `UserManagement` still pass while the identity cluster runs with `SecretManagementRoleEnforcement=Warn` or `RoleEnforcement=Warn`; they are refused only when `SecretManagementRoleEnforcement=Enforce` and `RoleEnforcement` is not `Warn`. A refused call prints `METHOD_FORBIDDEN` with the reason the identity service sends (e.g. `requiredRole=SecretManagement`) and exits with a non-zero code.",
                 "-s is the stored hash as GetApiSecretsApiResource lists it. It is sent in the request body, never in the request URL. Requires an identity service of the later 3.5.x update or newer (an older one answers 405).",
             ]
         );
@@ -67,7 +72,10 @@ internal class DeleteApiSecretApiResource : ServiceClientOctoCommand<IIdentitySe
             name,
             ServiceClient.ServiceUri);
 
-        await ServiceClient.DeleteApiSecretApiResource(name, secretValue);
+        await _methods.RunAsync(RtApiResourceMethodClient.RemoveSecretMethodId,
+            async () => await new RtApiResourceMethodClient(_methods.TenantClient).RemoveSecretAsync(await _methods.ResolveApiResourceRtIdAsync(name),
+                secretValue),
+            secret: secretValue);
 
         Logger.LogInformation("API secret \'{MaskedSecret}\' for API resource \'{Name}\' deleted", maskedSecret, name);
     }

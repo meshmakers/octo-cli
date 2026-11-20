@@ -4,19 +4,24 @@ using Meshmakers.Octo.Frontend.ManagementTool.Services;
 using Meshmakers.Octo.Sdk.ServiceClient.IdentityServices;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using GraphQlDtos.DataTransferObjects.System.Identity.v3;
+using Meshmakers.Octo.Sdk.ServiceClient.AssetRepositoryServices.Tenants;
 
 namespace Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Identity.Groups;
 
 internal class RemoveGroupFromGroup : ServiceClientOctoCommand<IIdentityServicesClient>
 {
+    private readonly IdentityMethodCall _methods;
     private readonly IArgument _childGroupId;
     private readonly IArgument _id;
 
     public RemoveGroupFromGroup(ILogger<RemoveGroupFromGroup> logger, IOptions<OctoToolOptions> options,
-        IIdentityServicesClient identityServicesClient, IAuthenticationService authenticationService)
+        IIdentityServicesClient identityServicesClient, ITenantClient tenantClient,
+        IAuthenticationService authenticationService)
         : base(logger, Constants.IdentityServicesGroup, "RemoveGroupFromGroup",
             "Removes a child group from a parent group.", options, identityServicesClient, authenticationService)
     {
+        _methods = new IdentityMethodCall(tenantClient, authenticationService, logger);
         _id = CommandArgumentValue.AddArgument("id", "identifier", ["ID of the parent group"], true, 1);
         _childGroupId = CommandArgumentValue.AddArgument("cgid", "childGroupId",
             ["ID of the child group to remove"], true, 1);
@@ -43,7 +48,9 @@ internal class RemoveGroupFromGroup : ServiceClientOctoCommand<IIdentityServices
             "Removing child group '{ChildGroupId}' from group '{RtId}' at '{ServiceClientServiceUri}'",
             childGroupId, rtId, ServiceClient.ServiceUri);
 
-        await ServiceClient.RemoveGroupFromGroup(rtId, childGroupId);
+        await _methods.RunAsync(RtGroupMethodClient.RemoveChildGroupMethodId,
+            () => new RtGroupMethodClient(_methods.TenantClient).RemoveChildGroupAsync(rtId.ToString(), childGroupId),
+            treatAsSuccess: e => e.Code == RtGroupMethodClient.RemoveChildGroupErrors.ChildGroupNotInGroup);
 
         Logger.LogInformation("Child group '{ChildGroupId}' removed from group '{RtId}'", childGroupId, rtId);
     }

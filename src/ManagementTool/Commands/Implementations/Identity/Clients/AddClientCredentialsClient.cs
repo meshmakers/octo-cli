@@ -6,11 +6,14 @@ using Meshmakers.Octo.Frontend.ManagementTool.Services;
 using Meshmakers.Octo.Sdk.ServiceClient.IdentityServices;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using GraphQlDtos.DataTransferObjects.System.Identity.v3;
+using Meshmakers.Octo.Sdk.ServiceClient.AssetRepositoryServices.Tenants;
 
 namespace Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Identity.Clients;
 
 internal class AddClientCredentialsClient : ServiceClientOctoCommand<IIdentityServicesClient>
 {
+    private readonly IdentityMethodCall _methods;
     private readonly IArgument _clientId;
     private readonly IArgument _clientName;
     private readonly IArgument _clientSecret;
@@ -19,12 +22,14 @@ internal class AddClientCredentialsClient : ServiceClientOctoCommand<IIdentitySe
     private readonly IArgument _autoProvision;
 
     public AddClientCredentialsClient(ILogger<AddClientCredentialsClient> logger, IOptions<OctoToolOptions> options,
-        IIdentityServicesClient identityServicesClient, IAuthenticationService authenticationService,
+        IIdentityServicesClient identityServicesClient, ITenantClient tenantClient,
+        IAuthenticationService authenticationService,
         SecretInput secretInput)
         : base(logger, Constants.IdentityServicesGroup, "AddClientCredentialsClient",
             "Adds a new client using grant type 'ClientCredentials'.", options,
             identityServicesClient, authenticationService)
     {
+        _methods = new IdentityMethodCall(tenantClient, authenticationService, logger);
         _secretInput = secretInput;
         _clientId = CommandArgumentValue.AddArgument("id", "clientId", ["ServiceClient ID, must be unique"],
             true,
@@ -64,7 +69,7 @@ internal class AddClientCredentialsClient : ServiceClientOctoCommand<IIdentitySe
             ],
             Notes:
             [
-                "Creating a client with a secret needs the tenant role `SecretManagement`. `TenantManagement` or `UserManagement` still pass while the identity cluster runs with `SecretManagementRoleEnforcement=Warn` or `RoleEnforcement=Warn`; they are refused only when `SecretManagementRoleEnforcement=Enforce` and `RoleEnforcement` is not `Warn`. A refused call (HTTP 403) prints the message of the identity service, which names the missing role; without a message the generic access-denied text is shown.",
+                "Creating a client with a secret needs the tenant role `SecretManagement`. `TenantManagement` or `UserManagement` still pass while the identity cluster runs with `SecretManagementRoleEnforcement=Warn` or `RoleEnforcement=Warn`; they are refused only when `SecretManagementRoleEnforcement=Enforce` and `RoleEnforcement` is not `Warn`. A refused call prints `METHOD_FORBIDDEN` with the reason the identity service sends (e.g. `requiredRole=SecretManagement`) and exits with a non-zero code.",
                 $"The client secret is read from a hidden prompt, from standard input (--secret-stdin) or from the environment variable {Constants.EnvVarNewClientSecret}, so it does not end up in the shell history or the process list. -s still works in this release but logs a deprecation warning and will be removed. {Constants.EnvVarClientSecret} is not read here: it is the secret octo-cli itself logs in with.",
             ]
         );
@@ -94,7 +99,9 @@ internal class AddClientCredentialsClient : ServiceClientOctoCommand<IIdentitySe
             AutoProvisionInChildTenants = autoProvision ? true : null
         };
 
-        await ServiceClient.CreateClient(clientDto);
+        await _methods.RunAsync(RtClientMethodClient.CreateClientMethodId,
+            () => ClientMethods.CreateAsync(_methods.TenantClient, clientDto),
+            secret: clientDto.ClientSecret);
 
         Logger.LogInformation("ServiceClient \'{ClientId}\' at \'{ServiceClientServiceUri}\' created{AutoNote}",
             clientId, ServiceClient.ServiceUri,

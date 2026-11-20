@@ -4,20 +4,25 @@ using Meshmakers.Octo.Frontend.ManagementTool.Services;
 using Meshmakers.Octo.Sdk.ServiceClient.IdentityServices;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using GraphQlDtos.DataTransferObjects.System.Identity.v3;
+using Meshmakers.Octo.Sdk.ServiceClient.AssetRepositoryServices.Tenants;
 
 namespace Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Identity.EmailDomainGroupRules;
 
 internal class CreateEmailDomainGroupRule : ServiceClientOctoCommand<IIdentityServicesClient>
 {
+    private readonly IdentityMethodCall _methods;
     private readonly IArgument _description;
     private readonly IArgument _emailDomainPattern;
     private readonly IArgument _targetGroupRtId;
 
     public CreateEmailDomainGroupRule(ILogger<CreateEmailDomainGroupRule> logger, IOptions<OctoToolOptions> options,
-        IIdentityServicesClient identityServicesClient, IAuthenticationService authenticationService)
+        IIdentityServicesClient identityServicesClient, ITenantClient tenantClient,
+        IAuthenticationService authenticationService)
         : base(logger, Constants.IdentityServicesGroup, "CreateEmailDomainGroupRule",
             "Creates an email domain group rule.", options, identityServicesClient, authenticationService)
     {
+        _methods = new IdentityMethodCall(tenantClient, authenticationService, logger);
         _emailDomainPattern = CommandArgumentValue.AddArgument("edp", "emailDomainPattern",
             ["Email domain pattern to match (e.g. meshmakers.com)"], true, 1);
         _targetGroupRtId = CommandArgumentValue.AddArgument("tgid", "targetGroupRtId",
@@ -53,7 +58,9 @@ internal class CreateEmailDomainGroupRule : ServiceClientOctoCommand<IIdentitySe
             TargetGroupRtId = CommandArgumentValue.GetArgumentScalarValue<string>(_targetGroupRtId),
             Description = CommandArgumentValue.GetArgumentScalarValueOrDefault<string>(_description)
         };
-        await ServiceClient.CreateEmailDomainGroupRule(dto);
+        await _methods.RunAsync(RtEmailDomainGroupRuleMethodClient.CreateEmailDomainGroupRuleMethodId,
+            () => new RtEmailDomainGroupRuleMethodClient(_methods.TenantClient).CreateEmailDomainGroupRuleAsync(
+                dto.EmailDomainPattern ?? string.Empty, dto.TargetGroupRtId ?? string.Empty, dto.Description));
 
         Logger.LogInformation("Email domain group rule '{EmailDomainPattern}' created", emailDomainPattern);
     }

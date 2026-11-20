@@ -4,20 +4,25 @@ using Meshmakers.Octo.Frontend.ManagementTool.Services;
 using Meshmakers.Octo.Sdk.ServiceClient.IdentityServices;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using GraphQlDtos.DataTransferObjects.System.Identity.v3;
+using Meshmakers.Octo.Sdk.ServiceClient.AssetRepositoryServices.Tenants;
 
 namespace Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Identity.Groups;
 
 internal class CreateGroup : ServiceClientOctoCommand<IIdentityServicesClient>
 {
+    private readonly IdentityMethodCall _methods;
     private readonly IArgument _description;
     private readonly IArgument _name;
     private readonly IArgument _roleIds;
 
     public CreateGroup(ILogger<CreateGroup> logger, IOptions<OctoToolOptions> options,
-        IIdentityServicesClient identityServicesClient, IAuthenticationService authenticationService)
+        IIdentityServicesClient identityServicesClient, ITenantClient tenantClient,
+        IAuthenticationService authenticationService)
         : base(logger, Constants.IdentityServicesGroup, "CreateGroup", "Creates a group.", options,
             identityServicesClient, authenticationService)
     {
+        _methods = new IdentityMethodCall(tenantClient, authenticationService, logger);
         _name = CommandArgumentValue.AddArgument("n", "name", ["Name of the group"], true, 1);
         _description = CommandArgumentValue.AddArgument("d", "description",
             ["Optional description of the group"], false, 1);
@@ -32,7 +37,7 @@ internal class CreateGroup : ServiceClientOctoCommand<IIdentityServicesClient>
                 new CodeSample(arguments: [
                     new CodeSampleArgument(_name, "Engineering"),
                     new CodeSampleArgument(_description, "Engineering team"),
-                    new CodeSampleArgument(_roleIds, "Development,CommunicationManagement"),
+                    new CodeSampleArgument(_roleIds, "<role-rtid>,<role-rtid>"),
                 ],
                     description: "Basic usage"),
             ]
@@ -51,7 +56,10 @@ internal class CreateGroup : ServiceClientOctoCommand<IIdentityServicesClient>
             GroupDescription = CommandArgumentValue.GetArgumentScalarValueOrDefault<string>(_description),
             RoleIds = ParseCommaSeparatedList(_roleIds)
         };
-        await ServiceClient.CreateGroup(dto);
+        var roleNames = await IdentityMethodCall.ResolveRoleNamesAsync(ServiceClient, dto.RoleIds ?? []);
+        await _methods.RunAsync(RtGroupMethodClient.CreateGroupMethodId,
+            () => new RtGroupMethodClient(_methods.TenantClient).CreateGroupAsync(name, dto.GroupDescription,
+                roleNames.Count > 0 ? roleNames : null));
 
         Logger.LogInformation("Group '{Name}' created", name);
     }

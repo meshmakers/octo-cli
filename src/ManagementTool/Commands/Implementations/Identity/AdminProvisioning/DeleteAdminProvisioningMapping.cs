@@ -4,21 +4,26 @@ using Meshmakers.Octo.Frontend.ManagementTool.Services;
 using Meshmakers.Octo.Sdk.ServiceClient.IdentityServices;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using GraphQlDtos.DataTransferObjects.System.Identity.v3;
+using Meshmakers.Octo.Sdk.ServiceClient.AssetRepositoryServices.Tenants;
 
 namespace Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Identity.AdminProvisioning;
 
 internal class DeleteAdminProvisioningMapping : ServiceClientOctoCommand<IIdentityServicesClient>
 {
+    private readonly IdentityMethodCall _methods;
     private readonly IArgument _mappingId;
     private readonly IArgument _targetTenantId;
 
     public DeleteAdminProvisioningMapping(ILogger<DeleteAdminProvisioningMapping> logger,
         IOptions<OctoToolOptions> options,
-        IIdentityServicesClient identityServicesClient, IAuthenticationService authenticationService)
+        IIdentityServicesClient identityServicesClient, ITenantClient tenantClient,
+        IAuthenticationService authenticationService)
         : base(logger, Constants.IdentityServicesGroup, "DeleteAdminProvisioningMapping",
             "Deletes an admin provisioning mapping from a target tenant.", options, identityServicesClient,
             authenticationService)
     {
+        _methods = new IdentityMethodCall(tenantClient, authenticationService, logger);
         _targetTenantId = CommandArgumentValue.AddArgument("ttid", "targetTenantId",
             ["Target tenant ID"], true, 1);
         _mappingId = CommandArgumentValue.AddArgument("mid", "mappingId",
@@ -50,7 +55,9 @@ internal class DeleteAdminProvisioningMapping : ServiceClientOctoCommand<IIdenti
             "Deleting admin provisioning mapping '{MappingRtId}' from target tenant '{TargetTenantId}' at '{ServiceClientServiceUri}'",
             mappingRtId, targetTenantId, ServiceClient.ServiceUri);
 
-        await ServiceClient.DeleteAdminProvisioningMapping(targetTenantId, mappingRtId);
+        await _methods.RunAsync(RtExternalTenantUserMappingMethodClient.RemoveAdminProvisioningMethodId,
+            () => new RtExternalTenantUserMappingMethodClient(_methods.TenantClient).RemoveAdminProvisioningAsync(
+                targetTenantId, mappingRtId.ToString()));
 
         Logger.LogInformation("Admin provisioning mapping '{MappingRtId}' deleted from target tenant '{TargetTenantId}'",
             mappingRtId, targetTenantId);

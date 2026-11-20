@@ -42,6 +42,8 @@ public sealed class SecretArgumentCommandTests
     public SecretArgumentCommandTests()
     {
         A.CallTo(() => _confirm.Confirm(A<string>._)).Returns(true);
+        A.CallTo(() => _identity.GetClient(A<string>._)).ReturnsLazily((string id) =>
+            Task.FromResult(new ClientDto { ClientId = id, RtId = "65f0c0ffee0000000000abce" }));
         A.CallTo(() => _identity.GetUserByNameEmailOrId(A<string>._)).ReturnsLazily((string name) =>
             Task.FromResult(new UserDto { Name = name, UserId = "65f0c0ffee0000000000abcd" }));
         A.CallTo(_tenant).Where(c => c.Method.Name == nameof(ITenantClient.SendMutationAsync))
@@ -63,6 +65,11 @@ public sealed class SecretArgumentCommandTests
         var variables = JsonSerializer.SerializeToElement(Assert.Single(_methodRequests).Variables);
         return variables.GetProperty("input").TryGetProperty(field, out var value) ? value.GetString() : null;
     }
+
+    /// <summary>The values of <c>input.&lt;field&gt;</c> of every method call, in call order (null when not sent).</summary>
+    private List<string?> SentInputs(string field) =>
+        _methodRequests.Select(r => JsonSerializer.SerializeToElement(r.Variables).GetProperty("input"))
+            .Select(i => i.TryGetProperty(field, out var value) ? value.GetString() : null).ToList();
 
     private static void AssertNoSecretIn<T>(RecordingLogger<T> logger, string secret) =>
         Assert.DoesNotContain(logger.Entries, e => e.Message.Contains(secret));
@@ -226,57 +233,50 @@ public sealed class SecretArgumentCommandTests
     [Fact]
     public async Task AddClientCredentialsClient_OnATerminal_PromptsTwice_AndNeverReadsTheLoginSecret()
     {
-        ClientDto? sent = null;
-        A.CallTo(() => _identity.CreateClient(A<ClientDto>._)).Invokes((ClientDto dto) => sent = dto);
         var console = new FakeSecretConsole().Answer(_secret, _secret);
         console.Environment[Constants.EnvVarClientSecret] = "the-cli-login-secret";
         var command = new AddClientCredentialsClient(new RecordingLogger<AddClientCredentialsClient>(), _options,
-            _identity, A.Fake<IAuthenticationService>(), new SecretInput(console));
+            _identity, _tenant, A.Fake<IAuthenticationService>(), new SecretInput(console));
         command.CommandArgumentValue.ParseLayer(["-id", "svc", "-n", "Service"]);
 
         await command.Execute();
 
-        Assert.Equal(_secret, sent!.ClientSecret);
+        Assert.Equal(_secret, SentInput("clientSecret"));
         Assert.Equal(2, console.Prompts.Count);
     }
 
     [Fact]
     public async Task AddClientCredentialsClient_FromTheEnvironment()
     {
-        ClientDto? sent = null;
-        A.CallTo(() => _identity.CreateClient(A<ClientDto>._)).Invokes((ClientDto dto) => sent = dto);
         var console = new FakeSecretConsole { IsInputRedirected = true };
         console.Environment[Constants.EnvVarNewClientSecret] = _secret;
         var command = new AddClientCredentialsClient(new RecordingLogger<AddClientCredentialsClient>(), _options,
-            _identity, A.Fake<IAuthenticationService>(), new SecretInput(console));
+            _identity, _tenant, A.Fake<IAuthenticationService>(), new SecretInput(console));
         command.CommandArgumentValue.ParseLayer(["-id", "svc", "-n", "Service", "-apic"]);
 
         await command.Execute();
 
-        Assert.Equal(_secret, sent!.ClientSecret);
-        Assert.True(sent.AutoProvisionInChildTenants);
+        Assert.Equal(_secret, SentInput("clientSecret"));
+        var input = JsonSerializer.SerializeToElement(Assert.Single(_methodRequests).Variables).GetProperty("input");
+        Assert.True(input.GetProperty("autoProvisionInChildTenants").GetBoolean());
     }
 
     [Fact]
     public async Task AddDeviceCodeClient_FromStandardInput_AndTheDeprecatedArgumentWarns()
     {
-        var sent = new List<ClientDto>();
-        A.CallTo(() => _identity.CreateClient(A<ClientDto>._)).Invokes((ClientDto dto) => sent.Add(dto));
-
         var stdin = new AddDeviceCodeClient(new RecordingLogger<AddDeviceCodeClient>(), _options, _identity,
-            A.Fake<IAuthenticationService>(),
+            _tenant, A.Fake<IAuthenticationService>(),
             new SecretInput(new FakeSecretConsole { IsInputRedirected = true, StandardInput = _secret + "\n" }));
         stdin.CommandArgumentValue.ParseLayer(["-id", "dev", "-n", "Device", "--secret-stdin"]);
         await stdin.Execute();
 
         var logger = new RecordingLogger<AddDeviceCodeClient>();
-        var legacy = new AddDeviceCodeClient(logger, _options, _identity, A.Fake<IAuthenticationService>(),
+        var legacy = new AddDeviceCodeClient(logger, _options, _identity, _tenant, A.Fake<IAuthenticationService>(),
             FakeSecretConsole.Empty());
         legacy.CommandArgumentValue.ParseLayer(["-id", "dev2", "-n", "Device", "-s", _secret]);
         await legacy.Execute();
 
-        Assert.All(sent, dto => Assert.Equal(_secret, dto.ClientSecret));
-        Assert.Equal(2, sent.Count);
+        Assert.Equal([_secret, _secret], SentInputs("clientSecret"));
         AssertDeprecationWarning(logger, "-s");
         AssertNoSecretIn(logger, _secret);
     }
@@ -286,44 +286,38 @@ public sealed class SecretArgumentCommandTests
     [Fact]
     public async Task AddOAuthIdentityProvider_FromStandardInput()
     {
-        IdentityProviderDto? sent = null;
-        A.CallTo(() => _identity.CreateIdentityProvider(A<IdentityProviderDto>._))
-            .Invokes((IdentityProviderDto dto) => sent = dto);
         var console = new FakeSecretConsole { IsInputRedirected = true, StandardInput = _secret };
         var command = new AddOAuthIdentityProvider(new RecordingLogger<AddOAuthIdentityProvider>(), _options,
-            _identity, A.Fake<IAuthenticationService>(), new SecretInput(console));
+            _identity, _tenant, A.Fake<IAuthenticationService>(), new SecretInput(console));
         command.CommandArgumentValue.ParseLayer(["-n", "Google", "-t", "google", "-cid", "cid", "-e", "true",
             "--client-secret-stdin"]);
 
         await command.Execute();
 
-        Assert.Equal(_secret, Assert.IsType<GoogleIdentityProviderDto>(sent).ClientSecret);
+        Assert.Equal(_secret, SentInput("clientSecret"));
+        Assert.Contains("systemIdentityGoogleIdentityProviders", Assert.Single(_methodRequests).Query);
     }
 
     [Fact]
     public async Task AddAzureEntryIdIdentityProvider_FromTheEnvironment_AndTheDeprecatedArgumentWarns()
     {
-        var sent = new List<AzureEntraIdProviderDto>();
-        A.CallTo(() => _identity.CreateIdentityProvider(A<IdentityProviderDto>._))
-            .Invokes((IdentityProviderDto dto) => sent.Add((AzureEntraIdProviderDto)dto));
 
         var console = new FakeSecretConsole { IsInputRedirected = true };
         console.Environment[Constants.EnvVarIdentityProviderClientSecret] = _secret;
         var fromEnvironment = new AddAzureEntryIdIdentityProvider(
             new RecordingLogger<AddAzureEntryIdIdentityProvider>(), _options, _identity,
-            A.Fake<IAuthenticationService>(), new SecretInput(console));
+            _tenant, A.Fake<IAuthenticationService>(), new SecretInput(console));
         fromEnvironment.CommandArgumentValue.ParseLayer(["-n", "Azure", "-t", "tid", "-cid", "cid", "-e", "true"]);
         await fromEnvironment.Execute();
 
         var logger = new RecordingLogger<AddAzureEntryIdIdentityProvider>();
         var legacy = new AddAzureEntryIdIdentityProvider(logger, _options, _identity,
-            A.Fake<IAuthenticationService>(), FakeSecretConsole.Empty());
+            _tenant, A.Fake<IAuthenticationService>(), FakeSecretConsole.Empty());
         legacy.CommandArgumentValue.ParseLayer(["-n", "Azure2", "-t", "tid", "-cid", "cid", "-e", "true", "-cs",
             _secret]);
         await legacy.Execute();
 
-        Assert.Equal(2, sent.Count);
-        Assert.All(sent, dto => Assert.Equal(_secret, dto.ClientSecret));
+        Assert.Equal([_secret, _secret], SentInputs("clientSecret"));
         AssertDeprecationWarning(logger, "-cs");
         AssertNoSecretIn(logger, _secret);
     }
@@ -333,26 +327,21 @@ public sealed class SecretArgumentCommandTests
     {
         A.CallTo(() => _identity.GetIdentityProvider(A<Meshmakers.Octo.ConstructionKit.Contracts.OctoObjectId>._))
             .Returns(new MicrosoftIdentityProviderDto { Name = "Old", ClientId = "cid" });
-        var sent = new List<IdentityProviderDto>();
-        A.CallTo(() => _identity.UpdateIdentityProvider(A<Meshmakers.Octo.ConstructionKit.Contracts.OctoObjectId>._,
-                A<IdentityProviderDto>._))
-            .Invokes((Meshmakers.Octo.ConstructionKit.Contracts.OctoObjectId _, IdentityProviderDto dto) => sent.Add(dto));
         const string providerId = "65f0a1b2c3d4e5f6a7b8c9d0";
 
         var rotate = new UpdateIdentityProvider(new RecordingLogger<UpdateIdentityProvider>(), _options, _identity,
-            A.Fake<IAuthenticationService>(),
+            _tenant, A.Fake<IAuthenticationService>(),
             new SecretInput(new FakeSecretConsole { IsInputRedirected = true, StandardInput = _secret }));
         rotate.CommandArgumentValue.ParseLayer(["-id", providerId, "-n", "New", "-e", "true", "--client-secret-stdin"]);
         await rotate.Execute();
 
         var keepConsole = new FakeSecretConsole();
         var keep = new UpdateIdentityProvider(new RecordingLogger<UpdateIdentityProvider>(), _options, _identity,
-            A.Fake<IAuthenticationService>(), new SecretInput(keepConsole));
+            _tenant, A.Fake<IAuthenticationService>(), new SecretInput(keepConsole));
         keep.CommandArgumentValue.ParseLayer(["-id", providerId, "-n", "New", "-e", "true"]);
         await keep.Execute();
 
-        Assert.Equal(_secret, Assert.IsType<MicrosoftIdentityProviderDto>(sent[0]).ClientSecret);
-        Assert.Null(Assert.IsType<MicrosoftIdentityProviderDto>(sent[1]).ClientSecret);
+        Assert.Equal([_secret, null], SentInputs("clientSecret"));
         Assert.Empty(keepConsole.Prompts);
     }
 

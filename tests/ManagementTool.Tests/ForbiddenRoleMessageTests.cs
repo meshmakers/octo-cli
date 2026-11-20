@@ -17,8 +17,10 @@ using Microsoft.Extensions.Options;
 namespace ManagementTool.Tests;
 
 /// <summary>
-/// AB#8094: identity answers a refused API secret write with <c>403 {"message": "...requires the role 'SecretManagement'..."}</c>
-/// (AB#5861). octo-cli prints that message and exits with -3; a 403 without a message keeps the ProvisionCurrentUser hint.
+/// AB#8094: a 403 of the identity service with <c>{"message": "...requires the role 'SecretManagement'..."}</c> (AB#5861) is
+/// printed verbatim with exit code -3; a 403 without a message keeps the ProvisionCurrentUser hint. The API secret writes run
+/// CK methods since identity wave 2, so the 403 here comes from the identity read before the method call (the client
+/// lookup); a refused secret method (<c>METHOD_FORBIDDEN</c>) is covered by <see cref="CreateApiSecretCommandsTests" />.
 /// The real <see cref="IdentityServicesClient" /> talks to a local HTTP listener, the real <see cref="Runner" /> prints.
 /// </summary>
 public sealed class ForbiddenRoleMessageTests : IDisposable
@@ -91,7 +93,7 @@ public sealed class ForbiddenRoleMessageTests : IDisposable
             A.Fake<IIdentityServiceClientAccessToken>());
         var command = new CreateApiSecretClient(new RecordingLogger<CreateApiSecretClient>(),
             Options.Create(new OctoToolOptions { TenantId = "octosystem" }), A.Fake<IConsoleService>(), client,
-            A.Fake<IAuthenticationService>());
+            MethodFakes.IdentityTenant([]), A.Fake<IAuthenticationService>());
         command.CommandArgumentValue.ParseLayer(["-cid", "my-client"]);
 
         var parser = A.Fake<ICommandParser>();
@@ -150,17 +152,18 @@ public sealed class ForbiddenRoleMessageTests : IDisposable
     {
         var options = Options.Create(new OctoToolOptions { TenantId = "octosystem" });
         var identity = A.Fake<IIdentityServicesClient>();
+        var tenant = A.Fake<Meshmakers.Octo.Sdk.ServiceClient.AssetRepositoryServices.Tenants.ITenantClient>();
         var auth = A.Fake<IAuthenticationService>();
         var documentations = new Command<OctoToolOptions>[]
         {
-            new CreateApiSecretClient(NullLogger<CreateApiSecretClient>.Instance, options, A.Fake<IConsoleService>(), identity, auth),
-            new UpdateApiSecretClient(NullLogger<UpdateApiSecretClient>.Instance, options, identity, auth),
-            new DeleteApiSecretClient(NullLogger<DeleteApiSecretClient>.Instance, options, identity, auth, A.Fake<IConfirmationService>()),
+            new CreateApiSecretClient(NullLogger<CreateApiSecretClient>.Instance, options, A.Fake<IConsoleService>(), identity, tenant, auth),
+            new UpdateApiSecretClient(NullLogger<UpdateApiSecretClient>.Instance, options, identity, tenant, auth),
+            new DeleteApiSecretClient(NullLogger<DeleteApiSecretClient>.Instance, options, identity, tenant, auth, A.Fake<IConfirmationService>()),
             new CreateApiSecretApiResource(NullLogger<CreateApiSecretApiResource>.Instance, options,
-                A.Fake<IConsoleService>(), identity, auth),
-            new UpdateApiSecretApiResource(NullLogger<UpdateApiSecretApiResource>.Instance, options, identity, auth),
-            new DeleteApiSecretApiResource(NullLogger<DeleteApiSecretApiResource>.Instance, options, identity, auth, A.Fake<IConfirmationService>()),
-            new AddClientCredentialsClient(NullLogger<AddClientCredentialsClient>.Instance, options, identity, auth,
+                A.Fake<IConsoleService>(), identity, tenant, auth),
+            new UpdateApiSecretApiResource(NullLogger<UpdateApiSecretApiResource>.Instance, options, identity, tenant, auth),
+            new DeleteApiSecretApiResource(NullLogger<DeleteApiSecretApiResource>.Instance, options, identity, tenant, auth, A.Fake<IConfirmationService>()),
+            new AddClientCredentialsClient(NullLogger<AddClientCredentialsClient>.Instance, options, identity, tenant, auth,
                 new SecretInput(A.Fake<ISecretConsole>())),
         };
 

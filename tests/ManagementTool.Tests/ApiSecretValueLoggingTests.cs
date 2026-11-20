@@ -1,4 +1,6 @@
 using FakeItEasy;
+using GraphQL;
+using Meshmakers.Octo.Sdk.ServiceClient.AssetRepositoryServices.Tenants;
 using Meshmakers.Common.Shared.Services;
 using Meshmakers.Octo.Communication.Contracts.DataTransferObjects;
 using Meshmakers.Octo.Frontend.ManagementTool;
@@ -23,11 +25,24 @@ public sealed class ApiSecretValueLoggingTests
     private readonly IConfirmationService _confirm = A.Fake<IConfirmationService>();
     private readonly IOptions<OctoToolOptions> _options = Options.Create(new OctoToolOptions { TenantId = "acme" });
     private readonly List<string> _written = [];
+    private readonly List<GraphQLRequest> _requests = [];
+    private readonly ITenantClient _tenant;
 
     public ApiSecretValueLoggingTests()
     {
         A.CallTo(() => _console.WriteLine(A<string>._)).Invokes((string s) => _written.Add(s));
         A.CallTo(() => _confirm.Confirm(A<string>._)).Returns(true);
+        _tenant = MethodFakes.IdentityTenant(_requests);
+        MethodFakes.GiveClientsRuntimeIds(_identity);
+    }
+
+    /// <summary>The secret travels only in the variables of the one method call, never in the document.</summary>
+    private void AssertSecretOnlyInTheMethodCall(string field)
+    {
+        var request = Assert.Single(_requests);
+        Assert.Contains(field, request.Query, StringComparison.Ordinal);
+        Assert.DoesNotContain(FakeSecret, request.Query, StringComparison.Ordinal);
+        Assert.Contains(FakeSecret, MethodFakes.VariablesOf(request), StringComparison.Ordinal);
     }
 
     private void AssertNoSecret(IEnumerable<LogEntry> entries)
@@ -41,12 +56,12 @@ public sealed class ApiSecretValueLoggingTests
     public async Task DeleteForClient_LogsNoSecret_ButCallsServiceWithIt()
     {
         var logger = new RecordingLogger<DeleteApiSecretClient>();
-        var command = new DeleteApiSecretClient(logger, _options, _identity, _auth, _confirm);
+        var command = new DeleteApiSecretClient(logger, _options, _identity, _tenant, _auth, _confirm);
         command.CommandArgumentValue.ParseLayer(["-cid", "c1", "-s", FakeSecret, "-y"]);
 
         await command.Execute();
 
-        A.CallTo(() => _identity.DeleteApiSecretClient("c1", FakeSecret)).MustHaveHappenedOnceExactly();
+        AssertSecretOnlyInTheMethodCall("removeSecret");
         AssertNoSecret(logger.Entries);
     }
 
@@ -54,26 +69,26 @@ public sealed class ApiSecretValueLoggingTests
     public async Task DeleteForApiResource_LogsNoSecret_ButCallsServiceWithIt()
     {
         var logger = new RecordingLogger<DeleteApiSecretApiResource>();
-        var command = new DeleteApiSecretApiResource(logger, _options, _identity, _auth, _confirm);
+        var command = new DeleteApiSecretApiResource(logger, _options, _identity, _tenant, _auth, _confirm);
         command.CommandArgumentValue.ParseLayer(["-n", "res", "-s", FakeSecret, "-y"]);
 
         await command.Execute();
 
-        A.CallTo(() => _identity.DeleteApiSecretApiResource("res", FakeSecret)).MustHaveHappenedOnceExactly();
+        AssertSecretOnlyInTheMethodCall("removeSecret");
         AssertNoSecret(logger.Entries);
     }
 
     [Fact]
     public async Task UpdateForClient_Found_LogsNoSecret()
     {
-        A.CallTo(() => _identity.GetApiSecretForClient("c1", FakeSecret)).Returns(new ApiSecretDto());
+        A.CallTo(() => _identity.GetApiSecretForClient("c1", FakeSecret)).Returns(new ApiSecretDto { ValueEncrypted = FakeSecret });
         var logger = new RecordingLogger<UpdateApiSecretClient>();
-        var command = new UpdateApiSecretClient(logger, _options, _identity, _auth);
+        var command = new UpdateApiSecretClient(logger, _options, _identity, _tenant, _auth);
         command.CommandArgumentValue.ParseLayer(["-cid", "c1", "-s", FakeSecret, "-d", "new"]);
 
         await command.Execute();
 
-        A.CallTo(() => _identity.UpdateApiSecretClient("c1", A<ApiSecretDto>._)).MustHaveHappenedOnceExactly();
+        AssertSecretOnlyInTheMethodCall("updateSecret");
         AssertNoSecret(logger.Entries);
     }
 
@@ -82,7 +97,7 @@ public sealed class ApiSecretValueLoggingTests
     {
         A.CallTo(() => _identity.GetApiSecretForClient("c1", FakeSecret)).Returns(Task.FromResult<ApiSecretDto>(null!));
         var logger = new RecordingLogger<UpdateApiSecretClient>();
-        var command = new UpdateApiSecretClient(logger, _options, _identity, _auth);
+        var command = new UpdateApiSecretClient(logger, _options, _identity, _tenant, _auth);
         command.CommandArgumentValue.ParseLayer(["-cid", "c1", "-s", FakeSecret]);
 
         await command.Execute();
@@ -94,14 +109,14 @@ public sealed class ApiSecretValueLoggingTests
     [Fact]
     public async Task UpdateForApiResource_Found_LogsNoSecret()
     {
-        A.CallTo(() => _identity.GetApiSecretForApiResource("res", FakeSecret)).Returns(new ApiSecretDto());
+        A.CallTo(() => _identity.GetApiSecretForApiResource("res", FakeSecret)).Returns(new ApiSecretDto { ValueEncrypted = FakeSecret });
         var logger = new RecordingLogger<UpdateApiSecretApiResource>();
-        var command = new UpdateApiSecretApiResource(logger, _options, _identity, _auth);
+        var command = new UpdateApiSecretApiResource(logger, _options, _identity, _tenant, _auth);
         command.CommandArgumentValue.ParseLayer(["-n", "res", "-s", FakeSecret, "-d", "new"]);
 
         await command.Execute();
 
-        A.CallTo(() => _identity.UpdateApiSecretApiResource("res", A<ApiSecretDto>._)).MustHaveHappenedOnceExactly();
+        AssertSecretOnlyInTheMethodCall("updateSecret");
         AssertNoSecret(logger.Entries);
     }
 
@@ -110,7 +125,7 @@ public sealed class ApiSecretValueLoggingTests
     {
         A.CallTo(() => _identity.GetApiSecretForApiResource("res", FakeSecret)).Returns(Task.FromResult<ApiSecretDto>(null!));
         var logger = new RecordingLogger<UpdateApiSecretApiResource>();
-        var command = new UpdateApiSecretApiResource(logger, _options, _identity, _auth);
+        var command = new UpdateApiSecretApiResource(logger, _options, _identity, _tenant, _auth);
         command.CommandArgumentValue.ParseLayer(["-n", "res", "-s", FakeSecret]);
 
         await command.Execute();

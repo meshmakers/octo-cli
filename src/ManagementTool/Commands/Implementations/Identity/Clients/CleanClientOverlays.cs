@@ -3,17 +3,21 @@ using Meshmakers.Octo.Frontend.ManagementTool.Services;
 using Meshmakers.Octo.Sdk.ServiceClient.IdentityServices;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using GraphQlDtos.DataTransferObjects.System.Identity.v3;
+using Meshmakers.Octo.Sdk.ServiceClient.AssetRepositoryServices.Tenants;
 
 namespace Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Identity.Clients;
 
 internal class CleanClientOverlays : ServiceClientOctoCommand<IIdentityServicesClient>
 {
+    private readonly IdentityMethodCall _methods;
     private readonly IConfirmationService _confirmationService;
     private readonly IArgument _overlayName;
     private readonly IArgument _yesArg;
 
     public CleanClientOverlays(ILogger<CleanClientOverlays> logger, IOptions<OctoToolOptions> options,
-        IIdentityServicesClient identityServicesClient, IAuthenticationService authenticationService,
+        IIdentityServicesClient identityServicesClient, ITenantClient tenantClient,
+        IAuthenticationService authenticationService,
         IConfirmationService confirmationService)
         : base(logger, Constants.IdentityServicesGroup, "CleanClientOverlays",
             "Strips overlay URI entries from every blueprint-managed client in the tenant. " +
@@ -23,6 +27,7 @@ internal class CleanClientOverlays : ServiceClientOctoCommand<IIdentityServicesC
             "can re-apply with Apply-IdentityOverlay afterwards (idempotent, no-op if state matches).",
             options, identityServicesClient, authenticationService)
     {
+        _methods = new IdentityMethodCall(tenantClient, authenticationService, logger);
         _confirmationService = confirmationService;
 
         _overlayName = CommandArgumentValue.AddArgument("n", "overlayName",
@@ -73,20 +78,29 @@ internal class CleanClientOverlays : ServiceClientOctoCommand<IIdentityServicesC
             string.IsNullOrEmpty(overlayName) ? "every overlay:*" : $"overlay:{overlayName}",
             ServiceClient.ServiceUri);
 
-        var result = await ServiceClient.CleanOverlayEntries(overlayName);
+        var value = await _methods.RunAsync(RtClientMethodClient.CleanOverlayEntriesMethodId,
+            () => new RtClientMethodClient(_methods.TenantClient).CleanOverlayEntriesAsync(
+                string.IsNullOrEmpty(overlayName) ? null : overlayName));
+        LogClean(value?.TotalEntriesRemoved ?? 0, value?.ClientsAffected ?? 0,
+            (value?.ClientResults ?? []).Select(c => (c.ClientId, c.RedirectUrisRemoved ?? 0,
+                c.PostLogoutRedirectUrisRemoved ?? 0, c.AllowedCorsOriginsRemoved ?? 0)));
+    }
 
+    private void LogClean(long total, long clientsAffected,
+        IEnumerable<(string? ClientId, long Redirect, long PostLogout, long Cors)> clientResults)
+    {
         Logger.LogInformation(
             "Clean complete: {Total} entries removed across {Clients} client(s)",
-            result.TotalEntriesRemoved, result.ClientsAffected);
+            total, clientsAffected);
 
-        foreach (var clientResult in result.ClientResults)
+        foreach (var clientResult in clientResults)
         {
             Logger.LogInformation(
                 "  [{ClientId}] RedirectUris={R}, PostLogoutRedirectUris={PL}, AllowedCorsOrigins={CO}",
                 clientResult.ClientId,
-                clientResult.RedirectUrisRemoved,
-                clientResult.PostLogoutRedirectUrisRemoved,
-                clientResult.AllowedCorsOriginsRemoved);
+                clientResult.Redirect,
+                clientResult.PostLogout,
+                clientResult.Cors);
         }
     }
 }

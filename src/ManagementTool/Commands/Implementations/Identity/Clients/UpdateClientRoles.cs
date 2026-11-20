@@ -3,20 +3,25 @@ using Meshmakers.Octo.Frontend.ManagementTool.Services;
 using Meshmakers.Octo.Sdk.ServiceClient.IdentityServices;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using GraphQlDtos.DataTransferObjects.System.Identity.v3;
+using Meshmakers.Octo.Sdk.ServiceClient.AssetRepositoryServices.Tenants;
 
 namespace Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Identity.Clients;
 
 internal class UpdateClientRoles : ServiceClientOctoCommand<IIdentityServicesClient>
 {
+    private readonly IdentityMethodCall _methods;
     private readonly IArgument _clientIdArg;
     private readonly IArgument _roleIdsArg;
 
     public UpdateClientRoles(ILogger<UpdateClientRoles> logger, IOptions<OctoToolOptions> options,
-        IIdentityServicesClient identityServicesClient, IAuthenticationService authenticationService)
+        IIdentityServicesClient identityServicesClient, ITenantClient tenantClient,
+        IAuthenticationService authenticationService)
         : base(logger, Constants.IdentityServicesGroup, "UpdateClientRoles",
             "Replaces the directly-assigned roles of a client (replace-all)", options,
             identityServicesClient, authenticationService)
     {
+        _methods = new IdentityMethodCall(tenantClient, authenticationService, logger);
         _clientIdArg = CommandArgumentValue.AddArgument("id", "clientId", ["ID of the client"], true, 1);
         _roleIdsArg = CommandArgumentValue.AddArgument("rids", "roleIds",
             ["Comma-separated list of role IDs to assign (replace-all)"], true, 1);
@@ -45,7 +50,10 @@ internal class UpdateClientRoles : ServiceClientOctoCommand<IIdentityServicesCli
         Logger.LogInformation("Setting {RoleCount} role(s) on client '{ClientId}' at '{ServiceClientServiceUri}'",
             roleIds.Count, clientId, ServiceClient.ServiceUri);
 
-        await ServiceClient.UpdateClientRoles(clientId, roleIds);
+        var roleNames = await IdentityMethodCall.ResolveRoleNamesAsync(ServiceClient, roleIds);
+        await _methods.RunAsync(RtClientMethodClient.SetRolesMethodId,
+            async () => await new RtClientMethodClient(_methods.TenantClient).SetRolesAsync(
+                await IdentityMethodCall.ResolveClientRtIdAsync(ServiceClient, clientId), roleNames));
 
         Logger.LogInformation("Client '{ClientId}' roles updated", clientId);
     }
