@@ -48,6 +48,12 @@ All notable changes to octo-cli are listed here. Newest first.
 
 ### Added
 
+- **AB#9577 — `Create --blueprint` creates a tenant with a catalog blueprint applied in one call.** `--blueprint <Name>-<version>`
+  (`-b`) sends `blueprintId` with the create; the asset repository applies it in the create transaction, so an unknown or failing
+  blueprint ends the command with exit -3 and the service's message and leaves no tenant behind (the user is not provisioned).
+  Combines with `--database`, `--scratch` and `--no-provision`; without it the calls are unchanged. Needs octo-sdk with the
+  `CreateTenantAsync(…, blueprintId)` overload.
+
 - **AB#8966 — `UninstallBlueprint --dry-run` and the kept entities.** `--dry-run` (`-dr`) lists the entities an uninstall would
   erase and the tenant-owned seed entities it would keep, with the reason (`Edited`, `Referenced` with the referencing rtIds,
   `NotComparable`, `EraseFailed`), without changing anything and without a prompt. It calls the asset repository's
