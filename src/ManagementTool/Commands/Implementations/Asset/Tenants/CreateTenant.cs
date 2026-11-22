@@ -14,6 +14,7 @@ internal class CreateTenant : ServiceClientOctoCommand<IAssetServicesClient>
     private readonly IArgument _tenantIdArg;
     private readonly IArgument _noProvisionArg;
     private readonly IArgument _scratchArg;
+    private readonly IArgument _blueprintArg;
 
     public CreateTenant(ILogger<CreateTenant> logger, IOptions<OctoToolOptions> options,
         IAssetServicesClient assetServicesClient, IIdentityServicesClient identityServicesClient,
@@ -34,6 +35,9 @@ internal class CreateTenant : ServiceClientOctoCommand<IAssetServicesClient>
         _scratchArg = CommandArgumentValue.AddArgument("sc", "scratch",
             ["Create a scratch tenant: the client-credentials client that runs this command becomes administrator " +
              "of the new tenant (no human login needed)"], false, 0);
+        _blueprintArg = CommandArgumentValue.AddArgument("b", "blueprint",
+            ["Catalog blueprint to apply while creating the tenant (<Name>-<version>, e.g. MyBlueprint-1.0.0). " +
+             "Transactional: if the blueprint is unknown or fails to apply, the tenant is not created"], false, 1);
     }
 
     public override CommandDocumentation? GetDocumentation() =>
@@ -55,6 +59,11 @@ internal class CreateTenant : ServiceClientOctoCommand<IAssetServicesClient>
                     new CodeSampleArgument(_scratchArg),
                 ],
                     description: "Scratch tenant for an agent (client-credentials login of the parent tenant)"),
+                new CodeSample(arguments: [
+                    new CodeSampleArgument(_tenantIdArg, "newtenant"),
+                    new CodeSampleArgument(_blueprintArg, "MyBlueprint-1.0.0"),
+                ],
+                    description: "Tenant with a catalog blueprint applied in the same call"),
             ],
             Notes:
             [
@@ -72,6 +81,12 @@ internal class CreateTenant : ServiceClientOctoCommand<IAssetServicesClient>
                 "--database is optional (AB#8797): without it the service names the database after the tenant id. An instance with " +
                 "a tenant-database prefix (System:TenantDatabasePrefix) prefixes that name and refuses an explicit name without " +
                 "the prefix (HTTP 409, 'Database name ... is not available'). Services before AB#8797 require --database.",
+                "--blueprint applies a catalog blueprint (ListBlueprints shows the ids) while the tenant is created, in " +
+                "one transaction: when the blueprint is unknown or fails to apply, the service aborts, no tenant is left behind " +
+                "and the command ends with a non-zero exit code and the service's message ('Blueprint application failed: ...'). " +
+                "Combines with --database, --scratch and --no-provision; the current user is provisioned only after the tenant " +
+                "and its blueprint exist. Same result as Create followed by InstallBlueprint, without a half-set-up tenant in " +
+                "between.",
             ]
         );
 
@@ -83,6 +98,14 @@ internal class CreateTenant : ServiceClientOctoCommand<IAssetServicesClient>
             ? CommandArgumentValue.GetArgumentScalarValue<string>(_databaseArg).ToLower()
             : null;
         var scratch = CommandArgumentValue.IsArgumentUsed(_scratchArg);
+        // The service applies the blueprint in the create transaction; a failure aborts the create.
+        var blueprintId = CommandArgumentValue.IsArgumentUsed(_blueprintArg)
+            ? CommandArgumentValue.GetArgumentScalarValue<string>(_blueprintArg).Trim()
+            : null;
+        if (blueprintId is { Length: 0 })
+        {
+            throw new ArgumentException("--blueprint needs a blueprint id (<Name>-<version>).");
+        }
         // A scratch tenant is created by a service token: there is no user to provision, the creator's mirror is the admin.
         var skipProvisioning = scratch || CommandArgumentValue.IsArgumentUsed(_noProvisionArg);
 
@@ -90,7 +113,12 @@ internal class CreateTenant : ServiceClientOctoCommand<IAssetServicesClient>
             "Creating {Kind} tenant \'{TenantId}\' (database \'{DatabaseName}\') at \'{ServiceClientServiceUri}\'",
             scratch ? "scratch" : "a", tenantId, databaseName ?? "<default>", ServiceClient.ServiceUri);
 
-        if (scratch)
+        if (blueprintId != null)
+        {
+            Logger.LogInformation("Applying blueprint '{BlueprintId}' in the same transaction", blueprintId);
+            await ServiceClient.CreateTenantAsync(tenantId, databaseName, scratch, blueprintId);
+        }
+        else if (scratch)
         {
             await ServiceClient.CreateTenantAsync(tenantId, databaseName, scratch: true);
         }

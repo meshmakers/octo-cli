@@ -83,6 +83,16 @@ SDK's `CkOperationsClient` (`octo-sdk/docs/method-clients.md`, "Asynchronous met
   every sent document validated against `Fixtures/asset-repo-schema.test-2-system-bot-3.7.json.gz` with
   `AssetRepositoryGraphQlSchema.ValidateAgainstSystemBotAsync`).
 
+## Create with a blueprint
+
+`Create --blueprint <Name>-<version>` (`-b`) sends `blueprintId` with the create call
+(`IAssetServicesClient.CreateTenantAsync(child, db, scratch, blueprintId)`). The asset repository creates the tenant and applies
+the catalog blueprint in one transaction: when the blueprint is unknown or fails, it aborts, leaves no tenant behind and answers
+400 ("Blueprint application failed: ..."), which `Runner` prints as one error line with exit -3; the current user is then not
+provisioned. Without `--blueprint` the command makes exactly the calls it made before (the SDK sends no `blueprintId`
+parameter). It combines with `--database`, `--scratch` and `--no-provision`. Tests: `CreateTenantBlueprintCommandTests`
+(argument wiring, order create-then-provision, failure path through the real SDK client against a local listener and `Runner`).
+
 ## Scratch tenants: an agent works in and cleans up what it creates
 
 An agent that creates throw-away child tenants with a client-credentials client no longer needs a human device-code login per tenant.
