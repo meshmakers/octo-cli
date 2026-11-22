@@ -41,6 +41,12 @@ entries of a `.zip` (a zip is rejected only when every model entry in it is empt
 without a YAML dependency; files that cannot be classified are passed through and judged by the server.
 A **non-existent input file** also fails with `ToolException.FilePathDoesNotExist` (non-zero exit, no server call) —
 it used to log an error and exit 0.
+**Accepted files**: a compiled CK model (`.json`, `.yaml` or a `.zip` of one) or a `.zip` of the source `ConstructionKit/` folder.
+A zip that holds `ckModel.yaml` is compiled by the asset repository on the path of `ValidateCk`; compile errors fail the
+command with the service's `400` problem `CK_MODEL_COMPILE_FAILED` (its detail lists file and element of each error) and
+nothing is imported. Source zips need an asset repository with source-zip support in `ImportCk`; an older one reads a file
+of the zip as a compiled model and fails. The client-side empty check above also reads the YAML entries of a source zip
+(`ckModel.yaml` alone has no content keys, so a source zip passes as soon as one file declares types, attributes, ...).
 Tests: `tests/ManagementTool.Tests/CkModelFileInspectorTests.cs`, `ImportConstructionKitModelTests.cs`.
 
 ## CK library status: ACTION terms and the upgrade guard

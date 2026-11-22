@@ -21,6 +21,9 @@ internal class ImportConstructionKitModel : JobWithWaitOctoCommand
         IAuthenticationService authenticationService)
         : base(logger, Constants.AssetRepositoryServicesGroup, "ImportCk",
             "Schedules an import job for construction kit files. File is specified using -f argument. To wait for job, use -w argument. " +
+            "Accepted: a compiled CK model (json, yaml or a zip of one) or a zip of the source ConstructionKit/ folder (a zip that holds " +
+            "ckModel.yaml); the service compiles a source zip like ValidateCk and refuses compile errors with CK_MODEL_COMPILE_FAILED " +
+            "(file and element of each error) before anything is imported. " +
             "The tenant upgrade guard refuses a file that would break an installed model (also for System) with CK_UPGRADE_BLOCKED; " +
             "--forceBreakingUpdate overrides it. " +
             "Requires the tenant role DataModelManagement (TenantOwners carry it); otherwise 403 DataModelManagementRequired.",
@@ -28,7 +31,9 @@ internal class ImportConstructionKitModel : JobWithWaitOctoCommand
     {
         _assetServicesClient = assetServicesClient;
 
-        _fileArg = CommandArgumentValue.AddArgument("f", "file", ["File to import"], true, 1);
+        _fileArg = CommandArgumentValue.AddArgument("f", "file",
+            ["File to import: a compiled CK model (.json, .yaml or a .zip of one) or a .zip of the source ConstructionKit/ folder"],
+            true, 1);
         // -f is the file, so the override of the tenant upgrade guard has its own name (the same as for the blueprints).
         _forceBreakingUpdateArg = CommandArgumentValue.AddArgument("fbu", "forceBreakingUpdate",
             [
@@ -54,6 +59,11 @@ internal class ImportConstructionKitModel : JobWithWaitOctoCommand
                     new CodeSampleArgument(_waitForJobArg),
                 ],
                     description: "Basic usage"),
+                new CodeSample(arguments: [
+                    new CodeSampleArgument(_fileArg, "./my-ck-source.zip"),
+                    new CodeSampleArgument(_waitForJobArg),
+                ],
+                    description: "Import a zip of the source ConstructionKit/ folder; the service compiles it first"),
                 new CodeSample(arguments: [
                     new CodeSampleArgument(_fileArg, "./my-ck-model.yaml"),
                     new CodeSampleArgument(_forceBreakingUpdateArg),
