@@ -6,6 +6,7 @@ All notable changes to octo-cli are listed here. Newest first.
 
 ### Changed
 
+- **AB#9609 — NuGet dependency pass.** Updated NLog.Extensions.Logging 6.3.0, System.IdentityModel.Tokens.Jwt 8.23.0 and Microsoft.CodeAnalysis.CSharp 5.12.0 and the test packages (coverlet.collector 10.1.1, Microsoft.NET.Test.Sdk 18.12.0, xunit.v3.mtp-off 4.0.3, xunit.runner.visualstudio 4.0.1); no behaviour change.
 - **AB#9053 — Communication write commands run the System.Communication methods.** `DeployPipeline`, `ExecutePipeline`,
   `SetPipelineDebug`, `MovePipelinesToAdapter`, `Deploy/UndeployDataFlow`, `Deploy/UndeployDeploymentSite`,
   `Deploy/UndeployTriggers`, `Deploy/UndeployWorkload`, `UpdateWorkloadChartVersion`, `CancelQueuedExecution` and
