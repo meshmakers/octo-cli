@@ -35,13 +35,13 @@
         <PackageReference Include="Meshmakers.Common.CommandLineParser" Version="$(MeshmakerVersion)" />
         <PackageReference Include="Meshmakers.Common.Configuration" Version="$(MeshmakerVersion)" />
         <PackageReference Include="Meshmakers.Octo.Sdk.ServiceClient" Version="$(OctoCoreLibVersion)" />
-        <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="8.22.0" />
+        <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="8.23.0" />
     </ItemGroup>
 
     <ItemGroup>
         <PackageReference Include="Microsoft.Extensions.Configuration.Binder" Version="10.0.15" />
         <PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="10.0.15" />
-        <PackageReference Include="NLog.Extensions.Logging" Version="6.2.0" />
+        <PackageReference Include="NLog.Extensions.Logging" Version="6.3.0" />
     </ItemGroup>
 
     <ItemGroup>
