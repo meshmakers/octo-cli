@@ -148,15 +148,6 @@ public class IdentityWave2MethodCommandTests
             Task.FromResult(new ApiSecretDto { ValueEncrypted = "stored-value" }));
         A.CallTo(() => _identity.GetApiSecretForApiResource(A<string>._, A<string>._)).Returns(
             Task.FromResult(new ApiSecretDto { ValueEncrypted = "stored-value" }));
-        A.CallTo(() => _identity.ApplyClientOverlay(A<string>._, A<ApplyOverlayUrisDto>._)).Returns(
-            Task.FromResult(new ApplyOverlayUrisResultDto
-            {
-                OverlayName = "dev", ClientId = "ci-client", RedirectUris = new ApplyOverlayUrisListCountDto(),
-                PostLogoutRedirectUris = new ApplyOverlayUrisListCountDto(),
-                AllowedCorsOrigins = new ApplyOverlayUrisListCountDto()
-            }));
-        A.CallTo(() => _identity.CleanOverlayEntries(A<string?>._)).Returns(
-            Task.FromResult(new CleanOverlayEntriesResultDto { ClientResults = [] }));
         MethodFakes.AnswerMethodCalls(_tenant, _requests, null);
     }
 
@@ -214,7 +205,7 @@ public class IdentityWave2MethodCommandTests
         var error = Assert.Single(logger.Entries, e => e.Level == LogLevel.Error);
         Assert.Contains("METHOD_FORBIDDEN", error.Message);
         Assert.Contains("reason=role", error.Message);
-        A.CallTo(() => _identity.DeleteGroup(A<OctoObjectId>._)).MustNotHaveHappened();
+        AssertNoRestWrite();
     }
 
     [Theory]
