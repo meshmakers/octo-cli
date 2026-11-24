@@ -98,8 +98,8 @@ callers are always AI clients, so octo-mcp-service `knowledge_set_status` refuse
   tenantless `/mcp` of the URI is cut. The URI comes from `-msu` or the context field `McpServiceUrl`
   (`AddContext -msu`, `Config -msu`); without one the command stops before anything is sent. The token is the context's
   own, or the one exchanged from it for another tenant (`ITenantTokenProvider`, as for every command; no fallback to a token
-  of another tenant). It goes only into the `Authorization` header and is never logged or printed, also not with
-  `--verbose`; error texts of the MCP service are redacted before they reach an exception.
+  of another tenant). It goes only into the `Authorization` header and is never logged or printed, at any log level
+  (also Trace in `nlog.config`; octo-cli has no `--verbose` switch); error texts of the MCP service are redacted before they reach an exception.
 - **Run reference.** `--runRef` (1-200 characters) is stored on every switched page as `AdoptedByRun`; default
   `octo-cli:<UTC time>`. The AI service's own pass stores `ai-service/knowledge-platform-updates/<UTC time>`.
 - **Errors.** A refused tool answer (`isSuccess: false`) stops with the tool's error code and message; HTTP 401/403 names

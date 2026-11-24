@@ -177,7 +177,7 @@ public sealed class KnowledgePlatformUpdatesCommandTests
     [Fact]
     public async Task TheTokenIsNeverLoggedOrPrinted_AtAnyLogLevel()
     {
-        // RecordingLogger is enabled for every level, as with --verbose.
+        // RecordingLogger is enabled for every level, as with Trace in nlog.config.
         var adoptLog = await RunAdopt(Options(), "-rr", "rollout-1");
         var dryLog = await RunAdopt(Options(), "--dryRun");
         var listLog = await RunList(Options(), "--json");

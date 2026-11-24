@@ -24,8 +24,8 @@ public interface IMcpToolClient
 /// <summary>
 ///     A minimal MCP Streamable HTTP client: <c>initialize</c>, <c>notifications/initialized</c>, <c>tools/call</c>,
 ///     answers as plain JSON or as an SSE stream. The bearer token goes only into the <c>Authorization</c> header; every
-///     text of an answer that reaches an exception is redacted (the token never appears in output, also not with
-///     <c>--verbose</c>).
+///     text of an answer that reaches an exception is redacted (the token never appears in output, at any log level,
+///     also Trace in <c>nlog.config</c>).
 /// </summary>
 internal sealed class McpToolClient : IMcpToolClient, IDisposable
 {
