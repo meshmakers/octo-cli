@@ -267,6 +267,8 @@ octo-cli -c SwitchServiceAccountsToImpersonation -a -y -rdf true # apply, no pro
 vault kv get -field=secret <path> | octo-cli -c AddClientCredentialsClient -id ci-deploy -n "CI Deploy" --secret-stdin -apic
 # List the sub-tenants a client has been mirrored into.
 octo-cli -c GetClientMirrors -id ci-deploy
+# List the roles assigned directly to the client (mirror) in one tenant, e.g. before and after a role grant.
+octo-cli --context <tenant-context> -c GetClientRoles -id ci-deploy
 # Backfill: provision the flagged client into every existing sub-tenant (idempotent).
 octo-cli -c ProvisionClientInExistingTenants -id ci-deploy
 # Manually provision into a single named sub-tenant.

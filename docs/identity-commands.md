@@ -1,5 +1,5 @@
 ---
-description: First-admin setup of a tenant, session revocation, sibling-tenant grants, user password and role methods, the 403 message with the missing role.
+description: First-admin setup of a tenant, session revocation, sibling-tenant grants, user password and role methods, GetClientRoles, the 403 message with the missing role.
 applies_to: **/Implementations/Identity/**, {Runner,ForbiddenResponseMessage,CkMethodErrorText,CkMethodFallback}.cs
 ---
 
@@ -192,6 +192,25 @@ reads (`Get*`, `LookupSourceTenantUser`) stay REST.
   (declared errors and results of the mapping methods), `ClientSecretCanaryTests` (real commands, SDK clients and `Runner` against a
   local identity and GraphQL listener, NLog at Trace: a client secret only in the GraphQL body, also on refusals that echo it; a
   generated secret exactly once on standard output and in no log line).
+
+## GetClientRoles lists the direct roles of a client
+
+`GetClientRoles -id <clientId>` (AB#9699) is read-only and prints the roles assigned **directly** to a client in the tenant of
+the context, as a JSON array of `RoleDto` (`Id`, `Name`), sorted by name, `[]` when there are none. Roles the client gets
+through a group are not listed. Operators use it to check a grant (e.g. `CommunicationManagement` for the CD deploy clients)
+before and after a change; `--context` selects the tenant.
+
+- **Flow**: two REST reads of the SDK, no CK method: `IIdentityServicesClient.GetRoles` (role id to name) and then
+  `GetClientDirectRoles` (`GET {tenant}/v1/clients/{id}/roles`, role ids). No new server code.
+- **Errors**: the tenant's roles are read first, so a `404` there means the tenant is unknown (the tenant middleware of the
+  service answers it without a body) and the command stops with `Tenant '<t>' was not found at '<host>'.` before it reads the
+  client. A `404` of the client's role endpoint ends with `Client '<id>' was not found in tenant '<t>'.`. Both are
+  `ToolException`s, exit code `-5`, and print nothing on standard output. A `403` keeps the `Runner` path below (exit `-3`).
+- **Role ids outside the tenant**: printed with `Name: null` and a warning, never dropped.
+- **Access**: the identity directory read policy (`UserManagement`, `TenantManagement`, `AdminPanelManagement` or
+  `CommunicationManagement`). Output and logs hold role ids and names and the client id only, never a secret.
+- Tests: `GetClientRolesCommandTests` (real `IdentityServicesClient` against a local listener and the real `Runner`: success with
+  names and order, no roles, role id outside the tenant, unknown client, unknown tenant without a client read).
 
 ## 403 names the missing role
 
