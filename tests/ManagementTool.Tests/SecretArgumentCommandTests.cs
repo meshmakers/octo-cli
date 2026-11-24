@@ -220,7 +220,10 @@ public sealed class SecretArgumentCommandTests
         A.CallTo(() => setup.AddAdminUser(A<AdminUserDto>._)).Invokes((AdminUserDto dto) => sent = dto);
         var console = new FakeSecretConsole { IsInputRedirected = true };
         console.Environment[Constants.EnvVarNewPassword] = _secret;
-        var command = new SetupCommand(new RecordingLogger<SetupCommand>(), _options, setup, new SecretInput(console));
+        var command = new SetupCommand(new RecordingLogger<SetupCommand>(), _options, setup,
+            A.Fake<ITenantSetupClientFactory>(), A.Fake<IAuthenticationService>(),
+            Options.Create(new OctoToolAuthenticationOptions()), A.Fake<IChildTenantAccess>(),
+            new SecretInput(console));
         command.CommandArgumentValue.ParseLayer(["-e", "admin@example.com"]);
 
         await command.Execute();
