@@ -222,7 +222,8 @@ public sealed class SecretArgumentCommandTests
         console.Environment[Constants.EnvVarNewPassword] = _secret;
         var systemContextOptions = Options.Create(new OctoToolOptions { TenantId = "octosystem" });
         var command = new SetupCommand(new RecordingLogger<SetupCommand>(), systemContextOptions, setup,
-            A.Fake<ITenantSetupClientFactory>(), A.Fake<IAuthenticationService>(), A.Fake<IChildTenantAccess>(),
+            A.Fake<ITenantSetupClientFactory>(), A.Fake<IAuthenticationService>(),
+            Options.Create(new OctoToolAuthenticationOptions()), A.Fake<IChildTenantAccess>(),
             new SecretInput(console));
         command.CommandArgumentValue.ParseLayer(["-e", "admin@example.com"]);
 

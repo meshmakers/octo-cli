@@ -3,6 +3,7 @@ using Meshmakers.Common.CommandLineParser;
 using Meshmakers.Common.CommandLineParser.Commands;
 using Meshmakers.Octo.Communication.Contracts.DataTransferObjects;
 using Meshmakers.Octo.Frontend.ManagementTool.Services;
+using Meshmakers.Octo.Sdk.ServiceClient.Authentication;
 using Meshmakers.Octo.Sdk.ServiceClient.IdentityServices;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -14,6 +15,7 @@ internal partial class SetupCommand : Command<OctoToolOptions>
     private static readonly string[] SystemTenantNames = ["octosystem", "system"];
 
     private readonly IAuthenticationService _authenticationService;
+    private readonly IOptions<OctoToolAuthenticationOptions> _authenticationOptions;
     private readonly IChildTenantAccess _childTenantAccess;
     private readonly IArgument _eMailArg;
     private readonly IIdentityServicesSetupClient _identityServicesSetupClient;
@@ -25,13 +27,15 @@ internal partial class SetupCommand : Command<OctoToolOptions>
 
     public SetupCommand(ILogger<SetupCommand> logger, IOptions<OctoToolOptions> options,
         IIdentityServicesSetupClient identityServicesSetupClient, ITenantSetupClientFactory tenantSetupClientFactory,
-        IAuthenticationService authenticationService, IChildTenantAccess childTenantAccess, SecretInput secretInput)
+        IAuthenticationService authenticationService, IOptions<OctoToolAuthenticationOptions> authenticationOptions,
+        IChildTenantAccess childTenantAccess, SecretInput secretInput)
         : base(logger, Constants.IdentityServicesGroup, "Setup",
             "Creates the first administrator of the system tenant or of another tenant that has no user yet", options)
     {
         _identityServicesSetupClient = identityServicesSetupClient;
         _tenantSetupClientFactory = tenantSetupClientFactory;
         _authenticationService = authenticationService;
+        _authenticationOptions = authenticationOptions;
         _childTenantAccess = childTenantAccess;
         _secretInput = secretInput;
 
@@ -70,19 +74,22 @@ internal partial class SetupCommand : Command<OctoToolOptions>
                     new CodeSampleArgument(_eMailArg, "admin@example.com"),
                     new CodeSampleArgument(_tenantIdArg, "mytenant"),
                 ],
-                    description: "First administrator of the child tenant mytenant (needs a token for mytenant, see the notes)"),
+                    description: "First administrator of the child tenant mytenant, run in a client-credentials session (see the notes)"),
             ],
             Notes:
             [
                 $"The admin password is read from a hidden prompt, from standard input (--password-stdin) or from the environment variable {Constants.EnvVarNewPassword}, so it does not end up in the shell history or the process list. -p/--password is deprecated: it still works in this release but logs a deprecation warning; the date of its removal will be announced.",
                 "Which tenant: -tid/--tenantId when given, else the tenant of the context. The system tenant (octosystem, also when it is the tenant of the context) is set up through the system route without a token, as before.",
-                "Another tenant is set up with POST {tenant}/v1/setup and a token issued for that tenant: the token of the context when the tenant is the context's own (exchanged when the context was signed in on a parent tenant), else a token obtained for the child tenant (client credentials of its creator or mirror, or the exchanged token of the signed-in user). The service accepts the call only while the tenant has no user.",
+                $"Another tenant is set up with POST {{tenant}}/v1/setup and a client-credentials token issued for that tenant: the token of the context when it was signed in with LogInClientCredentials on that tenant, else a token requested for the tenant with {Constants.EnvVarClientId} and {Constants.EnvVarClientSecret} (the client that created the tenant, or its mirror there). A signed-in user is refused: the token exchange creates a user in the tenant, and the service accepts the setup only while the tenant has no user.",
             ]
         );
 
     public override async Task Execute()
     {
         var targetTenantId = ResolveTargetTenantId();
+        var tenantSetupClient = targetTenantId == null
+            ? null
+            : await CreateAuthenticatedTenantSetupClientAsync(targetTenantId);
         var eMail = CommandArgumentValue.GetArgumentScalarValue<string>(_eMailArg);
         var password = _secretInput.Resolve(CommandArgumentValue,
             new SecretSpec("admin password", _passwordArg, _passwordStdinArg, Constants.EnvVarNewPassword, Required: true,
@@ -93,14 +100,13 @@ internal partial class SetupCommand : Command<OctoToolOptions>
             Password = password
         };
 
-        if (targetTenantId == null)
+        if (tenantSetupClient == null)
         {
             Logger.LogInformation("Adding admin to the system tenant");
             await _identityServicesSetupClient.AddAdminUser(adminUser);
             return;
         }
 
-        var tenantSetupClient = await CreateAuthenticatedTenantSetupClientAsync(targetTenantId);
         Logger.LogInformation("Adding admin to tenant '{TenantId}'", targetTenantId);
         await tenantSetupClient.AddAdminUser(adminUser);
     }
@@ -114,6 +120,11 @@ internal partial class SetupCommand : Command<OctoToolOptions>
 
         if (string.IsNullOrWhiteSpace(requestedTenantId))
         {
+            if (isTenantArgumentUsed)
+            {
+                throw new ToolException("-tid/--tenantId is empty. Name the tenant, or omit the argument.");
+            }
+
             return null;
         }
 
@@ -130,11 +141,23 @@ internal partial class SetupCommand : Command<OctoToolOptions>
 
     private async Task<IIdentityServicesSetupClient> CreateAuthenticatedTenantSetupClientAsync(string targetTenantId)
     {
+        var authentication = _authenticationOptions.Value;
+        var isUserSession = !string.IsNullOrEmpty(authentication.RefreshToken);
+        if (isUserSession)
+        {
+            throw new ToolException(
+                $"Setup of tenant '{targetTenantId}' cannot run with a signed-in user: the token exchange creates a " +
+                "user in that tenant, and the setup is accepted only while the tenant has no user. Run it in a " +
+                $"client-credentials session: set {Constants.EnvVarClientId} and {Constants.EnvVarClientSecret} to the " +
+                "client that created the tenant and run LogInClientCredentials for the parent context.");
+        }
+
         var tenantSetupClient = _tenantSetupClientFactory.Create(targetTenantId);
         var contextTenantId = Options.Value.TenantId?.Trim().ToLowerInvariant();
-        var isContextTenant = targetTenantId == contextTenantId;
+        var contextTokenTenantId = AccessTokenInspector.TryGetTenantId(authentication.AccessToken)?.ToLowerInvariant();
+        var isContextTokenIssuedForTarget = targetTenantId == contextTenantId && targetTenantId == contextTokenTenantId;
 
-        if (isContextTenant)
+        if (isContextTokenIssuedForTarget)
         {
             await _authenticationService.EnsureAuthenticated(tenantSetupClient.AccessToken);
         }
@@ -146,8 +169,9 @@ internal partial class SetupCommand : Command<OctoToolOptions>
         if (string.IsNullOrWhiteSpace(tenantSetupClient.AccessToken.AccessToken))
         {
             throw new ToolException(
-                $"Setting up tenant '{targetTenantId}' needs a token issued for that tenant. Sign in to a context of " +
-                "the tenant or its parent (LogIn, or LogInClientCredentials with the client that created the tenant).");
+                $"Setup of tenant '{targetTenantId}' needs a client-credentials token issued for that tenant. Set " +
+                $"{Constants.EnvVarClientId} and {Constants.EnvVarClientSecret} to the client that created the tenant " +
+                "and run LogInClientCredentials.");
         }
 
         return tenantSetupClient;

@@ -71,7 +71,7 @@ octo-cli -c Create -tid mytenant -db mytenant
 # Create tenant without admin provisioning
 octo-cli -c Create -tid mytenant -db mytenant --no-provision
 
-# First administrator of a tenant without users (asks for the password; default tenant: the context's)
+# First administrator of a tenant without users, in a client-credentials session of its creator (asks for the password; default tenant: the context's)
 octo-cli -c Setup -e admin@example.com -tid mytenant
 
 # Inspect a tenant's durable provisioning lifecycle (Creating/Active/Deleting/Failed)
