@@ -4,6 +4,15 @@ All notable changes to octo-cli are listed here. Newest first.
 
 ## Unreleased
 
+### Added
+
+- **AB#9699 — `GetClientRoles` lists the roles of a client in a tenant.** `octo-cli -c GetClientRoles -id <clientId>` prints
+  the roles assigned directly to the client in the tenant of the context as JSON (`Id`, `Name`; group-inherited roles are not
+  listed), read-only through the existing identity REST reads, so operators can check a grant such as `CommunicationManagement`
+  for the CD deploy clients before and after a change; standard output carries only the JSON (logs go to standard error), so
+  scripts can pipe it. An unknown client or tenant ends with a message naming it and exit
+  code -5 (a context whose tenant does not exist usually stops earlier, at sign-in, with -4). Needs no new server version.
+
 ### Changed
 
 - **AB#7970 — `Setup` creates the first administrator of a child tenant.** New `-tid/--tenantId` calls `POST {tenant}/v1/setup` with a client-credentials token issued for that tenant (the context's own when it was signed in on that tenant, else one requested with `OCTO_CLI_CLIENT_ID`/`OCTO_CLI_CLIENT_SECRET`, e.g. of the client that created the tenant). A signed-in user is refused and pointed to `Create` / `ProvisionCurrentUser` and `CreateUser`, because the token exchange would create a user in the tenant and the setup runs only while it has none. Without `-tid` (or with `-tid octosystem`) `Setup` keeps the former `system/v1/setup` call without a token, whatever the tenant of the context.

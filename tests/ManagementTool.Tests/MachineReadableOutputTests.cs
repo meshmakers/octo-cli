@@ -24,7 +24,14 @@ public sealed class MachineReadableOutputTests
         Assert.True(MachineReadableOutput.IsRequested(args));
 
     [Theory]
+    [InlineData("octo-cli", "-c", "GetClientRoles", "-id", "ci-deploy")]
+    [InlineData("octo-cli", "--context", "ctx", "-c", "getclientroles", "-id", "ci-deploy")]
+    public void GetClientRoles_IsRecognised_SoTheRoleListCanBePiped(params string[] args) =>
+        Assert.True(MachineReadableOutput.IsRequested(args));
+
+    [Theory]
     [InlineData("octo-cli", "-c", "LibraryStatus")]
+    [InlineData("octo-cli", "-c", "GetClientMirrors", "-id", "ci-deploy")]
     [InlineData("octo-cli", "-c", "GraphQlDtos")]
     [InlineData("octo-cli", "-q", "GraphQl")]
     [InlineData("octo-cli", "-c")]
