@@ -8,11 +8,12 @@ applies_to: **/Implementations/Identity/**, {Runner,ForbiddenResponseMessage,CkM
 ## First administrator: Setup
 
 `octo-cli -c Setup -e <email> [-tid <tenant>]` creates the first administrator of a tenant that has no user yet
-(`SetupCommand`). The tenant is `-tid/--tenantId` when given, else the tenant of the context.
+(`SetupCommand`). Without `-tid/--tenantId` it is always the system tenant; the tenant of the context is **not** used, so the
+documented first-install command `Setup -e …` keeps creating the system administrator from any context.
 
-- **System tenant** (no tenant, `octosystem` or `system`, also as the context's tenant): unchanged, SDK
-  `IIdentityServicesSetupClient` on `POST system/v1/setup`, no token.
-- **Any other tenant**: `POST {tenant}/v1/setup` through `ITenantSetupClientFactory` (the SDK client addresses only the
+- **System tenant** (no `-tid`, or `-tid octosystem` / `system`): unchanged, SDK `IIdentityServicesSetupClient` on
+  `POST system/v1/setup`, no token.
+- **Any other tenant, only with an explicit `-tid`**: `POST {tenant}/v1/setup` through `ITenantSetupClientFactory` (the SDK client addresses only the
   system route), with a **client-credentials** token issued for that tenant: the context's token through
   `AuthenticationService` when the context was signed in with `LogInClientCredentials` on that tenant (its `tenant_id` is the
   target), else a token from `ChildTenantAccess` (client credentials of the tenant's creator or mirror,
@@ -20,9 +21,13 @@ applies_to: **/Implementations/Identity/**, {Runner,ForbiddenResponseMessage,CkM
   command stops before the call.
 - **A signed-in user is refused** for any other tenant, before any token request: the token exchange (RFC 8693) creates a
   shadow user in the target tenant, and the service accepts the setup only while the tenant has no user, so a user session can
-  never create the first administrator (and would block the client path afterwards).
+  never create the first administrator (and would block the client path afterwards). The refusal names the operator path
+  instead: `Create` (provisions the caller) or `ProvisionCurrentUser -ttid <tenant>`, then `CreateUser` in the child tenant.
+  `Setup -tid` is for client-credentials sessions (scratch tenants, mirrored clients).
 - An empty `-tid` and a malformed tenant id (not 1-64 letters, digits, `-`, `_`) are refused before any call.
-- The service accepts the call only while the tenant has no user; the new administrator joins `TenantOwners`.
+- The service accepts the call only while the tenant has no user; the new administrator joins `TenantOwners`. Its `404` on a
+  child tenant (users already configured, or no such tenant) becomes a message that names `CreateUser` and
+  `ProvisionCurrentUser`; the system route passes the service's answer on unchanged.
 - Tests: `SetupCommandTenantTests`, `SecretArgumentCommandTests.Setup_FromTheEnvironment`.
 
 ## Revoke sessions: RevokeUserSessions / RevokeShadowUserSessions

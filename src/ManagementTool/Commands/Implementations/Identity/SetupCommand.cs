@@ -1,8 +1,10 @@
-﻿using System.Text.RegularExpressions;
+﻿using System.Net;
+using System.Text.RegularExpressions;
 using Meshmakers.Common.CommandLineParser;
 using Meshmakers.Common.CommandLineParser.Commands;
 using Meshmakers.Octo.Communication.Contracts.DataTransferObjects;
 using Meshmakers.Octo.Frontend.ManagementTool.Services;
+using Meshmakers.Octo.Sdk.ServiceClient;
 using Meshmakers.Octo.Sdk.ServiceClient.Authentication;
 using Meshmakers.Octo.Sdk.ServiceClient.IdentityServices;
 using Microsoft.Extensions.Logging;
@@ -51,7 +53,7 @@ internal partial class SetupCommand : Command<OctoToolOptions>
             ["Read the admin password from standard input (one value; a trailing line break is removed)"], false, 0);
         _tenantIdArg = CommandArgumentValue.AddArgument("tid", "tenantId",
             [
-                "Tenant whose first administrator is created (default: tenant of the context).",
+                "Tenant whose first administrator is created (default: the system tenant; the tenant of the context is not used).",
                 "The system tenant (octosystem) uses the system setup route as before."
             ],
             false, 1);
@@ -79,8 +81,9 @@ internal partial class SetupCommand : Command<OctoToolOptions>
             Notes:
             [
                 $"The admin password is read from a hidden prompt, from standard input (--password-stdin) or from the environment variable {Constants.EnvVarNewPassword}, so it does not end up in the shell history or the process list. -p/--password is deprecated: it still works in this release but logs a deprecation warning; the date of its removal will be announced.",
-                "Which tenant: -tid/--tenantId when given, else the tenant of the context. The system tenant (octosystem, also when it is the tenant of the context) is set up through the system route without a token, as before.",
-                $"Another tenant is set up with POST {{tenant}}/v1/setup and a client-credentials token issued for that tenant: the token of the context when it was signed in with LogInClientCredentials on that tenant, else a token requested for the tenant with {Constants.EnvVarClientId} and {Constants.EnvVarClientSecret} (the client that created the tenant, or its mirror there). A signed-in user is refused: the token exchange creates a user in the tenant, and the service accepts the setup only while the tenant has no user.",
+                "Which tenant: without -tid/--tenantId always the system tenant, through the system route without a token, as before, whatever the tenant of the context. Another tenant only with an explicit -tid.",
+                $"Another tenant is set up with POST {{tenant}}/v1/setup and a client-credentials token issued for that tenant: the token of the context when it was signed in with LogInClientCredentials on that tenant, else a token requested for the tenant with {Constants.EnvVarClientId} and {Constants.EnvVarClientSecret} (the client that created the tenant, or its mirror there). The service accepts the setup only while the tenant has no user.",
+                "A signed-in user is refused for another tenant: the token exchange would create a user in the tenant. An operator gets into a child tenant with Create (which provisions the caller) or ProvisionCurrentUser -ttid <tenant>, then adds local users there with CreateUser.",
             ]
         );
 
@@ -108,24 +111,31 @@ internal partial class SetupCommand : Command<OctoToolOptions>
         }
 
         Logger.LogInformation("Adding admin to tenant '{TenantId}'", targetTenantId);
-        await tenantSetupClient.AddAdminUser(adminUser);
+        try
+        {
+            await tenantSetupClient.AddAdminUser(adminUser);
+        }
+        catch (ServiceClientResultException exception) when (exception.HttpStatusCode == HttpStatusCode.NotFound)
+        {
+            throw new ToolException(
+                $"Tenant '{targetTenantId}' already has a user (for example the cross-tenant user of an operator who " +
+                "signed in there), or it does not exist, so there is no first administrator to create. An administrator " +
+                $"of the tenant adds users with CreateUser; an operator gets in with ProvisionCurrentUser -ttid {targetTenantId}.",
+                exception);
+        }
     }
 
     private string? ResolveTargetTenantId()
     {
-        var isTenantArgumentUsed = CommandArgumentValue.IsArgumentUsed(_tenantIdArg);
-        var requestedTenantId = isTenantArgumentUsed
-            ? CommandArgumentValue.GetArgumentScalarValue<string>(_tenantIdArg)
-            : Options.Value.TenantId;
+        if (!CommandArgumentValue.IsArgumentUsed(_tenantIdArg))
+        {
+            return null;
+        }
 
+        var requestedTenantId = CommandArgumentValue.GetArgumentScalarValue<string>(_tenantIdArg);
         if (string.IsNullOrWhiteSpace(requestedTenantId))
         {
-            if (isTenantArgumentUsed)
-            {
-                throw new ToolException("-tid/--tenantId is empty. Name the tenant, or omit the argument.");
-            }
-
-            return null;
+            throw new ToolException("-tid/--tenantId is empty. Name the tenant, or omit the argument for the system tenant.");
         }
 
         var normalizedTenantId = requestedTenantId.Trim().ToLowerInvariant();
@@ -147,9 +157,11 @@ internal partial class SetupCommand : Command<OctoToolOptions>
         {
             throw new ToolException(
                 $"Setup of tenant '{targetTenantId}' cannot run with a signed-in user: the token exchange creates a " +
-                "user in that tenant, and the setup is accepted only while the tenant has no user. Run it in a " +
-                $"client-credentials session: set {Constants.EnvVarClientId} and {Constants.EnvVarClientSecret} to the " +
-                "client that created the tenant and run LogInClientCredentials for the parent context.");
+                "user in that tenant, and the setup is accepted only while the tenant has no user. As an operator, use " +
+                $"Create (it provisions you) or ProvisionCurrentUser -ttid {targetTenantId}, then add users there with " +
+                "CreateUser. For an automated setup run it in a client-credentials session: set " +
+                $"{Constants.EnvVarClientId} and {Constants.EnvVarClientSecret} to the client that created the tenant " +
+                "and run LogInClientCredentials for the parent context.");
         }
 
         var tenantSetupClient = _tenantSetupClientFactory.Create(targetTenantId);

@@ -1,3 +1,4 @@
+using System.Net;
 using System.Text;
 using System.Text.Json;
 using FakeItEasy;
@@ -13,8 +14,8 @@ using Microsoft.Extensions.Options;
 namespace ManagementTool.Tests;
 
 /// <summary>
-///     Setup creates the first administrator of the system tenant or of another tenant: the tenant comes from
-///     -tid, else from the context; the system tenant keeps its former call without a token, another tenant needs a
+///     Setup creates the first administrator of the system tenant or, with an explicit -tid, of another tenant. The
+///     context tenant is ignored; the system tenant keeps its former call without a token, another tenant needs a
 ///     client-credentials token issued for it.
 /// </summary>
 public sealed class SetupCommandTenantTests
@@ -40,14 +41,18 @@ public sealed class SetupCommandTenantTests
     }
 
     [Theory]
-    [InlineData(null)]
-    [InlineData("")]
-    [InlineData("octosystem")]
-    [InlineData("OctoSystem")]
-    [InlineData("system")]
-    public async Task WithoutTenantArgument_OnTheSystemTenant_KeepsTheSystemCallWithoutAToken(string? contextTenantId)
+    [InlineData(null, false)]
+    [InlineData("", false)]
+    [InlineData("octosystem", false)]
+    [InlineData("OctoSystem", true)]
+    [InlineData("system", false)]
+    [InlineData("acme", false)]
+    [InlineData("acme", true)]
+    public async Task WithoutTenantArgument_AlwaysKeepsTheSystemCallWithoutAToken_WhateverTheContextTenant(
+        string? contextTenantId, bool isClientCredentialsSession)
     {
-        var command = NewCommand(contextTenantId, UserSession());
+        var authentication = isClientCredentialsSession ? ClientSession(ClientTokenOfAcme) : UserSession();
+        var command = NewCommand(contextTenantId, authentication);
         command.CommandArgumentValue.ParseLayer(["-e", AdminEMail]);
 
         await command.Execute();
@@ -80,7 +85,7 @@ public sealed class SetupCommandTenantTests
         A.CallTo(() => _authenticationService.EnsureAuthenticated(_tenantClientToken))
             .Invokes(() => _tenantClientToken.AccessToken = ClientTokenOfAcme);
         var command = NewCommand("acme", ClientSession(ClientTokenOfAcme));
-        command.CommandArgumentValue.ParseLayer(["-e", AdminEMail]);
+        command.CommandArgumentValue.ParseLayer(["-e", AdminEMail, "-tid", "acme"]);
 
         await command.Execute();
 
@@ -123,20 +128,19 @@ public sealed class SetupCommandTenantTests
     }
 
     [Theory]
-    [InlineData("acme", null)]
+    [InlineData("acme", "acme")]
     [InlineData("octosystem", "child1")]
-    public async Task SignedInUser_IsRefusedForAnotherTenant_BeforeAnyTokenRequest(string contextTenantId,
-        string? tenantArgument)
+    public async Task SignedInUser_IsRefusedForAnotherTenant_AndToldTheOperatorPath(string contextTenantId,
+        string tenantArgument)
     {
         var command = NewCommand(contextTenantId, UserSession());
-        string[] arguments = tenantArgument == null
-            ? ["-e", AdminEMail]
-            : ["-e", AdminEMail, "-tid", tenantArgument];
-        command.CommandArgumentValue.ParseLayer(arguments);
+        command.CommandArgumentValue.ParseLayer(["-e", AdminEMail, "-tid", tenantArgument]);
 
         var exception = await Assert.ThrowsAsync<ToolException>(command.Execute);
 
         Assert.Contains(Constants.EnvVarClientId, exception.Message);
+        Assert.Contains("ProvisionCurrentUser -ttid " + tenantArgument, exception.Message);
+        Assert.Contains("CreateUser", exception.Message);
         A.CallTo(() => _authenticationService.EnsureAuthenticated(A<IServiceClientAccessToken>._)).MustNotHaveHappened();
         A.CallTo(() => _childTenantAccess.GetAccessTokenAsync(A<string>._)).MustNotHaveHappened();
         A.CallTo(() => _tenantSetupClient.AddAdminUser(A<AdminUserDto>._)).MustNotHaveHappened();
@@ -148,7 +152,7 @@ public sealed class SetupCommandTenantTests
     {
         var console = new FakeSecretConsole();
         var command = NewCommand("acme", ClientSession(ClientTokenOfAcme), console);
-        command.CommandArgumentValue.ParseLayer(["-e", AdminEMail]);
+        command.CommandArgumentValue.ParseLayer(["-e", AdminEMail, "-tid", "acme"]);
 
         var exception = await Assert.ThrowsAsync<ToolException>(command.Execute);
 
@@ -156,6 +160,36 @@ public sealed class SetupCommandTenantTests
         Assert.Empty(console.Prompts);
         A.CallTo(() => _tenantSetupClient.AddAdminUser(A<AdminUserDto>._)).MustNotHaveHappened();
         A.CallTo(() => _systemSetupClient.AddAdminUser(A<AdminUserDto>._)).MustNotHaveHappened();
+    }
+
+    [Fact]
+    public async Task ChildTenantThatAlreadyHasAUser_IsReportedWithTheOperatorPath()
+    {
+        A.CallTo(() => _childTenantAccess.GetAccessTokenAsync("child1")).Returns("token-of-child1");
+        A.CallTo(() => _tenantSetupClient.AddAdminUser(A<AdminUserDto>._))
+            .Throws(new ServiceClientResultException("Users are already configured.", HttpStatusCode.NotFound));
+        var command = NewCommand("octosystem", ClientSession(ClientTokenOfParent));
+        command.CommandArgumentValue.ParseLayer(["-e", AdminEMail, "-tid", "child1"]);
+
+        var exception = await Assert.ThrowsAsync<ToolException>(command.Execute);
+
+        Assert.Contains("child1", exception.Message);
+        Assert.Contains("already has a user", exception.Message);
+        Assert.Contains("CreateUser", exception.Message);
+        Assert.DoesNotContain(_password, exception.Message);
+    }
+
+    [Fact]
+    public async Task SystemTenantRefusal_IsPassedOnUnchanged()
+    {
+        var systemRefusal = new ServiceClientResultException("Users are already configured.", HttpStatusCode.NotFound);
+        A.CallTo(() => _systemSetupClient.AddAdminUser(A<AdminUserDto>._)).Throws(systemRefusal);
+        var command = NewCommand(null, UserSession());
+        command.CommandArgumentValue.ParseLayer(["-e", AdminEMail]);
+
+        var exception = await Assert.ThrowsAsync<ServiceClientResultException>(command.Execute);
+
+        Assert.Same(systemRefusal, exception);
     }
 
     [Fact]
