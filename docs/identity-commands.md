@@ -1,9 +1,24 @@
 ---
-description: Session revocation, sibling-tenant grants, user password and role methods, the 403 message with the missing role.
+description: First-admin setup of a tenant, session revocation, sibling-tenant grants, user password and role methods, the 403 message with the missing role.
 applies_to: **/Implementations/Identity/**, {Runner,ForbiddenResponseMessage,CkMethodErrorText,CkMethodFallback}.cs
 ---
 
 # Identity commands
+
+## First administrator: Setup
+
+`octo-cli -c Setup -e <email> [-tid <tenant>]` creates the first administrator of a tenant that has no user yet
+(`SetupCommand`). The tenant is `-tid/--tenantId` when given, else the tenant of the context.
+
+- **System tenant** (no tenant, `octosystem` or `system`, also as the context's tenant): unchanged, SDK
+  `IIdentityServicesSetupClient` on `POST system/v1/setup`, no token.
+- **Any other tenant**: `POST {tenant}/v1/setup` through `ITenantSetupClientFactory` (the SDK client addresses only the
+  system route), with a bearer token issued for that tenant. The tenant of the context gets the context's token through
+  `AuthenticationService` (exchanged when the context was signed in on a parent); another tenant gets one from
+  `ChildTenantAccess` (client credentials of its creator or mirror, or the exchanged token of the signed-in user). Without a
+  token the command stops before the call. A malformed tenant id (not 1-64 letters, digits, `-`, `_`) is refused before any call.
+- The service accepts the call only while the tenant has no user; the new administrator joins `TenantOwners`.
+- Tests: `SetupCommandTenantTests`, `SecretArgumentCommandTests.Setup_FromTheEnvironment`.
 
 ## Revoke sessions: RevokeUserSessions / RevokeShadowUserSessions
 
