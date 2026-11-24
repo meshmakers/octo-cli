@@ -475,6 +475,8 @@ internal static class Program
         services.AddTransient<ICommand, DisableAiCommand>();
         services.AddTransient<ICommand, RedeemAiTicketCommand>();
         services.AddTransient<ICommand, GetAiCredentialsStatusCommand>();
+        services.AddTransient<ICommand, SetAiSpendCapCommand>();
+        services.AddTransient<ICommand, GetAiSpendCommand>();
         services.AddTransient<ICommand, RevokeAiCredentialsCommand>();
 
         // Communication - Adapters

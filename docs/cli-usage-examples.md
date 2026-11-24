@@ -328,3 +328,18 @@ octo-cli -c GetAiCredentialsStatus
 octo-cli -c RevokeAiCredentials      # destructive — prompts for confirmation
 octo-cli -c RevokeAiCredentials -y   # skip confirmation
 ```
+
+### LLM spend cap of the central-key gateway (AB#8690)
+
+```bash
+# Cap and spend (current and previous UTC month) of the context's own tenant - read-only for every user with read access.
+octo-cli -c GetAiSpend
+
+# As platform admin: context logged in to the system tenant with the role AiBudgetAdmin.
+octo-cli -c SetAiSpendCap -t ai-sandbox -c 20 -r "pilot budget"     # audited: old, new, who, why
+octo-cli -c GetAiSpend -t ai-sandbox                                # another tenant's cap and spend
+octo-cli -c SetAiSpendCap -t ai-sandbox -c 0 -r "stop central-key calls"
+```
+
+The cap lives in the AI service's system database, not in the tenant; the gateway uses a change within 60 seconds. A
+tenant without a cap reads as key source `None` (its central-key calls are refused).
