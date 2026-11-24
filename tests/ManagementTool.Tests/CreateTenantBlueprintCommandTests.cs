@@ -1,6 +1,7 @@
 using System.Net;
 using System.Text;
 using FakeItEasy;
+using GraphQL;
 using Meshmakers.Common.CommandLineParser;
 using Meshmakers.Common.CommandLineParser.Commands;
 using Meshmakers.Common.Shared.Services;
@@ -9,7 +10,8 @@ using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Asset.Ten
 using Meshmakers.Octo.Frontend.ManagementTool.Services;
 using Meshmakers.Octo.Sdk.ServiceClient;
 using Meshmakers.Octo.Sdk.ServiceClient.AssetRepositoryServices.System;
-using Meshmakers.Octo.Sdk.ServiceClient.IdentityServices;
+using Meshmakers.Octo.Sdk.ServiceClient.AssetRepositoryServices.Tenants;
+using Meshmakers.Octo.Sdk.ServiceClient.AssetRepositoryServices.Tenants.Methods;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
@@ -89,28 +91,44 @@ public sealed class CreateTenantBlueprintCommandTests : IDisposable
         }
     }
 
-    private static (CreateTenant Command, IAssetServicesClient Asset, IIdentityServicesClient Identity) NewCreate()
+    /// <summary>
+    ///     The command over a tenant client whose method calls succeed; <c>Requests</c> records the method mutations
+    ///     (the admin provisioning runs <c>ExternalTenantUserMapping.ProvisionCurrentUser</c>, AB#9044).
+    /// </summary>
+    private static (CreateTenant Command, IAssetServicesClient Asset, ITenantClient Tenant, List<GraphQLRequest> Requests)
+        NewCreate()
     {
         var asset = A.Fake<IAssetServicesClient>();
-        var identity = A.Fake<IIdentityServicesClient>();
+        var requests = new List<GraphQLRequest>();
+        var tenant = MethodFakes.IdentityTenant(requests);
         A.CallTo(() => asset.AccessToken).Returns(A.Fake<IServiceClientAccessToken>());
         var command = new CreateTenant(NullLogger<CreateTenant>.Instance,
-            Options.Create(new OctoToolOptions { TenantId = "parent1" }), asset, identity,
+            Options.Create(new OctoToolOptions { TenantId = "parent1" }), asset, tenant,
             A.Fake<IAuthenticationService>());
-        return (command, asset, identity);
+        return (command, asset, tenant, requests);
+    }
+
+    /// <summary>Asserts exactly one ProvisionCurrentUser method call, for <paramref name="tenantId" />.</summary>
+    private static void AssertProvisioned(List<GraphQLRequest> requests, string tenantId)
+    {
+        var call = Assert.Single(requests);
+        Assert.Contains("provisionCurrentUser(", call.Query, StringComparison.Ordinal);
+        Assert.Contains("\"" + tenantId + "\"", MethodFakes.VariablesOf(call), StringComparison.Ordinal);
     }
 
     [Fact]
     public async Task Create_WithBlueprint_SendsTheBlueprint_AndProvisionsTheUserAfterwards()
     {
-        var (command, asset, identity) = NewCreate();
+        var (command, asset, tenant, requests) = NewCreate();
         command.CommandArgumentValue.ParseLayer(["-tid", "Starter1", "--blueprint", "Octo.Starter-1.2.0"]);
 
         await command.Execute();
 
         A.CallTo(() => asset.CreateTenantAsync("starter1", null, false, "Octo.Starter-1.2.0"))
             .MustHaveHappenedOnceExactly()
-            .Then(A.CallTo(() => identity.ProvisionCurrentUser("starter1")).MustHaveHappenedOnceExactly());
+            .Then(A.CallTo(tenant).Where(c => c.Method.Name == nameof(ITenantClient.SendMutationAsync))
+                .MustHaveHappenedOnceExactly());
+        AssertProvisioned(requests, "starter1");
         A.CallTo(() => asset.CreateTenantAsync(A<string>._, A<string?>._)).MustNotHaveHappened();
         A.CallTo(() => asset.CreateTenantAsync(A<string>._, A<string?>._, A<bool>._)).MustNotHaveHappened();
     }
@@ -118,20 +136,20 @@ public sealed class CreateTenantBlueprintCommandTests : IDisposable
     [Fact]
     public async Task Create_WithBlueprintScratchAndDatabase_CombinesThem_AndProvisionsNoUser()
     {
-        var (command, asset, identity) = NewCreate();
+        var (command, asset, _, requests) = NewCreate();
         command.CommandArgumentValue.ParseLayer(["-tid", "Scratch1", "-db", "Scratch1_Db", "-sc", "-b", "Octo.Starter-1.2.0"]);
 
         await command.Execute();
 
         A.CallTo(() => asset.CreateTenantAsync("scratch1", "scratch1_db", true, "Octo.Starter-1.2.0"))
             .MustHaveHappenedOnceExactly();
-        A.CallTo(() => identity.ProvisionCurrentUser(A<string>._)).MustNotHaveHappened();
+        Assert.Empty(requests);
     }
 
     [Fact]
     public async Task Create_WithoutBlueprint_DoesNotUseTheBlueprintOverload()
     {
-        var (command, asset, _) = NewCreate();
+        var (command, asset, _, _) = NewCreate();
         command.CommandArgumentValue.ParseLayer(["-tid", "plain1", "-db", "plain1_db"]);
 
         await command.Execute();
@@ -144,14 +162,14 @@ public sealed class CreateTenantBlueprintCommandTests : IDisposable
     [Fact]
     public async Task Create_WithFailingBlueprint_ProvisionsNoUser()
     {
-        var (command, asset, identity) = NewCreate();
+        var (command, asset, _, requests) = NewCreate();
         A.CallTo(() => asset.CreateTenantAsync("t1", null, false, "Unknown-9.9.9"))
             .ThrowsAsync(new ServiceClientResultException(FailureMessage, HttpStatusCode.BadRequest, null));
         command.CommandArgumentValue.ParseLayer(["-tid", "t1", "-b", "Unknown-9.9.9"]);
 
         await Assert.ThrowsAsync<ServiceClientResultException>(command.Execute);
 
-        A.CallTo(() => identity.ProvisionCurrentUser(A<string>._)).MustNotHaveHappened();
+        Assert.Empty(requests);
     }
 
     [Fact]
@@ -164,9 +182,10 @@ public sealed class CreateTenantBlueprintCommandTests : IDisposable
         var asset = new AssetServicesClient(
             new AssetServiceClientOptions { EndpointUri = _baseUri, TenantId = "parent1" },
             A.Fake<IAssetServiceClientAccessToken>());
-        var identity = A.Fake<IIdentityServicesClient>();
+        var methodRequests = new List<GraphQLRequest>();
+        var tenant = MethodFakes.IdentityTenant(methodRequests);
         var command = new CreateTenant(NullLogger<CreateTenant>.Instance,
-            Options.Create(new OctoToolOptions { TenantId = "parent1" }), asset, identity,
+            Options.Create(new OctoToolOptions { TenantId = "parent1" }), asset, tenant,
             A.Fake<IAuthenticationService>());
         command.CommandArgumentValue.ParseLayer(["-tid", "t1", "-b", "Unknown-9.9.9"]);
 
@@ -184,14 +203,55 @@ public sealed class CreateTenantBlueprintCommandTests : IDisposable
         Assert.Contains(FailureMessage, error.Message);
         Assert.Single(_requests);
         Assert.Contains("blueprintId=Unknown-9.9.9", _requests[0]);
-        A.CallTo(identity).Where(call => call.Method.Name == nameof(IIdentityServicesClient.ProvisionCurrentUser))
-            .MustNotHaveHappened();
+        Assert.Empty(methodRequests);
+    }
+
+    [Fact]
+    public async Task Create_ProvisioningMethodUnavailable_SaysTheTenantExists_AndNamesTheRemedy()
+    {
+        var asset = A.Fake<IAssetServicesClient>();
+        var requests = new List<GraphQLRequest>();
+        var tenant = MethodFakes.IdentityTenant(requests);
+        MethodFakes.AnswerMethodCalls(tenant, requests, "METHOD_HANDLER_NOT_AVAILABLE");
+        var logger = new RecordingLogger<CreateTenant>();
+        var command = new CreateTenant(logger, Options.Create(new OctoToolOptions { TenantId = "parent1" }), asset,
+            tenant, A.Fake<IAuthenticationService>());
+        command.CommandArgumentValue.ParseLayer(["-tid", "t1"]);
+
+        var ex = await Assert.ThrowsAsync<ServiceClientException>(command.Execute);
+
+        A.CallTo(() => asset.CreateTenantAsync("t1", null)).MustHaveHappenedOnceExactly();
+        Assert.Contains("does not offer the CK method", ex.Message);
+        var error = Assert.Single(logger.Entries, e => e.Level == LogLevel.Error);
+        Assert.Contains("Tenant 't1' was created", error.Message);
+        Assert.Contains("ProvisionCurrentUser -ttid t1", error.Message);
+    }
+
+    [Fact]
+    public async Task Create_ProvisioningRefused_KeepsTheMethodError_AndSaysTheTenantExists()
+    {
+        var asset = A.Fake<IAssetServicesClient>();
+        var requests = new List<GraphQLRequest>();
+        var tenant = MethodFakes.IdentityTenant(requests);
+        MethodFakes.AnswerMethodCalls(tenant, requests, "METHOD_FORBIDDEN");
+        var logger = new RecordingLogger<CreateTenant>();
+        var command = new CreateTenant(logger, Options.Create(new OctoToolOptions { TenantId = "parent1" }), asset,
+            tenant, A.Fake<IAuthenticationService>());
+        command.CommandArgumentValue.ParseLayer(["-tid", "t2"]);
+
+        // The refusal keeps its own exception (and so the runner's exit code -3).
+        var ex = await Assert.ThrowsAnyAsync<Exception>(command.Execute);
+
+        Assert.True(ex is CkMethodCallException or ServiceClientException, ex.GetType().Name);
+        A.CallTo(() => asset.CreateTenantAsync("t2", null)).MustHaveHappenedOnceExactly();
+        var error = Assert.Single(logger.Entries, e => e.Level == LogLevel.Error);
+        Assert.Contains("Tenant 't2' was created", error.Message);
     }
 
     [Fact]
     public void Create_Help_NamesTheTransactionalBehaviour()
     {
-        var (command, _, _) = NewCreate();
+        var (command, _, _, _) = NewCreate();
 
         var notes = command.GetDocumentation()?.Notes;
 

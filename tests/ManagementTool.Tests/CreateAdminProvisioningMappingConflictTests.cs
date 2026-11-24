@@ -60,7 +60,8 @@ public sealed class CreateAdminProvisioningMappingConflictTests
         var variables = MethodFakes.VariablesOf(request);
         Assert.Contains("\"targetTenantId\":\"customer-project\"", variables);
         Assert.Contains("\"sourceUserId\":\"u-1\"", variables);
-        A.CallTo(() => _identity.CreateAdminProvisioningMapping(A<string>._, A<Meshmakers.Octo.Communication.Contracts.DataTransferObjects.CreateExternalTenantUserMappingDto>._))
+        // No REST write (the REST CreateAdminProvisioningMapping is obsolete, AB#9044): only reads on the identity client.
+        A.CallTo(_identity).Where(c => !c.Method.IsSpecialName && !c.Method.Name.StartsWith("Get", StringComparison.Ordinal))
             .MustNotHaveHappened();
     }
 

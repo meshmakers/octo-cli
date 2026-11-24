@@ -1,7 +1,11 @@
+using GraphQlDtos.DataTransferObjects.System.Identity.v3;
 using Meshmakers.Common.CommandLineParser;
+using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Identity;
 using Meshmakers.Octo.Frontend.ManagementTool.Services;
+using Meshmakers.Octo.Sdk.ServiceClient;
 using Meshmakers.Octo.Sdk.ServiceClient.AssetRepositoryServices.System;
-using Meshmakers.Octo.Sdk.ServiceClient.IdentityServices;
+using Meshmakers.Octo.Sdk.ServiceClient.AssetRepositoryServices.Tenants;
+using Meshmakers.Octo.Sdk.ServiceClient.AssetRepositoryServices.Tenants.Methods;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
@@ -9,7 +13,7 @@ namespace Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Asset
 
 internal class CreateTenant : ServiceClientOctoCommand<IAssetServicesClient>
 {
-    private readonly IIdentityServicesClient _identityServicesClient;
+    private readonly IdentityMethodCall _methods;
     private readonly IArgument _databaseArg;
     private readonly IArgument _tenantIdArg;
     private readonly IArgument _noProvisionArg;
@@ -17,13 +21,15 @@ internal class CreateTenant : ServiceClientOctoCommand<IAssetServicesClient>
     private readonly IArgument _blueprintArg;
 
     public CreateTenant(ILogger<CreateTenant> logger, IOptions<OctoToolOptions> options,
-        IAssetServicesClient assetServicesClient, IIdentityServicesClient identityServicesClient,
+        IAssetServicesClient assetServicesClient, ITenantClient tenantClient,
         IAuthenticationService authenticationService)
         : base(logger, Constants.AssetRepositoryServicesGroup, "Create",
             "Creates a new tenant and provisions the current user as admin.", options,
             assetServicesClient, authenticationService)
     {
-        _identityServicesClient = identityServicesClient;
+        // The provisioning runs the System.Identity method ExternalTenantUserMapping.ProvisionCurrentUser in the current
+        // (parent) tenant, like the ProvisionCurrentUser command; the REST method of the SDK is obsolete (AB#9044).
+        _methods = new IdentityMethodCall(tenantClient, authenticationService, logger);
 
         _tenantIdArg = CommandArgumentValue.AddArgument("tid", "tenantId", ["Id of tenant"],
             true, 1);
@@ -133,14 +139,28 @@ internal class CreateTenant : ServiceClientOctoCommand<IAssetServicesClient>
 
         if (!skipProvisioning)
         {
-            // Copy the access token from the asset services client to the identity services client
-            _identityServicesClient.AccessToken.AccessToken = ServiceClient.AccessToken.AccessToken;
-
             Logger.LogInformation(
-                "Provisioning current user as admin in tenant '{TenantId}' via identity service at '{IdentityServiceUri}'",
-                tenantId, _identityServicesClient.ServiceUri);
+                "Provisioning current user as admin in tenant '{TenantId}' via the method gateway at '{TenantServiceUri}'",
+                tenantId, _methods.TenantClient.ServiceUri);
 
-            var mapping = await _identityServicesClient.ProvisionCurrentUser(tenantId);
+            RtAdminProvisioningResultRecordDto? record;
+            try
+            {
+                record = await _methods.RunAsync(RtExternalTenantUserMappingMethodClient.ProvisionCurrentUserMethodId,
+                    () => new RtExternalTenantUserMappingMethodClient(_methods.TenantClient).ProvisionCurrentUserAsync(
+                        tenantId));
+            }
+            catch (Exception e) when (e is ServiceClientException or CkMethodCallException)
+            {
+                // The tenant exists at this point; the error of the method call alone would read as if nothing changed.
+                // Exception and exit code stay those of the method call.
+                Logger.LogError(
+                    "Tenant '{TenantId}' was created, but provisioning the current user as its admin failed. Fix the " +
+                    "cause below, then run 'ProvisionCurrentUser -ttid {TenantId}'", tenantId, tenantId);
+                throw;
+            }
+
+            var mapping = IdentityMethodCall.ToMappingDto(record);
 
             Implementations.Identity.AdminProvisioning.ProvisionCurrentUser.LogProvisioned(Logger, tenantId, mapping);
         }

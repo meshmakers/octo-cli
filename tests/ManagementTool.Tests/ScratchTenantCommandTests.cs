@@ -1,4 +1,5 @@
 using FakeItEasy;
+using GraphQL;
 using Meshmakers.Common.Shared.Services;
 using Meshmakers.Octo.Communication.Contracts;
 using Meshmakers.Octo.Communication.Contracts.DataTransferObjects;
@@ -7,6 +8,7 @@ using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Asset.Ten
 using Meshmakers.Octo.Frontend.ManagementTool.Services;
 using Meshmakers.Octo.Sdk.ServiceClient;
 using Meshmakers.Octo.Sdk.ServiceClient.AssetRepositoryServices.System;
+using Meshmakers.Octo.Sdk.ServiceClient.AssetRepositoryServices.Tenants;
 using Meshmakers.Octo.Sdk.ServiceClient.Authentication;
 using Meshmakers.Octo.Sdk.ServiceClient.BotServices;
 using Meshmakers.Octo.Sdk.ServiceClient.IdentityServices;
@@ -30,21 +32,35 @@ public sealed class ScratchTenantCommandTests : IDisposable
 
     // ---- Create --scratch -------------------------------------------------
 
-    private static (CreateTenant Command, IAssetServicesClient Asset, IIdentityServicesClient Identity) NewCreate()
+    /// <summary>
+    ///     The command over a tenant client whose method calls succeed; <c>Requests</c> records the method mutations
+    ///     (the admin provisioning runs <c>ExternalTenantUserMapping.ProvisionCurrentUser</c>, AB#9044).
+    /// </summary>
+    private static (CreateTenant Command, IAssetServicesClient Asset, ITenantClient Tenant, List<GraphQLRequest> Requests)
+        NewCreate()
     {
         var asset = A.Fake<IAssetServicesClient>();
-        var identity = A.Fake<IIdentityServicesClient>();
+        var requests = new List<GraphQLRequest>();
+        var tenant = MethodFakes.IdentityTenant(requests);
         A.CallTo(() => asset.AccessToken).Returns(A.Fake<IServiceClientAccessToken>());
         var command = new CreateTenant(NullLogger<CreateTenant>.Instance,
-            Options.Create(new OctoToolOptions { TenantId = "parent1" }), asset, identity,
+            Options.Create(new OctoToolOptions { TenantId = "parent1" }), asset, tenant,
             A.Fake<IAuthenticationService>());
-        return (command, asset, identity);
+        return (command, asset, tenant, requests);
+    }
+
+    /// <summary>Asserts exactly one ProvisionCurrentUser method call, for <paramref name="tenantId" />.</summary>
+    private static void AssertProvisioned(List<GraphQLRequest> requests, string tenantId)
+    {
+        var call = Assert.Single(requests);
+        Assert.Contains("provisionCurrentUser(", call.Query, StringComparison.Ordinal);
+        Assert.Contains("\"" + tenantId + "\"", MethodFakes.VariablesOf(call), StringComparison.Ordinal);
     }
 
     [Fact]
     public async Task Create_Scratch_CreatesAScratchTenant_AndProvisionsNoUser()
     {
-        var (command, asset, identity) = NewCreate();
+        var (command, asset, _, requests) = NewCreate();
         command.CommandArgumentValue.ParseLayer(["-tid", "Scratch1", "-db", "Scratch1_Db", "-sc"]);
 
         await command.Execute();
@@ -52,27 +68,27 @@ public sealed class ScratchTenantCommandTests : IDisposable
         A.CallTo(() => asset.CreateTenantAsync("scratch1", "scratch1_db", true)).MustHaveHappenedOnceExactly();
         A.CallTo(() => asset.CreateTenantAsync("scratch1", "scratch1_db")).MustNotHaveHappened();
         // A service token has no user to provision; the creator's mirror is the administrator.
-        A.CallTo(() => identity.ProvisionCurrentUser(A<string>._)).MustNotHaveHappened();
+        Assert.Empty(requests);
     }
 
     [Fact]
     public async Task Create_WithoutScratch_IsUnchanged_CreatesThePlainTenant_AndProvisionsTheUser()
     {
-        var (command, asset, identity) = NewCreate();
+        var (command, asset, _, requests) = NewCreate();
         command.CommandArgumentValue.ParseLayer(["-tid", "plain1", "-db", "plain1_db"]);
 
         await command.Execute();
 
         A.CallTo(() => asset.CreateTenantAsync("plain1", "plain1_db")).MustHaveHappenedOnceExactly();
         A.CallTo(() => asset.CreateTenantAsync(A<string>._, A<string>._, A<bool>._)).MustNotHaveHappened();
-        A.CallTo(() => identity.ProvisionCurrentUser("plain1")).MustHaveHappenedOnceExactly();
+        AssertProvisioned(requests, "plain1");
     }
 
     [Fact]
     public async Task Create_WithoutDatabase_LetsTheServiceDeriveTheName()
     {
         // AB#8797: no -db = no databaseName; the service names the database (tenant id, instance prefix).
-        var (command, asset, _) = NewCreate();
+        var (command, asset, _, _) = NewCreate();
         command.CommandArgumentValue.ParseLayer(["-tid", "MeshTest"]);
 
         await command.Execute();
