@@ -11,6 +11,7 @@ using Meshmakers.Octo.Frontend.ManagementTool.Services;
 using Meshmakers.Octo.Sdk.ServiceClient;
 using Meshmakers.Octo.Sdk.ServiceClient.AssetRepositoryServices.System;
 using Meshmakers.Octo.Sdk.ServiceClient.AssetRepositoryServices.Tenants;
+using Meshmakers.Octo.Sdk.ServiceClient.AssetRepositoryServices.Tenants.Methods;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
@@ -203,6 +204,48 @@ public sealed class CreateTenantBlueprintCommandTests : IDisposable
         Assert.Single(_requests);
         Assert.Contains("blueprintId=Unknown-9.9.9", _requests[0]);
         Assert.Empty(methodRequests);
+    }
+
+    [Fact]
+    public async Task Create_ProvisioningMethodUnavailable_SaysTheTenantExists_AndNamesTheRemedy()
+    {
+        var asset = A.Fake<IAssetServicesClient>();
+        var requests = new List<GraphQLRequest>();
+        var tenant = MethodFakes.IdentityTenant(requests);
+        MethodFakes.AnswerMethodCalls(tenant, requests, "METHOD_HANDLER_NOT_AVAILABLE");
+        var logger = new RecordingLogger<CreateTenant>();
+        var command = new CreateTenant(logger, Options.Create(new OctoToolOptions { TenantId = "parent1" }), asset,
+            tenant, A.Fake<IAuthenticationService>());
+        command.CommandArgumentValue.ParseLayer(["-tid", "t1"]);
+
+        var ex = await Assert.ThrowsAsync<ServiceClientException>(command.Execute);
+
+        A.CallTo(() => asset.CreateTenantAsync("t1", null)).MustHaveHappenedOnceExactly();
+        Assert.Contains("does not offer the CK method", ex.Message);
+        var error = Assert.Single(logger.Entries, e => e.Level == LogLevel.Error);
+        Assert.Contains("Tenant 't1' was created", error.Message);
+        Assert.Contains("ProvisionCurrentUser -ttid t1", error.Message);
+    }
+
+    [Fact]
+    public async Task Create_ProvisioningRefused_KeepsTheMethodError_AndSaysTheTenantExists()
+    {
+        var asset = A.Fake<IAssetServicesClient>();
+        var requests = new List<GraphQLRequest>();
+        var tenant = MethodFakes.IdentityTenant(requests);
+        MethodFakes.AnswerMethodCalls(tenant, requests, "METHOD_FORBIDDEN");
+        var logger = new RecordingLogger<CreateTenant>();
+        var command = new CreateTenant(logger, Options.Create(new OctoToolOptions { TenantId = "parent1" }), asset,
+            tenant, A.Fake<IAuthenticationService>());
+        command.CommandArgumentValue.ParseLayer(["-tid", "t2"]);
+
+        // The refusal keeps its own exception (and so the runner's exit code -3).
+        var ex = await Assert.ThrowsAnyAsync<Exception>(command.Execute);
+
+        Assert.True(ex is CkMethodCallException or ServiceClientException, ex.GetType().Name);
+        A.CallTo(() => asset.CreateTenantAsync("t2", null)).MustHaveHappenedOnceExactly();
+        var error = Assert.Single(logger.Entries, e => e.Level == LogLevel.Error);
+        Assert.Contains("Tenant 't2' was created", error.Message);
     }
 
     [Fact]
