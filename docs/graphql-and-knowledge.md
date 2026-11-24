@@ -80,6 +80,34 @@ callers are always AI clients, so octo-mcp-service `knowledge_set_status` refuse
   client-credentials refusal, concurrent-write conflict, errors, and every sent request validated against the asset
   repository schema, see below).
 
+## ListKnowledgePlatformUpdates / AdoptKnowledgePlatformUpdates: adopt Blueprint page versions now
+
+`octo-cli -c ListKnowledgePlatformUpdates [-tid <tenant>] [-msu <uri>] [--json]` and
+`octo-cli -c AdoptKnowledgePlatformUpdates [-tid <tenant>] [--dryRun] [--runRef <id>] [-msu <uri>] [--json]`
+(`Asset/Knowledge/*KnowledgePlatformUpdatesCommand.cs`, shared part `KnowledgePlatformUpdatesMcp.cs`).
+
+- **Why.** A blueprint update brings new Blueprint versions of knowledge pages but never refreshes an existing page. The AI
+  service adopts unedited pages of every AI tenant by itself every 15 minutes; these commands are for adopting
+  immediately (e.g. right after a blueprint update during a rollout), also on clusters where agents have no MCP client.
+- **Same rules by construction.** The commands do not reimplement the rule: they call the MCP tools
+  `knowledge_list_platform_updates` and `knowledge_adopt_platform_updates` of the MCP service. Only a page whose current
+  version is a Blueprint version (never edited in the tenant) is switched; edited pages are listed as `Available` and keep
+  their content. `--dryRun` calls only the list tool and writes nothing.
+- **Endpoint and token.** `Services/McpToolClient.cs` is a minimal MCP Streamable HTTP client (`initialize`,
+  `notifications/initialized`, `tools/call`; plain JSON or SSE answers) on `<MCP service URI>/<tenant>/mcp`; a trailing
+  tenantless `/mcp` of the URI is cut. The URI comes from `-msu` or the context field `McpServiceUrl`
+  (`AddContext -msu`, `Config -msu`); without one the command stops before anything is sent. The token is the context's
+  own, or the one exchanged from it for another tenant (`ITenantTokenProvider`, as for every command; no fallback to a token
+  of another tenant). It goes only into the `Authorization` header and is never logged or printed, also not with
+  `--verbose`; error texts of the MCP service are redacted before they reach an exception.
+- **Run reference.** `--runRef` (1-200 characters) is stored on every switched page as `AdoptedByRun`; default
+  `octo-cli:<UTC time>`. The AI service's own pass stores `ai-service/knowledge-platform-updates/<UTC time>`.
+- **Errors.** A refused tool answer (`isSuccess: false`) stops with the tool's error code and message; HTTP 401/403 names
+  `LogIn` and the MCP service URI of the context.
+- Tests: `KnowledgePlatformUpdatesCommandTests` (tool, endpoint, token, dry run, default run reference, no URI, refusal,
+  token never in logs or output at any level) and `McpToolClientTests` (session, SSE, HTTP 401, tool error result, both
+  without the token).
+
 ## GraphQL documents against the asset repository schema
 
 Tests that fake `SendGraphQlAsync` accept any document; the asset repository validates it and answers HTTP 200 with

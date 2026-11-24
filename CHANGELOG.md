@@ -59,6 +59,8 @@ All notable changes to octo-cli are listed here. Newest first.
 
 ### Added
 
+- **AB#9647 - `ListKnowledgePlatformUpdates` and `AdoptKnowledgePlatformUpdates`.** Operators adopt newer Blueprint versions of unedited knowledge pages right away instead of waiting for the AI service's 15-minute pass, also where agents have no MCP client. Both commands call the MCP tools `knowledge_list_platform_updates` / `knowledge_adopt_platform_updates` on `<MCP service URI>/<tenant>/mcp` with the context's own token (exchanged for another tenant like every command), so the rules are the tool's: edited pages are never changed. `AdoptKnowledgePlatformUpdates --dryRun` only lists; `--runRef` is stored as `AdoptedByRun` (default `octo-cli:<UTC time>`). New context field `McpServiceUrl` (`AddContext -msu`, `Config -msu`, shown by `ListContexts`); per call `-msu` overrides it.
+
 - **AB#9577 — `Create --blueprint` creates a tenant with a catalog blueprint applied in one call.** `--blueprint <Name>-<version>`
   (`-b`) sends `blueprintId` with the create; the asset repository applies it in the create transaction, so an unknown or failing
   blueprint ends the command with exit -3 and the service's message and leaves no tenant behind (the user is not provisioned).

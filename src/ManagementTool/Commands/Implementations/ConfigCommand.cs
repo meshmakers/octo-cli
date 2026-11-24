@@ -15,6 +15,7 @@ internal class ConfigOctoCommand : Command<OctoToolOptions>
     private readonly IArgument _identityServicesUriArg;
     private readonly IArgument _reportingServicesUriArg;
     private readonly IArgument _aiServicesUriArg;
+    private readonly IArgument _mcpServicesUriArg;
     private readonly IArgument _tenantIdArg;
 
     public ConfigOctoCommand(ILogger<ConfigOctoCommand> logger, IOptions<OctoToolOptions> options,
@@ -37,6 +38,8 @@ internal class ConfigOctoCommand : Command<OctoToolOptions>
             ["URI of reporting services (e. g. 'https://localhost:5007/')"], 1);
         _aiServicesUriArg = CommandArgumentValue.AddArgument("aisu", "aiServicesUri",
             ["URI of AI services (e. g. 'https://localhost:5019/')"], 1);
+        _mcpServicesUriArg = CommandArgumentValue.AddArgument("msu", "mcpServicesUri",
+            ["URI of the MCP service (e. g. 'https://localhost:5017/')"], 1);
     }
 
     public override CommandDocumentation? GetDocumentation() =>
@@ -87,6 +90,10 @@ internal class ConfigOctoCommand : Command<OctoToolOptions>
 
         Options.Value.AiServiceUrl = CommandArgumentValue.IsArgumentUsed(_aiServicesUriArg)
             ? CommandArgumentValue.GetArgumentScalarValue<string>(_aiServicesUriArg).ToLower()
+            : null;
+
+        Options.Value.McpServiceUrl = CommandArgumentValue.IsArgumentUsed(_mcpServicesUriArg)
+            ? CommandArgumentValue.GetArgumentScalarValue<string>(_mcpServicesUriArg).ToLower()
             : null;
 
         if (CommandArgumentValue.IsArgumentUsed(_identityServicesUriArg))

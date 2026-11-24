@@ -9,5 +9,8 @@ public class OctoToolOptions
     public string? ReportingServiceUrl { get; set; }
     public string? AiServiceUrl { get; set; }
 
+    /// <summary>Base URI of the MCP service (octo-mcp-service); the knowledge platform-update commands call it.</summary>
+    public string? McpServiceUrl { get; set; }
+
     public string? TenantId { get; set; }
 }
