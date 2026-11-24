@@ -10,7 +10,7 @@ All notable changes to octo-cli are listed here. Newest first.
   the roles assigned directly to the client in the tenant of the context as JSON (`Id`, `Name`; group-inherited roles are not
   listed), read-only through the existing identity REST reads, so operators can check a grant such as `CommunicationManagement`
   for the CD deploy clients before and after a change. An unknown client or tenant ends with a message naming it and exit
-  code -5. Needs no new server version.
+  code -5 (a context whose tenant does not exist usually stops earlier, at sign-in, with -4). Needs no new server version.
 
 ### Changed
 

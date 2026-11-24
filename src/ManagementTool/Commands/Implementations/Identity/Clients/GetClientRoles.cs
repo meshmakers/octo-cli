@@ -47,7 +47,7 @@ internal class GetClientRoles : ServiceClientOctoCommand<IIdentityServicesClient
             Notes:
             [
                 "Prints a JSON array of the client's direct roles (Id and Name, sorted by name; [] when it has none). Roles the client gets through a group are not listed. No secret is printed.",
-                "Reads the tenant of the context (switch it per call with --context). An unknown client or tenant ends with a message naming it and exit code -5.",
+                "Reads the tenant of the context (switch it per call with --context). An unknown client or tenant ends with a message naming it and exit code -5; a context whose tenant does not exist usually stops earlier, at sign-in (the token for that tenant is refused, exit code -4).",
                 "A role id that is no role of the tenant is printed with Name null and a warning.",
                 "Needs a role that may read the identity directory in the tenant (e.g. TenantManagement or UserManagement)."
             ]

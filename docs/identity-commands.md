@@ -206,6 +206,10 @@ before and after a change; `--context` selects the tenant.
   service answers it without a body) and the command stops with `Tenant '<t>' was not found at '<host>'.` before it reads the
   client. A `404` of the client's role endpoint ends with `Client '<id>' was not found in tenant '<t>'.`. Both are
   `ToolException`s, exit code `-5`, and print nothing on standard output. A `403` keeps the `Runner` path below (exit `-3`).
+  On a real stack a context whose tenant never existed usually stops earlier, in `PreValidate`: the sign-in for that tenant
+  falls back to the parent's token and its exchange for the tenant is refused ("Authentication failed: No token for tenant
+  '<t>' was issued …", exit `-4`; verified on the local stack 2026-11-24). The `-5` tenant message covers a valid token reaching an identity service that does
+  not know the tenant.
 - **Role ids outside the tenant**: printed with `Name: null` and a warning, never dropped.
 - **Access**: the identity directory read policy (`UserManagement`, `TenantManagement`, `AdminPanelManagement` or
   `CommunicationManagement`). Output and logs hold role ids and names and the client id only, never a secret.
