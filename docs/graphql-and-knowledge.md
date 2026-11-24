@@ -22,7 +22,7 @@ token out of `contexts.json` and call the route with curl or Python: the token i
   context selection) switches the console log target to `StdErr`; its list `CommandNames` is the place to register another
   command with this property. The body is written as the service sent it plus a final line break if it had none, so
   `octo-cli ... | jq` and `ConvertFrom-Json` work. `GetOperation` and `ListOperations` are registered too, so their
-  `-j` output can be piped. The other commands print JSON through `IConsoleService`/the logger on standard output with banner
+  `-j` output can be piped, and `GetClientRoles` (AB#9699), whose role list scripts read before and after a grant. The other commands print JSON through `IConsoleService`/the logger on standard output with banner
   and log lines mixed in.
 - **Exit codes:** 0 success. GraphQL errors (non-empty `errors`, HTTP 200 or 400) print the body to standard error, nothing to
   standard output, exit `-5`. A tenant where the operator is not provisioned, an exchange denial or a 403: the tenant-token message

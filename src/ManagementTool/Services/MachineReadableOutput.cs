@@ -15,7 +15,8 @@ namespace Meshmakers.Octo.Frontend.ManagementTool.Services;
 public static class MachineReadableOutput
 {
     /// <summary>Names of the commands (the value of <c>-c</c>) whose standard output is machine readable.</summary>
-    public static readonly IReadOnlyList<string> CommandNames = ["GraphQl", "GetOperation", "ListOperations"];
+    public static readonly IReadOnlyList<string> CommandNames =
+        ["GraphQl", "GetOperation", "ListOperations", "GetClientRoles"];
 
     private static readonly string[] CommandTerms = ["-c", "--c", "/c", "-command", "--command", "/command"];
 

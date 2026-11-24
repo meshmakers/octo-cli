@@ -9,7 +9,8 @@ All notable changes to octo-cli are listed here. Newest first.
 - **AB#9699 — `GetClientRoles` lists the roles of a client in a tenant.** `octo-cli -c GetClientRoles -id <clientId>` prints
   the roles assigned directly to the client in the tenant of the context as JSON (`Id`, `Name`; group-inherited roles are not
   listed), read-only through the existing identity REST reads, so operators can check a grant such as `CommunicationManagement`
-  for the CD deploy clients before and after a change. An unknown client or tenant ends with a message naming it and exit
+  for the CD deploy clients before and after a change; standard output carries only the JSON (logs go to standard error), so
+  scripts can pipe it. An unknown client or tenant ends with a message naming it and exit
   code -5 (a context whose tenant does not exist usually stops earlier, at sign-in, with -4). Needs no new server version.
 
 ### Changed

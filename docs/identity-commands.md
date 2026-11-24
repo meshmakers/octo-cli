@@ -197,7 +197,8 @@ reads (`Get*`, `LookupSourceTenantUser`) stay REST.
 
 `GetClientRoles -id <clientId>` (AB#9699) is read-only and prints the roles assigned **directly** to a client in the tenant of
 the context, as a JSON array of `RoleDto` (`Id`, `Name`), sorted by name, `[]` when there are none. Roles the client gets
-through a group are not listed. Operators use it to check a grant (e.g. `CommunicationManagement` for the CD deploy clients)
+through a group are not listed. Standard output carries only that JSON; banner and log lines go to standard error
+(`MachineReadableOutput.CommandNames`), so `octo-cli ... | jq` works. Operators use it to check a grant (e.g. `CommunicationManagement` for the CD deploy clients)
 before and after a change; `--context` selects the tenant.
 
 - **Flow**: two REST reads of the SDK, no CK method: `IIdentityServicesClient.GetRoles` (role id to name) and then
