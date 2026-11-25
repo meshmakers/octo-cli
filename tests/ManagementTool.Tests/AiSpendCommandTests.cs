@@ -53,6 +53,62 @@ public sealed class AiSpendCommandTests
         A.CallTo(() => _client.SetAiSpendCapAsync(A<string>._, A<SetAiSpendCapRequestDto>._)).MustNotHaveHappened();
     }
 
+    [Theory]
+    [InlineData("ByoKey", null, "ByoKey")]
+    [InlineData("Subscription", null, "Subscription")]
+    [InlineData("None", "2101-01-01T00:00:00Z", "None")] // deliberately blocked: stays blocked
+    [InlineData("None", null, "CentralKey")] // no entry yet: the first cap opens the central key
+    [InlineData("CentralKey", "2101-01-01T00:00:00Z", "CentralKey")]
+    public async Task SetAiSpendCap_WithoutKeySource_KeepsTheStoredKeySource(string stored, string? changedAt,
+        string expected)
+    {
+        SetAiSpendCapRequestDto? sent = null;
+        A.CallTo(() => _client.GetAiSpendCapAsync("ai-sandbox")).Returns(new AiSpendReportDto
+        {
+            TenantId = "ai-sandbox",
+            KeySource = stored,
+            CapChangedAt = changedAt == null ? null : DateTimeOffset.Parse(changedAt, System.Globalization.CultureInfo.InvariantCulture)
+        });
+        A.CallTo(() => _client.SetAiSpendCapAsync("ai-sandbox", A<SetAiSpendCapRequestDto>._))
+            .Invokes((string _, SetAiSpendCapRequestDto r) => sent = r)
+            .Returns(new AiSpendCapChangeDto { TenantId = "ai-sandbox" });
+        var command = NewSet();
+        command.CommandArgumentValue.ParseLayer(["-t", "ai-sandbox", "-c", "5", "-r", "raise"]);
+
+        await command.Execute();
+
+        Assert.Equal(expected, sent!.KeySource);
+    }
+
+    [Fact]
+    public async Task SetAiSpendCap_ExplicitKeySource_IsSentInCanonicalForm_WithoutReadingTheStoredOne()
+    {
+        SetAiSpendCapRequestDto? sent = null;
+        A.CallTo(() => _client.SetAiSpendCapAsync("ai-sandbox", A<SetAiSpendCapRequestDto>._))
+            .Invokes((string _, SetAiSpendCapRequestDto r) => sent = r)
+            .Returns(new AiSpendCapChangeDto { TenantId = "ai-sandbox" });
+        var command = NewSet();
+        command.CommandArgumentValue.ParseLayer(["-t", "ai-sandbox", "-c", "5", "-r", "own key", "-ks", "byokey"]);
+
+        await command.Execute();
+
+        Assert.Equal("ByoKey", sent!.KeySource);
+        A.CallTo(() => _client.GetAiSpendCapAsync(A<string>._)).MustNotHaveHappened();
+    }
+
+    [Theory]
+    [InlineData("   ")]
+    [InlineData(null)]
+    public async Task SetAiSpendCap_BlankOrTooLongReason_IsRefusedBeforeAnyRequest(string? reason)
+    {
+        var command = NewSet();
+        command.CommandArgumentValue.ParseLayer(["-t", "ai-sandbox", "-c", "1", "-r", reason ?? new string('r', 501)]);
+
+        await Assert.ThrowsAsync<ToolException>(command.Execute);
+        A.CallTo(() => _client.SetAiSpendCapAsync(A<string>._, A<SetAiSpendCapRequestDto>._)).MustNotHaveHappened();
+        A.CallTo(() => _client.GetAiSpendCapAsync(A<string>._)).MustNotHaveHappened();
+    }
+
     [Fact]
     public async Task SetAiSpendCap_UnknownKeySource_IsRefusedBeforeAnyRequest()
     {
@@ -72,7 +128,9 @@ public sealed class AiSpendCommandTests
             .Invokes((string c1, int _, string c2) => rows.Add((c1, c2)));
         A.CallTo(() => _client.GetAiSpendAsync()).Returns(new AiSpendReportDto
         {
-            TenantId = "customer", KeySource = "CentralKey", CapMonthlyEur = 20m,
+            TenantId = "customer",
+            KeySource = "CentralKey",
+            CapMonthlyEur = 20m,
             Months =
             [
                 new AiSpendMonthDto

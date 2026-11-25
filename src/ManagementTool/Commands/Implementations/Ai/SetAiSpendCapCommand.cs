@@ -37,7 +37,7 @@ internal class SetAiSpendCapCommand : ServiceClientOctoCommand<IAiServicesClient
         _reasonArg = CommandArgumentValue.AddArgument("r", "reason",
             ["Why the cap changes (stored in the audit record, max. 500 characters)"], true, 1);
         _keySourceArg = CommandArgumentValue.AddArgument("ks", "keySource",
-            ["Key source: CentralKey (default), None, ByoKey or Subscription. Only CentralKey is served by the gateway"],
+            ["Key source: CentralKey, None, ByoKey or Subscription. Not given: the tenant keeps its current key source (CentralKey when it has none yet). Only CentralKey is served by the gateway"],
             false, 1);
     }
 
@@ -69,7 +69,8 @@ internal class SetAiSpendCapCommand : ServiceClientOctoCommand<IAiServicesClient
         var tenantId = CommandArgumentValue.GetArgumentScalarValue<string>(_tenantArg).Trim();
         var capText = CommandArgumentValue.GetArgumentScalarValue<string>(_capArg).Trim();
         var reason = CommandArgumentValue.GetArgumentScalarValue<string>(_reasonArg).Trim();
-        var keySource = CommandArgumentValue.IsArgumentUsed(_keySourceArg)
+        var keySourceGiven = CommandArgumentValue.IsArgumentUsed(_keySourceArg);
+        var keySource = keySourceGiven
             ? CommandArgumentValue.GetArgumentScalarValue<string>(_keySourceArg).Trim()
             : "CentralKey";
 
@@ -88,6 +89,20 @@ internal class SetAiSpendCapCommand : ServiceClientOctoCommand<IAiServicesClient
         if (string.IsNullOrWhiteSpace(reason) || reason.Length > MaxReasonLength)
         {
             throw new ToolException($"A reason of 1 to {MaxReasonLength} characters is required.");
+        }
+
+        if (!keySourceGiven)
+        {
+            // Changing only the cap must not switch a ByoKey, Subscription or deliberately blocked (None) tenant to the
+            // central key: keep the stored key source; a tenant without any yet gets CentralKey.
+            var current = await ServiceClient.GetAiSpendCapAsync(tenantId);
+            knownKeySource = KeySources.FirstOrDefault(k =>
+                string.Equals(k, current.KeySource, StringComparison.OrdinalIgnoreCase) &&
+                !string.Equals(k, "None", StringComparison.Ordinal)) ?? "CentralKey";
+            if (current.CapChangedAt != null && string.Equals(current.KeySource, "None", StringComparison.OrdinalIgnoreCase))
+            {
+                knownKeySource = "None";
+            }
         }
 
         Logger.LogInformation("Setting the LLM spend cap of tenant '{TenantId}' at '{ServiceClientServiceUri}'",
