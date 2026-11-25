@@ -48,7 +48,7 @@ internal static class AgentMcp
                 "Config -msu <url>. The MCP service runs the agent checks; the CLI calls it with your token.");
         }
 
-        var endpoint = KnowledgePlatformUpdatesMcp.Endpoint(null, options, tenantId);
+        var endpoint = KnowledgePlatformUpdatesMcp.Endpoint(options, tenantId);
         var token = await KnowledgePlatformUpdatesMcp.TokenForTenantAsync(contextToken, tenantId, tenantTokenProvider);
         arguments["tenantId"] = tenantId;
 
