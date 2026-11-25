@@ -69,6 +69,8 @@ The CLI uses named contexts (similar to `kubectl config use-context`) stored in 
 
 **Migration**: On first run, if `contexts.json` does not exist but `settings.json` does, the CLI automatically imports the legacy settings as a `"default"` context. The original `settings.json` is kept intact.
 
+Service URLs of a context: identity, asset, bot, communication, reporting, AI and, since the knowledge platform-update commands, `McpServiceUrl` (the MCP service; `AddContext -msu`, `Config -msu`, shown by `ListContexts`; https, plain http only for a loopback host, because the knowledge commands send the user's token there and take no per-call URL). Only those commands use it; a context without it works for every other command.
+
 ## Tokens per tenant — guard and exchange
 
 A command addressing tenant X never sends a token whose `tenant_id` claim is another tenant. The tenant a
