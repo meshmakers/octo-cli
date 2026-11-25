@@ -213,3 +213,38 @@ octo-cli -c GetPipelineDebug --identifier cc0000000000000000000003
 # Get pipeline debug state as compact JSON
 octo-cli -c GetPipelineDebug --identifier cc0000000000000000000003 --json
 ```
+
+## Agent commands: CreateAgent, UpdateAgent, EnableAgent, DisableAgent, GetAgents, GetAgentRuns
+
+`Ai/Agents/*AgentCommand.cs`, `GetAgentsCommand.cs`, `GetAgentRunsCommand.cs`, shared part `AgentMcp.cs` (AB#8455).
+
+```bash
+octo-cli -c CreateAgent -n "Knowledge curator" -if ./curator.md -g "knowledge_*:Medium" -rc Medium [-d] [-r <role>]...
+octo-cli -c UpdateAgent -a "Knowledge curator" [-n|-i|-if|-m|-cm|-al|-rk|-su|-mid|-g...|-cg|-rc|-cb|-wm|-ct...|-cct|-r...|-cr]
+octo-cli -c EnableAgent  -a "Knowledge curator"
+octo-cli -c DisableAgent -a "Knowledge curator"
+octo-cli -c GetAgents [-a "Knowledge curator"] [--json]
+octo-cli -c GetAgentRuns [-a "Knowledge curator"]
+```
+
+- **The checks stay in the MCP service.** Each command calls one agent tool of octo-mcp-service — `create_agent`,
+  `update_agent`, `set_agent_enabled`, `list_agents`, `get_agent` — through the MCP client of the knowledge
+  platform-update commands (`Services/McpToolClient.cs`, `KnowledgePlatformUpdatesMcp`), with the signed-in user's own
+  token (exchanged for another tenant with `-tid`, as every command). The tools allow tenant administrators only (role
+  `TenantManagement` or `UserManagement`) and refuse an agent's own token; a refusal stops with the tool's code, e.g.
+  `NotTenantAdministrator`. There is no REST endpoint for agents.
+- **URL only from the context.** The endpoint is `<McpServiceUrl of the context>/<tenant>/mcp` (`AddContext -msu`,
+  `Config -msu`). The agent commands have no per-call URL option, so the token goes only to the URL stored in the context.
+- **No client secret on the command line.** `create_agent` generates the secret of the agent's service-account client
+  and never returns it; `CreateAgent` has no option for it, so no secret lands in a shell history or process list.
+- **Grants.** `-g <toolPattern>[:<maxRisk>[:<argumentConstraints JSON>]]`, repeatable (`knowledge_*:Medium`,
+  `query_entities:Low:{"ckTypeId":["System.Ai/KnowledgePage"]}`). In `UpdateAgent` the given grants, CK types (`-ct`) and
+  roles (`-r`) replace the list; `-cg`, `-cct`, `-cr` clear it, `-cm` goes back to the tenant default model. Defaults of a
+  new agent are narrow: no grants, risk ceiling Low, change budget 0, write mode Propose.
+- **GetAgentRuns** is not available yet: it ends with "Agent runs are not available yet" (AB#8460 brings the run
+  history), without signing in or calling a service.
+- **Output.** One line per agent (name, id, enabled, version, autonomy, client, mandate summary); `GetAgents -a` and the
+  write commands add model, runner, sponsor, client state, grants, writable CK types and the first line of the
+  instructions. `--json` prints the tool's answer. The token is never logged or printed, at any log level.
+- Tests: `AgentCommandsTests` (tool, endpoint and token per command, every option, clear flags, invalid input before any
+  call, no URL override, refusal of a non-administrator, GetAgentRuns, token never in logs or output).
