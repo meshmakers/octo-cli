@@ -15,17 +15,21 @@ internal static class KnowledgePlatformUpdatesMcp
     public const string ListTool = "knowledge_list_platform_updates";
     public const string AdoptTool = "knowledge_adopt_platform_updates";
 
-    /// <summary>The tenant route of the MCP service from the argument or the context's <c>McpServiceUrl</c>.</summary>
-    public static Uri Endpoint(string? argumentUrl, OctoToolOptions options, string tenantId)
+    /// <summary>
+    ///     The tenant route of the MCP service from the context's <c>McpServiceUrl</c> only. There is deliberately no
+    ///     per-call override: the signed-in user's token goes only to the MCP service stored with the context.
+    /// </summary>
+    public static Uri Endpoint(OctoToolOptions options, string tenantId)
     {
-        var url = string.IsNullOrWhiteSpace(argumentUrl) ? options.McpServiceUrl : argumentUrl;
+        var url = options.McpServiceUrl;
         if (string.IsNullOrWhiteSpace(url))
         {
             throw new ToolException(
                 "No MCP service URL: set it on the context (octo-cli -c AddContext -n <name> -msu <url>, or Config -msu " +
-                "<url>) or pass -msu <url>. The MCP service runs the knowledge rules; the CLI calls it with your token.");
+                "<url>). The MCP service runs the knowledge rules; the CLI calls it with your token.");
         }
 
+        McpServiceUrlRule.Check(url);
         return McpToolClient.TenantEndpoint(url, tenantId);
     }
 
@@ -69,19 +73,33 @@ internal static class KnowledgePlatformUpdatesMcp
     /// </summary>
     public static JsonObject RequireSuccess(JsonNode? answer, string toolName)
     {
-        if (answer is not JsonObject result)
-        {
-            throw new ToolException($"The MCP tool '{toolName}' sent no answer object.");
-        }
-
-        if (result["isSuccess"] is JsonValue ok && ok.TryGetValue<bool>(out var success) && success)
+        var result = AnswerObject(answer, toolName);
+        if (IsSuccess(result))
         {
             return result;
         }
 
+        throw Refused(result, toolName, "Nothing was changed by this command.");
+    }
+
+    /// <summary>The answer of a knowledge tool as an object, refused or not.</summary>
+    public static JsonObject AnswerObject(JsonNode? answer, string toolName) =>
+        answer as JsonObject ?? throw new ToolException($"The MCP tool '{toolName}' sent no answer object.");
+
+    /// <summary>Whether the tool answered <c>isSuccess: true</c>.</summary>
+    public static bool IsSuccess(JsonObject result) =>
+        result["isSuccess"] is JsonValue ok && ok.TryGetValue<bool>(out var success) && success;
+
+    /// <summary>
+    ///     The exception for a refused call: the tool's error code and message and what the command did before. Like
+    ///     every exception text it passes the central ErrorOutputRedactor before it is written.
+    /// </summary>
+    public static ToolException Refused(JsonObject result, string toolName, string outcome)
+    {
         var code = Text(result, "errorCode");
-        throw new ToolException($"The MCP tool '{toolName}' refused" + (code == null ? "" : $" ({code})") + ": " +
-                                (Text(result, "errorMessage") ?? "no message") + ". Nothing was changed by this command.");
+        var message = Text(result, "errorMessage") ?? "no message";
+        return new ToolException($"The MCP tool '{toolName}' refused" + (code == null ? "" : $" ({code})") + ": " +
+                                 message + ". " + outcome);
     }
 
     public static string? Text(JsonObject node, string name) =>

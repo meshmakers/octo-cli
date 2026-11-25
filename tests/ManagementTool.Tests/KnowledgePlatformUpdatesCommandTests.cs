@@ -6,6 +6,7 @@ using FakeItEasy;
 using Meshmakers.Common.Shared.Services;
 using Meshmakers.Octo.Frontend.ManagementTool;
 using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Asset.Knowledge;
+using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.General.Context;
 using Meshmakers.Octo.Frontend.ManagementTool.Services;
 using Meshmakers.Octo.Sdk.ServiceClient.AssetRepositoryServices.System;
 using Meshmakers.Octo.Sdk.ServiceClient.Authentication;
@@ -65,13 +66,17 @@ public sealed class KnowledgePlatformUpdatesCommandTests
 
     private static OctoToolOptions Options(string? mcpUrl = McpUrl) => new() { TenantId = Tenant, McpServiceUrl = mcpUrl };
 
-    private async Task<RecordingLogger<AdoptKnowledgePlatformUpdatesCommand>> RunAdopt(OctoToolOptions options, params string[] args)
+    private Task<RecordingLogger<AdoptKnowledgePlatformUpdatesCommand>> RunAdopt(OctoToolOptions options, params string[] args) =>
+        RunAdoptAs(UserToken, A.Fake<ITenantTokenProvider>(), options, args);
+
+    private async Task<RecordingLogger<AdoptKnowledgePlatformUpdatesCommand>> RunAdoptAs(string contextToken,
+        ITenantTokenProvider? tokenProvider, OctoToolOptions options, params string[] args)
     {
         var logger = new RecordingLogger<AdoptKnowledgePlatformUpdatesCommand>();
         var command = new AdoptKnowledgePlatformUpdatesCommand(logger, Microsoft.Extensions.Options.Options.Create(options),
             A.Fake<IAssetServicesClient>(), A.Fake<IAuthenticationService>(),
-            Microsoft.Extensions.Options.Options.Create(new OctoToolAuthenticationOptions { AccessToken = UserToken }),
-            _mcp, _console, A.Fake<ITenantTokenProvider>(), new FixedTime(new DateTimeOffset(2026, 11, 24, 15, 30, 0, TimeSpan.Zero)));
+            Microsoft.Extensions.Options.Options.Create(new OctoToolAuthenticationOptions { AccessToken = contextToken }),
+            _mcp, _console, tokenProvider, new FixedTime(new DateTimeOffset(2026, 11, 24, 15, 30, 0, TimeSpan.Zero)));
         command.CommandArgumentValue.ParseLayer(args);
         await command.Execute();
         return logger;
@@ -154,12 +159,158 @@ public sealed class KnowledgePlatformUpdatesCommandTests
         Assert.Empty(_calls);
     }
 
-    [Fact]
-    public async Task McpServiceUriArgument_OverridesTheContext()
+    [Theory]
+    [InlineData("-msu")]
+    [InlineData("--mcpServiceUri")]
+    public async Task APerCallMcpServiceUri_IsNotAccepted_SoTheTokenGoesOnlyToTheContextsService(string flag)
     {
-        await RunList(Options(), "-msu", "https://other.example.test/mcp");
+        // There is no per-call override: an instruction such as "-msu http://elsewhere/" cannot redirect the user's token.
+        // The commands declare no such argument, so the word never reaches the endpoint; the call goes to the context's URL.
+        await RunList(Options(), flag, "http://other.example.test/mcp");
+        await RunAdopt(Options(), flag, "http://other.example.test/mcp");
 
-        Assert.Equal(new Uri("https://other.example.test/ai-sandbox/mcp"), Assert.Single(_calls).Endpoint);
+        Assert.Equal(2, _calls.Count);
+        Assert.All(_calls, c => Assert.Equal(new Uri("https://mcp.example.test/ai-sandbox/mcp"), c.Endpoint));
+    }
+
+    [Fact]
+    public async Task AnHttpMcpServiceUrlOnTheContext_IsRefusedBeforeAnyCall_ExceptForLocalhost()
+    {
+        var ex = await Assert.ThrowsAsync<ToolException>(() => RunList(Options("http://mcp.example.test/")));
+        Assert.Contains("https", ex.Message);
+        Assert.Empty(_calls);
+
+        await RunList(Options("http://localhost:5017/"));
+        Assert.Equal(new Uri("http://localhost:5017/ai-sandbox/mcp"), Assert.Single(_calls).Endpoint);
+    }
+
+    [Fact]
+    public async Task Adopt_FailedPartWay_PrintsThePagesAlreadySwitched_AndDoesNotClaimNothingChanged()
+    {
+        A.CallTo(() => _mcp.CallToolAsync(A<Uri>._, A<string>._, A<string>._, A<JsonObject>._, A<CancellationToken>._))
+            .Returns(Task.FromResult<JsonNode?>(JsonNode.Parse("""
+                {"isSuccess":false,"errorCode":"Unexpected","errorMessage":"database went away","tenantId":"ai-sandbox",
+                 "adopted":[{"isSuccess":true,"slug":"app-index","fromVersion":2,"toVersion":3,"blueprint":"System.Ai.Builder-1.2.0"}],
+                 "skipped":[],"available":[],"truncated":false}
+                """)));
+
+        var ex = await Assert.ThrowsAsync<ToolException>(() => RunAdopt(Options(), "-rr", "rollout-1"));
+
+        Assert.Contains(_printed, l => l.Contains("ADOPTED") && l.Contains("app-index"));
+        Assert.Contains("database went away", ex.Message);
+        Assert.Contains("1 page(s) were switched before the failure", ex.Message);
+        Assert.DoesNotContain("Nothing was changed", ex.Message);
+    }
+
+    [Fact]
+    public async Task Adopt_FailedPartWay_WithJson_PrintsTheAnswerBeforeTheError()
+    {
+        A.CallTo(() => _mcp.CallToolAsync(A<Uri>._, A<string>._, A<string>._, A<JsonObject>._, A<CancellationToken>._))
+            .Returns(Task.FromResult<JsonNode?>(JsonNode.Parse("""
+                {"isSuccess":false,"errorMessage":"database went away",
+                 "adopted":[{"isSuccess":true,"slug":"app-index","fromVersion":2,"toVersion":3}],"skipped":[],"available":[]}
+                """)));
+
+        await Assert.ThrowsAsync<ToolException>(() => RunAdopt(Options(), "--json"));
+
+        Assert.Contains(_printed, l => l.Contains("\"adopted\"") && l.Contains("app-index"));
+    }
+
+    [Fact]
+    public async Task Adopt_RefusedWithoutAnySwitchedPage_SaysNothingWasChanged()
+    {
+        A.CallTo(() => _mcp.CallToolAsync(A<Uri>._, A<string>._, A<string>._, A<JsonObject>._, A<CancellationToken>._))
+            .Returns(Task.FromResult<JsonNode?>(JsonNode.Parse(
+                """{"isSuccess":false,"errorCode":"ModelTooOld","errorMessage":"Needs System.Ai 4.10.0","adopted":[],"skipped":[]}""")));
+
+        var ex = await Assert.ThrowsAsync<ToolException>(() => RunAdopt(Options()));
+        Assert.Contains("Nothing was changed", ex.Message);
+        Assert.Empty(_printed);
+    }
+
+    [Fact]
+    public async Task OtherTenant_SendsTheExchangedTokenOfThatTenant_NotTheContextToken()
+    {
+        var rootToken = Jwt(new { sub = "686a6215fd3e5972ff5693fd", tenant_id = "octosystem" });
+        var provider = A.Fake<ITenantTokenProvider>();
+        A.CallTo(() => provider.GetAccessTokenAsync(Tenant, rootToken, A<CancellationToken>._))
+            .Returns(Task.FromResult("exchanged-token-for-ai-sandbox"));
+
+        await RunAdoptAs(rootToken, provider, Options(), "-tid", Tenant, "-rr", "rollout-1");
+
+        var call = Assert.Single(_calls);
+        Assert.Equal("exchanged-token-for-ai-sandbox", call.Token);
+        Assert.Equal(new Uri("https://mcp.example.test/ai-sandbox/mcp"), call.Endpoint);
+    }
+
+    [Fact]
+    public async Task OtherTenant_WithoutATokenProvider_IsRefused_AndNeverFallsBackToTheContextToken()
+    {
+        var rootToken = Jwt(new { sub = "686a6215fd3e5972ff5693fd", tenant_id = "octosystem" });
+
+        var ex = await Assert.ThrowsAsync<ToolException>(() => RunAdoptAs(rootToken, null, Options(), "-tid", Tenant));
+
+        Assert.Contains(Tenant, ex.Message);
+        Assert.Empty(_calls);
+    }
+
+    [Fact]
+    public async Task OtherTenant_ExchangeDenied_IsRefusedWithTheWayOut_AndNeverFallsBackToTheContextToken()
+    {
+        var rootToken = Jwt(new { sub = "686a6215fd3e5972ff5693fd", tenant_id = "octosystem" });
+        var provider = A.Fake<ITenantTokenProvider>();
+        A.CallTo(() => provider.GetAccessTokenAsync(Tenant, rootToken, A<CancellationToken>._))
+            .Throws(new TenantTokenExchangeDeniedException(Tenant, TenantTokenDenialCause.Unknown));
+
+        var ex = await Assert.ThrowsAsync<ToolException>(() => RunAdoptAs(rootToken, provider, Options(), "-tid", Tenant));
+
+        Assert.Contains("ProvisionCurrentUser", ex.Message);
+        Assert.Empty(_calls);
+    }
+
+    [Theory]
+    [InlineData("https://mcp.example.test/")]
+    [InlineData("http://localhost:5017/")]
+    [InlineData("http://127.0.0.1:5017/")]
+    [InlineData("http://[::1]:5017/")]
+    public void McpServiceUrlRule_AcceptsHttpsAndLoopbackHttp(string url) => McpServiceUrlRule.Check(url);
+
+    [Theory]
+    [InlineData("http://mcp.example.test/")]
+    [InlineData("http://10.0.0.5:5017/")]
+    [InlineData("http://localhost.example.test/")]
+    [InlineData("ftp://mcp.example.test/")]
+    [InlineData("mcp.example.test")]
+    public void McpServiceUrlRule_RefusesPlainHttpToAnotherHostAndNonHttpUrls(string url) =>
+        Assert.Throws<ToolException>(() => McpServiceUrlRule.Check(url));
+
+    [Fact]
+    public async Task AddContext_RefusesAnHttpMcpServiceUrl_AndSavesNoContext()
+    {
+        var contexts = A.Fake<IContextManager>();
+        var command = new AddContextCommand(new RecordingLogger<AddContextCommand>(),
+            Microsoft.Extensions.Options.Options.Create(new OctoToolOptions()), contexts);
+        command.CommandArgumentValue.ParseLayer(["-n", "test", "-msu", "http://mcp.example.test/"]);
+
+        await Assert.ThrowsAsync<ToolException>(() => command.Execute());
+
+        A.CallTo(() => contexts.AddOrUpdateContext(A<string>._, A<ContextEntry>._)).MustNotHaveHappened();
+    }
+
+    [Fact]
+    public async Task AddContext_StoresAnHttpsMcpServiceUrl()
+    {
+        var contexts = A.Fake<IContextManager>();
+        ContextEntry? saved = null;
+        A.CallTo(() => contexts.AddOrUpdateContext("test", A<ContextEntry>._))
+            .Invokes((string _, ContextEntry entry) => saved = entry);
+        var command = new AddContextCommand(new RecordingLogger<AddContextCommand>(),
+            Microsoft.Extensions.Options.Options.Create(new OctoToolOptions()), contexts);
+        command.CommandArgumentValue.ParseLayer(["-n", "test", "-msu", "https://mcp.example.test/"]);
+
+        await command.Execute();
+
+        Assert.Equal("https://mcp.example.test/", saved?.OctoToolOptions?.McpServiceUrl);
     }
 
     [Fact]

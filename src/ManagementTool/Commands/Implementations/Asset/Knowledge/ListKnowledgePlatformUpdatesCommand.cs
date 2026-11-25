@@ -19,7 +19,6 @@ internal class ListKnowledgePlatformUpdatesCommand : ServiceClientOctoCommand<IA
     private readonly IConsoleService _consoleService;
     private readonly IArgument _jsonArg;
     private readonly IMcpToolClient _mcpToolClient;
-    private readonly IArgument _mcpServiceUriArg;
     private readonly IArgument _tenantIdArg;
     private readonly ITenantTokenProvider? _tenantTokenProvider;
 
@@ -39,9 +38,6 @@ internal class ListKnowledgePlatformUpdatesCommand : ServiceClientOctoCommand<IA
 
         _tenantIdArg = CommandArgumentValue.AddArgument("tid", "tenantId",
             ["Id of the tenant of the knowledge base. Default: the tenant of the context"], false, 1);
-        _mcpServiceUriArg = CommandArgumentValue.AddArgument("msu", "mcpServiceUri",
-            ["URI of the MCP service (e. g. 'https://localhost:5017/'). Default: the MCP service URI of the context"],
-            false, 1);
         _jsonArg = CommandArgumentValue.AddArgument("json", "json",
             ["Print the answer of the MCP tool as JSON instead of a table"], false, 0);
     }
@@ -60,16 +56,14 @@ internal class ListKnowledgePlatformUpdatesCommand : ServiceClientOctoCommand<IA
                 "Adoptable: the page was never edited in the tenant (its current version is a Blueprint version). Available: " +
                 "the page was edited in the tenant and keeps its content; a person restores the newer version or dismisses it.",
                 "Calls the MCP tool knowledge_list_platform_updates on <MCP service URI>/<tenant>/mcp with the token of the " +
-                "context (exchanged for another tenant like every command). Set the URI once with AddContext -msu or Config -msu."
+                "context (exchanged for another tenant like every command). The URI comes only from the context (AddContext -msu or " +
+                "Config -msu): there is no per-call override, so your token goes only to the MCP service of the context."
             ]);
 
     public override async Task Execute()
     {
         var tenantId = KnowledgePlatformUpdatesCommandSupport.TenantId(CommandArgumentValue, _tenantIdArg, Options.Value);
-        var endpoint = KnowledgePlatformUpdatesMcp.Endpoint(
-            CommandArgumentValue.IsArgumentUsed(_mcpServiceUriArg)
-                ? CommandArgumentValue.GetArgumentScalarValue<string>(_mcpServiceUriArg)
-                : null, Options.Value, tenantId);
+        var endpoint = KnowledgePlatformUpdatesMcp.Endpoint(Options.Value, tenantId);
         var token = await KnowledgePlatformUpdatesMcp.TokenForTenantAsync(_authenticationOptions.Value.AccessToken, tenantId,
             _tenantTokenProvider);
 

@@ -41,7 +41,7 @@ internal class AddContextCommand : Command<OctoToolOptions>
         _aiServicesUriArg = CommandArgumentValue.AddArgument("aisu", "aiServicesUri",
             ["URI of AI services (e. g. 'https://localhost:5019/')"], 1);
         _mcpServicesUriArg = CommandArgumentValue.AddArgument("msu", "mcpServicesUri",
-            ["URI of the MCP service (e. g. 'https://localhost:5017/')"], 1);
+            ["URI of the MCP service (e. g. 'https://localhost:5017/'); https, http only for localhost"], 1);
         _tenantIdArg = CommandArgumentValue.AddArgument("tid", "tenantId",
             ["Id of tenant (e. g. 'meshtest')"], 1);
     }
@@ -92,8 +92,9 @@ internal class AddContextCommand : Command<OctoToolOptions>
 
         if (CommandArgumentValue.IsArgumentUsed(_mcpServicesUriArg))
         {
-            toolOptions.McpServiceUrl =
-                CommandArgumentValue.GetArgumentScalarValue<string>(_mcpServicesUriArg).ToLower();
+            var mcpServiceUrl = CommandArgumentValue.GetArgumentScalarValue<string>(_mcpServicesUriArg).ToLower();
+            McpServiceUrlRule.Check(mcpServiceUrl); // the knowledge commands send the user's token there
+            toolOptions.McpServiceUrl = mcpServiceUrl;
         }
 
         if (CommandArgumentValue.IsArgumentUsed(_tenantIdArg))

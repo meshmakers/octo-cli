@@ -39,7 +39,7 @@ internal class ConfigOctoCommand : Command<OctoToolOptions>
         _aiServicesUriArg = CommandArgumentValue.AddArgument("aisu", "aiServicesUri",
             ["URI of AI services (e. g. 'https://localhost:5019/')"], 1);
         _mcpServicesUriArg = CommandArgumentValue.AddArgument("msu", "mcpServicesUri",
-            ["URI of the MCP service (e. g. 'https://localhost:5017/')"], 1);
+            ["URI of the MCP service (e. g. 'https://localhost:5017/'); https, http only for localhost"], 1);
     }
 
     public override CommandDocumentation? GetDocumentation() =>
@@ -95,6 +95,10 @@ internal class ConfigOctoCommand : Command<OctoToolOptions>
         Options.Value.McpServiceUrl = CommandArgumentValue.IsArgumentUsed(_mcpServicesUriArg)
             ? CommandArgumentValue.GetArgumentScalarValue<string>(_mcpServicesUriArg).ToLower()
             : null;
+        if (Options.Value.McpServiceUrl != null)
+        {
+            McpServiceUrlRule.Check(Options.Value.McpServiceUrl); // the knowledge commands send the user's token there
+        }
 
         if (CommandArgumentValue.IsArgumentUsed(_identityServicesUriArg))
         {

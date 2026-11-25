@@ -27,7 +27,6 @@ internal class AdoptKnowledgePlatformUpdatesCommand : ServiceClientOctoCommand<I
     private readonly IArgument _dryRunArg;
     private readonly IArgument _jsonArg;
     private readonly IMcpToolClient _mcpToolClient;
-    private readonly IArgument _mcpServiceUriArg;
     private readonly IArgument _runRefArg;
     private readonly IArgument _tenantIdArg;
     private readonly ITenantTokenProvider? _tenantTokenProvider;
@@ -56,9 +55,6 @@ internal class AdoptKnowledgePlatformUpdatesCommand : ServiceClientOctoCommand<I
              "Default: 'octo-cli:<UTC time>'"], false, 1);
         _dryRunArg = CommandArgumentValue.AddArgument("dr", "dryRun",
             ["Change nothing: list the pages that would be switched and the edited pages that keep their content"], false, 0);
-        _mcpServiceUriArg = CommandArgumentValue.AddArgument("msu", "mcpServiceUri",
-            ["URI of the MCP service (e. g. 'https://localhost:5017/'). Default: the MCP service URI of the context"],
-            false, 1);
         _jsonArg = CommandArgumentValue.AddArgument("json", "json",
             ["Print the answer of the MCP tool as JSON instead of a summary"], false, 0);
     }
@@ -82,8 +78,11 @@ internal class AdoptKnowledgePlatformUpdatesCommand : ServiceClientOctoCommand<I
                 "version; it takes title, summary, sections, citations, status and the declared links of the newest Blueprint " +
                 "version. Edited pages are listed as Available and keep their content.",
                 "Calls <MCP service URI>/<tenant>/mcp with the token of the context (exchanged for another tenant like every " +
-                "command); the MCP service needs no MCP client setup on your side. Set the URI once with AddContext -msu or " +
-                "Config -msu.",
+                "command); the MCP service needs no MCP client setup on your side. The URI comes only from the context " +
+                "(AddContext -msu or Config -msu): there is no per-call override, so your token goes only to the MCP " +
+                "service of the context.",
+                "If the tool fails part-way, the pages it already switched are printed before the error (one transaction " +
+                "per page); run the command again for the rest.",
                 "A second run without a new blueprint version writes nothing."
             ]);
 
@@ -99,10 +98,7 @@ internal class AdoptKnowledgePlatformUpdatesCommand : ServiceClientOctoCommand<I
             throw new ToolException($"--runRef must hold 1 to {MaxRunRefLength} characters.");
         }
 
-        var endpoint = KnowledgePlatformUpdatesMcp.Endpoint(
-            CommandArgumentValue.IsArgumentUsed(_mcpServiceUriArg)
-                ? CommandArgumentValue.GetArgumentScalarValue<string>(_mcpServiceUriArg)
-                : null, Options.Value, tenantId);
+        var endpoint = KnowledgePlatformUpdatesMcp.Endpoint(Options.Value, tenantId);
         var token = await KnowledgePlatformUpdatesMcp.TokenForTenantAsync(_authenticationOptions.Value.AccessToken, tenantId,
             _tenantTokenProvider);
 
@@ -126,17 +122,35 @@ internal class AdoptKnowledgePlatformUpdatesCommand : ServiceClientOctoCommand<I
 
         Logger.LogInformation("Adopting knowledge platform updates of tenant '{TenantId}' at {Endpoint} (runRef '{RunRef}')",
             tenantId, endpoint, runRef);
-        var answer = KnowledgePlatformUpdatesMcp.RequireSuccess(
+        var answer = KnowledgePlatformUpdatesMcp.AnswerObject(
             await _mcpToolClient.CallToolAsync(endpoint, token, KnowledgePlatformUpdatesMcp.AdoptTool,
                 new JsonObject { ["runRef"] = runRef, ["tenantId"] = tenantId }), KnowledgePlatformUpdatesMcp.AdoptTool);
+        var success = KnowledgePlatformUpdatesMcp.IsSuccess(answer);
+        var switched = KnowledgePlatformUpdatesMcp.Items(answer, "adopted").Count();
+        var touched = switched + KnowledgePlatformUpdatesMcp.Items(answer, "skipped").Count();
+        if (!success && touched == 0)
+        {
+            throw KnowledgePlatformUpdatesMcp.Refused(answer, KnowledgePlatformUpdatesMcp.AdoptTool,
+                "Nothing was changed by this command.");
+        }
 
+        // A run that failed part-way has already committed the pages in "adopted" (one transaction per page): show them
+        // before the error instead of claiming that nothing changed.
         if (CommandArgumentValue.IsArgumentUsed(_jsonArg))
         {
             _consoleService.WriteLine(answer.ToJsonString());
-            return;
+        }
+        else
+        {
+            Print(_consoleService, tenantId, runRef, answer);
         }
 
-        Print(_consoleService, tenantId, runRef, answer);
+        if (!success)
+        {
+            throw KnowledgePlatformUpdatesMcp.Refused(answer, KnowledgePlatformUpdatesMcp.AdoptTool,
+                $"{switched} page(s) were switched before the failure (listed above, AdoptedByRun '{runRef}'); run the " +
+                "command again for the rest.");
+        }
     }
 
     /// <summary>The run reference when <c>--runRef</c> is not given: <c>octo-cli:2026-11-24T15:30:00Z</c>.</summary>
