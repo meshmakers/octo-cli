@@ -29,8 +29,8 @@ internal class GetAgentsCommand : ServiceClientOctoCommand<IAssetServicesClient>
         IOptions<OctoToolAuthenticationOptions> authenticationOptions, IMcpToolClient mcpToolClient,
         IConsoleService consoleService, ITenantTokenProvider? tenantTokenProvider = null)
         : base(logger, Constants.AiServicesGroup, "GetAgents",
-            "Lists the agents of the tenant with their mandates, or shows one agent with -a (tenant administrators " +
-            "only). Calls the MCP tools list_agents / get_agent with your token; changes nothing.",
+            "Lists the agents of the tenant with their mandates, or shows one agent with -a. Calls the MCP tools " +
+            "list_agents / get_agent with your token; changes nothing.",
             options, assetServicesClient, authenticationService)
     {
         _authenticationOptions = authenticationOptions;
@@ -56,7 +56,8 @@ internal class GetAgentsCommand : ServiceClientOctoCommand<IAssetServicesClient>
             ],
             Notes:
             [
-                "Tenant administrators only (role TenantManagement or UserManagement); an agent's own token is refused.",
+                "A read: your roles in the tenant decide whether you may read its agents (the engine checks them). " +
+                "Only the write commands (CreateAgent, UpdateAgent, EnableAgent, DisableAgent) need a tenant administrator.",
                 "Calls <McpServiceUrl of the context>/<tenant>/mcp (set it once with AddContext -msu or Config -msu)."
             ]);
 

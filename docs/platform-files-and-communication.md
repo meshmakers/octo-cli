@@ -230,9 +230,9 @@ octo-cli -c GetAgentRuns [-a "Knowledge curator"]
 - **The checks stay in the MCP service.** Each command calls one agent tool of octo-mcp-service — `create_agent`,
   `update_agent`, `set_agent_enabled`, `list_agents`, `get_agent` — through the MCP client of the knowledge
   platform-update commands (`Services/McpToolClient.cs`, `KnowledgePlatformUpdatesMcp`), with the signed-in user's own
-  token (exchanged for another tenant with `-tid`, as every command). The tools allow tenant administrators only (role
+  token (exchanged for another tenant with `-tid`, as every command). The writing tools (`create_agent`, `update_agent`, `set_agent_enabled`) allow tenant administrators only (role
   `TenantManagement` or `UserManagement`) and refuse an agent's own token; a refusal stops with the tool's code, e.g.
-  `NotTenantAdministrator`. There is no REST endpoint for agents.
+  `NotTenantAdministrator`. The reads (`GetAgents`) are checked by the engine against the caller's roles. There is no REST endpoint for agents.
 - **URL only from the context.** The endpoint is `<McpServiceUrl of the context>/<tenant>/mcp` (`AddContext -msu`,
   `Config -msu`). The agent commands have no per-call URL option, so the token goes only to the URL stored in the context.
 - **No client secret on the command line.** `create_agent` generates the secret of the agent's service-account client
