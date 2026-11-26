@@ -17,6 +17,7 @@ internal class AddContextCommand : Command<OctoToolOptions>
     private readonly IArgument _communicationServicesUriArg;
     private readonly IArgument _reportingServicesUriArg;
     private readonly IArgument _aiServicesUriArg;
+    private readonly IArgument _mcpServicesUriArg;
     private readonly IArgument _tenantIdArg;
 
     public AddContextCommand(ILogger<AddContextCommand> logger, IOptions<OctoToolOptions> options,
@@ -39,6 +40,8 @@ internal class AddContextCommand : Command<OctoToolOptions>
             ["URI of reporting services (e. g. 'https://localhost:5007/')"], 1);
         _aiServicesUriArg = CommandArgumentValue.AddArgument("aisu", "aiServicesUri",
             ["URI of AI services (e. g. 'https://localhost:5019/')"], 1);
+        _mcpServicesUriArg = CommandArgumentValue.AddArgument("msu", "mcpServicesUri",
+            ["URI of the MCP service (e. g. 'https://localhost:5017/'); https, http only for localhost"], 1);
         _tenantIdArg = CommandArgumentValue.AddArgument("tid", "tenantId",
             ["Id of tenant (e. g. 'meshtest')"], 1);
     }
@@ -85,6 +88,13 @@ internal class AddContextCommand : Command<OctoToolOptions>
         {
             toolOptions.AiServiceUrl =
                 CommandArgumentValue.GetArgumentScalarValue<string>(_aiServicesUriArg).ToLower();
+        }
+
+        if (CommandArgumentValue.IsArgumentUsed(_mcpServicesUriArg))
+        {
+            var mcpServiceUrl = CommandArgumentValue.GetArgumentScalarValue<string>(_mcpServicesUriArg).ToLower();
+            McpServiceUrlRule.Check(mcpServiceUrl); // the knowledge commands send the user's token there
+            toolOptions.McpServiceUrl = mcpServiceUrl;
         }
 
         if (CommandArgumentValue.IsArgumentUsed(_tenantIdArg))

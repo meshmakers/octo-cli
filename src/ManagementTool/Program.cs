@@ -150,6 +150,7 @@ internal static class Program
             options.CommunicationServiceUrl = effectiveContext.OctoToolOptions.CommunicationServiceUrl;
             options.ReportingServiceUrl = effectiveContext.OctoToolOptions.ReportingServiceUrl;
             options.AiServiceUrl = effectiveContext.OctoToolOptions.AiServiceUrl;
+            options.McpServiceUrl = effectiveContext.OctoToolOptions.McpServiceUrl;
             options.TenantId = effectiveContext.OctoToolOptions.TenantId;
         });
 
@@ -315,6 +316,9 @@ internal static class Program
 
         services.AddTransient<ICommand, GraphQlCommand>();
         services.AddTransient<ICommand, SetKnowledgePageStatusCommand>();
+        services.AddSingleton<IMcpToolClient, McpToolClient>(_ => new McpToolClient());
+        services.AddTransient<ICommand, ListKnowledgePlatformUpdatesCommand>();
+        services.AddTransient<ICommand, AdoptKnowledgePlatformUpdatesCommand>();
 
         services.AddTransient<ICommand, ListBlueprints>();
         services.AddTransient<ICommand, RefreshBlueprintCatalogs>();
