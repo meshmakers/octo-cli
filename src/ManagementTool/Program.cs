@@ -279,6 +279,8 @@ internal static class Program
         // AB#7192: the token and the capability clients of a child tenant (Delete --disable-features).
         services.AddSingleton<IChildTenantAccess, ChildTenantAccess>();
         services.AddSingleton<IChildTenantFeaturesFactory, ChildTenantFeaturesFactory>();
+        // AB#9872: the identity clients of a child tenant (client role commands with --child-tenant-id).
+        services.AddSingleton<IChildTenantIdentityFactory, ChildTenantIdentityFactory>();
         services.AddSingleton<ITenantSetupClientFactory, TenantSetupClientFactory>();
         services.AddSingleton<ICommunicationServicesClient, CommunicationServicesClient>();
         services.AddSingleton<IStreamDataServicesClient, StreamDataServicesClient>();

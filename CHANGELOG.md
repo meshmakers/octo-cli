@@ -14,6 +14,14 @@ All notable changes to octo-cli are listed here. Newest first.
   logged or printed. A refusal of `create_agent` after a write no longer claims that nothing changed. Listing agent runs
   is not part of this change (it needs the run orchestrator). **Requires octo-mcp-service with the
   agent tools (AB#8454) and the context field `McpServiceUrl` (AB#9647).**
+- **AB#9872 — client role commands reach a child tenant.** `GetClientRoles`, `AddClientToRole` and `RemoveClientFromRole` take
+  the optional `-ctid|--child-tenant-id <tenant>` (the option name of `ProvisionClientInTenant`): they act in that child tenant
+  (at any depth) of the context's tenant with the caller's token for it, obtained like `Delete --disable-features` does (token
+  exchange of a signed-in user, or the client's mirror in a client-credentials session), so a role grant on every tenant of a
+  cluster needs only the parent context. A tenant that is not listed by `GetTenants -r` of the context, the context's own
+  tenant and a caller without a token for the child end with a message naming the tenant and exit code -5; a refusal in the
+  child keeps exit code -3. No token is printed. Same options and output as before; without the option nothing changes.
+  Needs no new server version.
 - **AB#9699 — `GetClientRoles` lists the roles of a client in a tenant.** `octo-cli -c GetClientRoles -id <clientId>` prints
   the roles assigned directly to the client in the tenant of the context as JSON (`Id`, `Name`; group-inherited roles are not
   listed), read-only through the existing identity REST reads, so operators can check a grant such as `CommunicationManagement`
