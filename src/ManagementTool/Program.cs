@@ -325,7 +325,6 @@ internal static class Program
         services.AddTransient<ICommand, EnableAgentCommand>();
         services.AddTransient<ICommand, DisableAgentCommand>();
         services.AddTransient<ICommand, GetAgentsCommand>();
-        services.AddTransient<ICommand, GetAgentRunsCommand>();
 
         services.AddTransient<ICommand, ListBlueprints>();
         services.AddTransient<ICommand, RefreshBlueprintCatalogs>();

@@ -214,9 +214,9 @@ octo-cli -c GetPipelineDebug --identifier cc0000000000000000000003
 octo-cli -c GetPipelineDebug --identifier cc0000000000000000000003 --json
 ```
 
-## Agent commands: CreateAgent, UpdateAgent, EnableAgent, DisableAgent, GetAgents, GetAgentRuns
+## Agent commands: CreateAgent, UpdateAgent, EnableAgent, DisableAgent, GetAgents
 
-`Ai/Agents/*AgentCommand.cs`, `GetAgentsCommand.cs`, `GetAgentRunsCommand.cs`, shared part `AgentMcp.cs` (AB#8455).
+`Ai/Agents/*AgentCommand.cs`, `GetAgentsCommand.cs`, shared part `AgentMcp.cs`.
 
 ```bash
 octo-cli -c CreateAgent -n "Knowledge curator" -if ./curator.md -g "knowledge_*:Medium" -rc Medium [-d] [-r <role>]...
@@ -224,7 +224,6 @@ octo-cli -c UpdateAgent -a "Knowledge curator" [-n|-i|-if|-m|-cm|-al|-rk|-su|-mi
 octo-cli -c EnableAgent  -a "Knowledge curator"
 octo-cli -c DisableAgent -a "Knowledge curator"
 octo-cli -c GetAgents [-a "Knowledge curator"] [--json]
-octo-cli -c GetAgentRuns [-a "Knowledge curator"]
 ```
 
 - **The checks stay in the MCP service.** Each command calls one agent tool of octo-mcp-service — `create_agent`,
@@ -241,10 +240,13 @@ octo-cli -c GetAgentRuns [-a "Knowledge curator"]
   `query_entities:Low:{"ckTypeId":["System.Ai/KnowledgePage"]}`). In `UpdateAgent` the given grants, CK types (`-ct`) and
   roles (`-r`) replace the list; `-cg`, `-cct`, `-cr` clear it, `-cm` goes back to the tenant default model. Defaults of a
   new agent are narrow: no grants, risk ceiling Low, change budget 0, write mode Propose.
-- **GetAgentRuns** is not available yet: it ends with "Agent runs are not available yet" (AB#8460 brings the run
-  history), without signing in or calling a service.
+- **Refusals.** A refusal ends with the tool's code and message. A refusal of `update_agent` or `set_agent_enabled`
+  can follow a partial change; a refusal of `create_agent` after its first write (`IdentityFailed`, `Failed`) can leave a
+  client, agent or mandate when its rollback failed too, and the message names it. Only refusals before any write say
+  "Nothing was changed by this command."
+- **Listing runs** is not part of these commands yet: it needs the run orchestrator.
 - **Output.** One line per agent (name, id, enabled, version, autonomy, client, mandate summary); `GetAgents -a` and the
   write commands add model, runner, sponsor, client state, grants, writable CK types and the first line of the
   instructions. `--json` prints the tool's answer. The token is never logged or printed, at any log level.
 - Tests: `AgentCommandsTests` (tool, endpoint and token per command, every option, clear flags, invalid input before any
-  call, no URL override, refusal of a non-administrator, GetAgentRuns, token never in logs or output).
+  call, no URL override, refusal of a non-administrator, partial refusals, token never in logs or output).

@@ -16,10 +16,9 @@ using Microsoft.Extensions.Options;
 namespace ManagementTool.Tests;
 
 /// <summary>
-///     <c>CreateAgent</c>, <c>UpdateAgent</c>, <c>EnableAgent</c>, <c>DisableAgent</c>, <c>GetAgents</c> and
-///     <c>GetAgentRuns</c> (AB#8455): the first five call the agent tools of the MCP service on the tenant route of the
-///     context's <c>McpServiceUrl</c> with the user's own token, so the admin check stays in octo-mcp-service; a refusal
-///     ends with the tool's code; the token never reaches output; <c>GetAgentRuns</c> says runs are not available yet.
+///     <c>CreateAgent</c>, <c>UpdateAgent</c>, <c>EnableAgent</c>, <c>DisableAgent</c> and <c>GetAgents</c> call the
+///     agent tools of the MCP service on the tenant route of the context's <c>McpServiceUrl</c> with the user's own token,
+///     so the admin check stays in octo-mcp-service; a refusal ends with the tool's code; the token never reaches output.
 /// </summary>
 public sealed class AgentCommandsTests
 {
@@ -319,18 +318,19 @@ public sealed class AgentCommandsTests
         Assert.Contains("Nothing was changed by this command.", ex.Message);
     }
 
-    [Fact]
-    public async Task GetAgentRuns_SaysRunsAreNotAvailableYet_WithoutSignInOrCall()
+    [Theory]
+    [InlineData("IdentityFailed")]
+    [InlineData("Failed")]
+    public async Task ARefusalOfCreateAgentAfterAWrite_DoesNotClaimThatNothingChanged(string code)
     {
-        var command = new GetAgentRunsCommand(new RecordingLogger<GetAgentRunsCommand>(), Options(),
-            A.Fake<IAssetServicesClient>(), A.Fake<IAuthenticationService>());
-        command.CommandArgumentValue.ParseLayer(["-a", "Knowledge curator"]);
+        // The identity step failed and the rollback could not delete the client.
+        _nextAnswer = "{\"isSuccess\":false,\"errorCode\":\"" + code + "\",\"errorMessage\":\"Nothing was kept, except: client 'agent-knowledge-curator' remains and must be deleted by hand.\"}";
 
-        await command.PreValidate();
-        var ex = await Assert.ThrowsAsync<ToolException>(() => command.Execute());
-        Assert.Contains("not available yet", ex.Message);
-        Assert.Contains("AB#8460", ex.Message);
-        Assert.Empty(_calls);
+        var ex = await Assert.ThrowsAsync<ToolException>(() =>
+            Create(Options(), "-n", "Knowledge curator", "-i", "Keep the pages tidy."));
+        Assert.Contains("client 'agent-knowledge-curator' remains", ex.Message);
+        Assert.DoesNotContain("Nothing was changed", ex.Message);
+        Assert.Contains("delete it by hand", ex.Message);
     }
 
     [Fact]

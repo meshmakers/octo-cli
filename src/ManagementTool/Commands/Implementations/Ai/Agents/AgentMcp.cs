@@ -24,10 +24,6 @@ internal static class AgentMcp
     public const string ListTool = "list_agents";
     public const string GetTool = "get_agent";
 
-    /// <summary>The answer of <c>GetAgentRuns</c> until the run history exists.</summary>
-    public const string RunsNotAvailable =
-        "Agent runs are not available yet: the run history of agents comes with AB#8460. Nothing was read.";
-
     /// <summary>The tenant from <c>-tid</c> or the context, lower case.</summary>
     public static string TenantId(ICommandArgumentValue arguments, IArgument tenantIdArg, OctoToolOptions options) =>
         KnowledgePlatformUpdatesCommandSupport.TenantId(arguments, tenantIdArg, options);
@@ -61,18 +57,26 @@ internal static class AgentMcp
             return result;
         }
 
-        throw KnowledgePlatformUpdatesMcp.Refused(result, toolName, RefusalOutcome(toolName));
+        var errorCode = result["errorCode"] is JsonValue code && code.TryGetValue<string>(out var text) ? text : null;
+        throw KnowledgePlatformUpdatesMcp.Refused(result, toolName, RefusalOutcome(toolName, errorCode));
     }
 
     /// <summary>
     ///     What a refusal means for the tenant. <c>update_agent</c> and <c>set_agent_enabled</c> can refuse after a partial
     ///     change (the agent was updated or disabled, its identity client was not: <c>IdentityFailed</c>), so the command
-    ///     must not claim that nothing changed; their message says what did. <c>create_agent</c> keeps nothing on any
-    ///     failure, and the reads change nothing.
+    ///     must not claim that nothing changed; their message says what did. <c>create_agent</c> rolls its writes back on a
+    ///     failure after the first write (<c>IdentityFailed</c>, <c>Failed</c>), but when the rollback fails too, a client,
+    ///     agent or mandate can remain and the tool's message names it; only its refusals before any write (validation,
+    ///     <c>AgentExists</c>, <c>NotTenantAdministrator</c>, ...) change nothing. The reads change nothing.
     /// </summary>
-    public static string RefusalOutcome(string toolName) => toolName is UpdateTool or SetEnabledTool
-        ? "The tool's message says what was changed; a refusal after a partial change is possible, so check the agent with GetAgents."
-        : "Nothing was changed by this command.";
+    public static string RefusalOutcome(string toolName, string? errorCode = null) => toolName switch
+    {
+        UpdateTool or SetEnabledTool =>
+            "The tool's message says what was changed; a refusal after a partial change is possible, so check the agent with GetAgents.",
+        CreateTool when errorCode is "IdentityFailed" or "Failed" or null =>
+            "The tool's message says what was kept; when it names a client, agent or mandate that remains, delete it by hand, then check with GetAgents.",
+        _ => "Nothing was changed by this command."
+    };
 
     /// <summary>
     ///     Parses a tool grant <c>&lt;toolPattern&gt;[:&lt;maxRisk&gt;[:&lt;argumentConstraints JSON&gt;]]</c>, e.g.
@@ -159,6 +163,12 @@ internal static class AgentMcp
         }
 
         console.WriteLine(headline);
+        if (answer["message"] is JsonValue message && message.TryGetValue<string>(out var note) &&
+            !string.IsNullOrWhiteSpace(note))
+        {
+            console.WriteLine($"  Note: {note}");
+        }
+
         if (answer["agent"] is JsonObject agent)
         {
             PrintAgent(console, agent, detailed: true);
