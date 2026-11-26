@@ -12,6 +12,13 @@ All notable changes to octo-cli are listed here. Newest first.
   for the CD deploy clients before and after a change; standard output carries only the JSON (logs go to standard error), so
   scripts can pipe it. An unknown client or tenant ends with a message naming it and exit
   code -5 (a context whose tenant does not exist usually stops earlier, at sign-in, with -4). Needs no new server version.
+- **AB#8690 — `SetAiSpendCap` and `GetAiSpend` (AI services group).** `SetAiSpendCap -t <tenant> -c <EUR> -r <reason>
+  [-ks <key source>]` sets the monthly LLM spend cap of a tenant for the central-key LLM gateway
+  (`PUT system/v1/aiSpendCaps/{tenant}`); without `-ks` the tenant keeps its stored key source (`CentralKey` when it has none yet); only a context of the system tenant with the role `AiBudgetAdmin` succeeds,
+  every change is audited by the AI service. A cap that is not a decimal number of 0 or more (with `.`), an unknown key
+  source or a missing reason is refused before any request. `GetAiSpend` shows key source, cap and the spend (spent,
+  reserved, calls, reset) of the current and previous UTC month: of the context's own tenant, or with `-t` of another
+  tenant through the cap administration.
 
 ### Changed
 
