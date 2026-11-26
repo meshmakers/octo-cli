@@ -27,6 +27,9 @@ public sealed class AiSpendCommandTests
     public async Task SetAiSpendCap_SendsTenantCapCentralKeyAndReason()
     {
         SetAiSpendCapRequestDto? sent = null;
+        // A tenant without an entry yet reads as key source None without a change date.
+        A.CallTo(() => _client.GetAiSpendCapAsync("ai-sandbox"))
+            .Returns(new AiSpendReportDto { TenantId = "ai-sandbox", KeySource = "None" });
         A.CallTo(() => _client.SetAiSpendCapAsync("ai-sandbox", A<SetAiSpendCapRequestDto>._))
             .Invokes((string _, SetAiSpendCapRequestDto r) => sent = r)
             .Returns(new AiSpendCapChangeDto { TenantId = "ai-sandbox", NewCapMonthlyEur = 12.5m });
@@ -78,6 +81,28 @@ public sealed class AiSpendCommandTests
         await command.Execute();
 
         Assert.Equal(expected, sent!.KeySource);
+    }
+
+    [Theory]
+    [InlineData("Free")]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("3")]
+    public async Task SetAiSpendCap_WithoutKeySource_UnknownStoredKeySource_IsRefused_AndNothingIsSet(string? stored)
+    {
+        // A stored value the CLI does not know must not become CentralKey on a cap-only change (fail closed).
+        A.CallTo(() => _client.GetAiSpendCapAsync("ai-sandbox")).Returns(new AiSpendReportDto
+        {
+            TenantId = "ai-sandbox",
+            KeySource = stored!,
+            CapChangedAt = DateTimeOffset.UnixEpoch
+        });
+        var command = NewSet();
+        command.CommandArgumentValue.ParseLayer(["-t", "ai-sandbox", "-c", "5", "-r", "raise"]);
+
+        var refusal = await Assert.ThrowsAsync<ToolException>(command.Execute);
+        Assert.Contains("-ks", refusal.Message);
+        A.CallTo(() => _client.SetAiSpendCapAsync(A<string>._, A<SetAiSpendCapRequestDto>._)).MustNotHaveHappened();
     }
 
     [Fact]

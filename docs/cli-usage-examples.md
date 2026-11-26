@@ -336,10 +336,13 @@ octo-cli -c RevokeAiCredentials -y   # skip confirmation
 octo-cli -c GetAiSpend
 
 # As platform admin: context logged in to the system tenant with the role AiBudgetAdmin.
-octo-cli -c SetAiSpendCap -t ai-sandbox -c 20 -r "pilot budget"     # audited: old, new, who, why
+octo-cli -c SetAiSpendCap -t ai-sandbox -c 20 -r "pilot budget"     # audited: old, new, who, why; key source kept
+octo-cli -c SetAiSpendCap -t ai-sandbox -c 20 -r "to central key" -ks CentralKey   # switch another key source
 octo-cli -c GetAiSpend -t ai-sandbox                                # another tenant's cap and spend
 octo-cli -c SetAiSpendCap -t ai-sandbox -c 0 -r "stop central-key calls"
 ```
 
 The cap lives in the AI service's system database, not in the tenant; the gateway uses a change within 60 seconds. A
-tenant without a cap reads as key source `None` (its central-key calls are refused).
+tenant without a cap reads as key source `None` (its central-key calls are refused). Without `-ks` the stored key
+source is kept (a tenant without an entry gets `CentralKey`); a stored value the CLI does not know is refused and needs
+an explicit `-ks`.

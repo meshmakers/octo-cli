@@ -52,7 +52,8 @@ internal class SetAiSpendCapCommand : ServiceClientOctoCommand<IAiServicesClient
                         new CodeSampleArgument(_capArg, "20"),
                         new CodeSampleArgument(_reasonArg, "pilot budget AB#8690")
                     ],
-                    description: "Give a tenant a central-key budget of EUR 20 per UTC month")
+                    description:
+                    "Set a monthly cap of EUR 20 (key source kept; a tenant without an entry gets CentralKey). Add -ks CentralKey to switch a tenant with another key source to the central key")
             ],
             Notes:
             [
@@ -94,15 +95,20 @@ internal class SetAiSpendCapCommand : ServiceClientOctoCommand<IAiServicesClient
         if (!keySourceGiven)
         {
             // Changing only the cap must not switch a ByoKey, Subscription or deliberately blocked (None) tenant to the
-            // central key: keep the stored key source; a tenant without any yet gets CentralKey.
+            // central key: keep the stored key source; only a tenant without an entry yet (None, no change date) gets
+            // CentralKey. A stored value this command does not know (or none) is refused instead of defaulting to
+            // CentralKey, which would open the central key on a cap-only change.
             var current = await ServiceClient.GetAiSpendCapAsync(tenantId);
-            knownKeySource = KeySources.FirstOrDefault(k =>
-                string.Equals(k, current.KeySource, StringComparison.OrdinalIgnoreCase) &&
-                !string.Equals(k, "None", StringComparison.Ordinal)) ?? "CentralKey";
-            if (current.CapChangedAt != null && string.Equals(current.KeySource, "None", StringComparison.OrdinalIgnoreCase))
+            var stored = KeySources.FirstOrDefault(k =>
+                string.Equals(k, current.KeySource, StringComparison.OrdinalIgnoreCase));
+            if (stored == null)
             {
-                knownKeySource = "None";
+                throw new ToolException(
+                    $"The stored key source '{current.KeySource}' of tenant '{tenantId}' is not one of " +
+                    $"{string.Join(", ", KeySources)}; give the key source explicitly with -ks.");
             }
+
+            knownKeySource = stored == "None" && current.CapChangedAt == null ? "CentralKey" : stored;
         }
 
         Logger.LogInformation("Setting the LLM spend cap of tenant '{TenantId}' at '{ServiceClientServiceUri}'",
