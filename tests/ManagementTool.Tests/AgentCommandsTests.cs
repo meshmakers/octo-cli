@@ -291,10 +291,32 @@ public sealed class AgentCommandsTests
     {
         _nextAnswer = """{"isSuccess":false,"errorCode":"NotTenantAdministrator","errorMessage":"Only tenant administrators manage agents"}""";
 
-        var ex = await Assert.ThrowsAsync<ToolException>(() => Get());
+        var ex = await Assert.ThrowsAsync<ToolException>(() => Disable("-a", "Knowledge curator"));
         Assert.Contains("NotTenantAdministrator", ex.Message);
         Assert.Contains("Only tenant administrators manage agents", ex.Message);
         Assert.Empty(_printed);
+    }
+
+    [Fact]
+    public async Task APartialRefusalOfTheKillSwitch_DoesNotClaimThatNothingChanged()
+    {
+        // set_agent_enabled disabled the agent but could not disable its client (IdentityFailed).
+        _nextAnswer = """{"isSuccess":false,"errorCode":"IdentityFailed","errorMessage":"The agent is disabled, but its client is still enabled"}""";
+
+        var ex = await Assert.ThrowsAsync<ToolException>(() => Disable("-a", "Knowledge curator"));
+        Assert.Contains("The agent is disabled, but its client is still enabled", ex.Message);
+        Assert.DoesNotContain("Nothing was changed", ex.Message);
+        Assert.Contains("partial change", ex.Message);
+    }
+
+    [Fact]
+    public async Task ARefusalOfCreateAgent_SaysNothingWasChanged()
+    {
+        _nextAnswer = """{"isSuccess":false,"errorCode":"AgentExists","errorMessage":"An agent named 'Knowledge curator' exists already."}""";
+
+        var ex = await Assert.ThrowsAsync<ToolException>(() =>
+            Create(Options(), "-n", "Knowledge curator", "-i", "Keep the pages tidy."));
+        Assert.Contains("Nothing was changed by this command.", ex.Message);
     }
 
     [Fact]

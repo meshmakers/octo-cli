@@ -96,7 +96,7 @@ Environment variables are prefixed with `OCTO_`:
 | Bots | Dump, Restore, ExportArchiveData, ImportArchiveData, RunFixupScripts | Bot Services |
 | Communication | enable/disable, adapters (incl. RotateAdapterServiceAccountSecret), SwitchServiceAccountsToImpersonation, pipelines (incl. MovePipelines for bulk reassignment to a different adapter), triggers, pools, adapter pool queue (GetAdapterPoolQueue, CancelQueuedExecution), dataFlows, workloads (GetWorkloadsByChart, UpdateWorkloadChartVersion, UpdateWorkloadResources, DeployWorkload, UndeployWorkload) | Communication Controller |
 | Reporting | enable/disable | Report Services |
-| AI Services | EnableAi, DisableAi, RedeemAiTicket (anonymous — bastion-side), GetAiCredentialsStatus, RevokeAiCredentials | AI Services |
+| AI Services | EnableAi, DisableAi, RedeemAiTicket (anonymous — bastion-side), GetAiCredentialsStatus, RevokeAiCredentials; CreateAgent, UpdateAgent, EnableAgent, DisableAgent, GetAgents, GetAgentRuns (through the MCP agent tools) | AI Services |
 | DevOps | certificates | Local operations |
 | General | login, loginClientCredentials, authStatus, config | Local operations |
 | Context | addContext, removeContext, useContext, listContexts | Local operations |

@@ -54,9 +54,25 @@ internal static class AgentMcp
 
         logger.LogInformation("Calling MCP tool '{Tool}' for tenant '{TenantId}' at {Endpoint}", toolName, tenantId,
             endpoint);
-        return KnowledgePlatformUpdatesMcp.RequireSuccess(
+        var result = KnowledgePlatformUpdatesMcp.AnswerObject(
             await mcpToolClient.CallToolAsync(endpoint, token, toolName, arguments), toolName);
+        if (KnowledgePlatformUpdatesMcp.IsSuccess(result))
+        {
+            return result;
+        }
+
+        throw KnowledgePlatformUpdatesMcp.Refused(result, toolName, RefusalOutcome(toolName));
     }
+
+    /// <summary>
+    ///     What a refusal means for the tenant. <c>update_agent</c> and <c>set_agent_enabled</c> can refuse after a partial
+    ///     change (the agent was updated or disabled, its identity client was not: <c>IdentityFailed</c>), so the command
+    ///     must not claim that nothing changed; their message says what did. <c>create_agent</c> keeps nothing on any
+    ///     failure, and the reads change nothing.
+    /// </summary>
+    public static string RefusalOutcome(string toolName) => toolName is UpdateTool or SetEnabledTool
+        ? "The tool's message says what was changed; a refusal after a partial change is possible, so check the agent with GetAgents."
+        : "Nothing was changed by this command.";
 
     /// <summary>
     ///     Parses a tool grant <c>&lt;toolPattern&gt;[:&lt;maxRisk&gt;[:&lt;argumentConstraints JSON&gt;]]</c>, e.g.
