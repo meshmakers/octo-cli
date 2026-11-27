@@ -6,6 +6,14 @@ All notable changes to octo-cli are listed here. Newest first.
 
 ### Added
 
+- **AB#8455 — Tenant administrators manage agents with octo-cli.** `CreateAgent`, `UpdateAgent`, `EnableAgent`,
+  `DisableAgent` and `GetAgents` (list, or one agent with `-a`) call the agent tools of the MCP service (`create_agent`,
+  `update_agent`, `set_agent_enabled`, `list_agents`, `get_agent`) on `<McpServiceUrl of the context>/<tenant>/mcp` with
+  the signed-in user's token, so the checks stay in the MCP service (the write commands need a tenant administrator and
+  refuse an agent's own token; a refusal ends with the tool's code, e.g. `NotTenantAdministrator`). No per-call URL option and no client-secret option; the token is never
+  logged or printed. A refusal of `create_agent` after a write no longer claims that nothing changed. Listing agent runs
+  is not part of this change (it needs the run orchestrator). **Requires octo-mcp-service with the
+  agent tools (AB#8454) and the context field `McpServiceUrl` (AB#9647).**
 - **AB#9699 — `GetClientRoles` lists the roles of a client in a tenant.** `octo-cli -c GetClientRoles -id <clientId>` prints
   the roles assigned directly to the client in the tenant of the context as JSON (`Id`, `Name`; group-inherited roles are not
   listed), read-only through the existing identity REST reads, so operators can check a grant such as `CommunicationManagement`

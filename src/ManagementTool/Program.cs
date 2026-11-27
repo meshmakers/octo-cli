@@ -4,6 +4,7 @@ using Meshmakers.Common.Shared.Services;
 using Meshmakers.Octo.Communication.Contracts;
 using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations;
 using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Ai;
+using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Ai.Agents;
 using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Asset.Blueprints;
 using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Asset.CkModelLibraries;
 using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Asset.FixupScripts;
@@ -319,6 +320,11 @@ internal static class Program
         services.AddSingleton<IMcpToolClient, McpToolClient>(_ => new McpToolClient());
         services.AddTransient<ICommand, ListKnowledgePlatformUpdatesCommand>();
         services.AddTransient<ICommand, AdoptKnowledgePlatformUpdatesCommand>();
+        services.AddTransient<ICommand, CreateAgentCommand>();
+        services.AddTransient<ICommand, UpdateAgentCommand>();
+        services.AddTransient<ICommand, EnableAgentCommand>();
+        services.AddTransient<ICommand, DisableAgentCommand>();
+        services.AddTransient<ICommand, GetAgentsCommand>();
 
         services.AddTransient<ICommand, ListBlueprints>();
         services.AddTransient<ICommand, RefreshBlueprintCatalogs>();
