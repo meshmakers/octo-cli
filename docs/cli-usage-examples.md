@@ -269,6 +269,10 @@ vault kv get -field=secret <path> | octo-cli -c AddClientCredentialsClient -id c
 octo-cli -c GetClientMirrors -id ci-deploy
 # List the roles assigned directly to the client (mirror) in one tenant, e.g. before and after a role grant.
 octo-cli --context <tenant-context> -c GetClientRoles -id ci-deploy
+# The same from the parent's context for a child tenant, with your token exchanged for it (AB#9872).
+octo-cli -c GetClientRoles -id ci-deploy -ctid acme
+octo-cli -c AddClientToRole -id ci-deploy -r CommunicationManagement -ctid acme
+octo-cli -c RemoveClientFromRole -id ci-deploy -r CommunicationManagement -ctid acme -y
 # Backfill: provision the flagged client into every existing sub-tenant (idempotent).
 octo-cli -c ProvisionClientInExistingTenants -id ci-deploy
 # Manually provision into a single named sub-tenant.

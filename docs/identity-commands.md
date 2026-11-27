@@ -1,5 +1,5 @@
 ---
-description: First-admin setup of a tenant, session revocation, sibling-tenant grants, user password and role methods, GetClientRoles, the 403 message with the missing role.
+description: First-admin setup of a tenant, session revocation, sibling-tenant grants, user password and role methods, GetClientRoles, client roles in a child tenant, the 403 message with the missing role.
 applies_to: **/Implementations/Identity/**, {Runner,ForbiddenResponseMessage,CkMethodErrorText,CkMethodFallback}.cs
 ---
 
@@ -216,6 +216,56 @@ before and after a change; `--context` selects the tenant.
   `CommunicationManagement`). Output and logs hold role ids and names and the client id only, never a secret.
 - Tests: `GetClientRolesCommandTests` (real `IdentityServicesClient` against a local listener and the real `Runner`: success with
   names and order, no roles, role id outside the tenant, unknown client, unknown tenant without a client read).
+
+## Client roles in a child tenant (`--child-tenant-id`)
+
+`GetClientRoles`, `AddClientToRole` and `RemoveClientFromRole` take the optional `-ctid|--child-tenant-id <tenant>` (AB#9872),
+the option name of their neighbours `ProvisionClientInTenant` and `UnprovisionClientFromTenant`. With it the command acts in
+that child tenant of the context's tenant instead of the context's tenant, so an operator grants or checks a role of the
+mirrored CD client in every customer tenant from one parent context (e.g. `octosystem`), without a context and a login per
+tenant. Without the option nothing changes.
+
+```bash
+octo-cli --context <cluster>_octosystem -c GetClientRoles -id ci-deploy-<cluster> -ctid energyiq
+octo-cli --context <cluster>_octosystem -c AddClientToRole -id ci-deploy-<cluster> -r CommunicationManagement -ctid energyiq
+octo-cli --context <cluster>_octosystem -c RemoveClientFromRole -id ci-deploy-<cluster> -r CommunicationManagement -ctid energyiq -y
+```
+
+- **Flow** (`ChildTenantIdentityFactory`, `Commands/Implementations/Identity/Clients/ChildTenantIdentity.cs`):
+  1. A context without a tenant is refused (`The context names no tenant: --child-tenant-id needs a context of the parent
+     tenant.`); a tenant id equal to the context's tenant is refused (`Tenant '<t>' is the tenant of the context, not a child of it: omit
+     --child-tenant-id.`).
+  2. The descendants of the context's tenant are read with the context's token (`GetTenantDescendantsAsync`, the list of
+     `GetTenants -r`). A tenant that is not among them - unknown, or below another parent - is refused before any token is
+     requested: `Tenant '<t>' is not a child tenant of '<parent>' at '<host>': it does not exist or belongs to another parent.`
+  3. The token for the child comes from `IChildTenantAccess`, the path of `Delete --disable-features` (unchanged): a
+     signed-in user's token is exchanged for the child (RFC 8693; the identity service allows it for a descendant where the
+     user is provisioned with a role, e.g. by `ProvisionCurrentUser -ttid <tenant>`), a client-credentials session (`OCTO_CLI_CLIENT_ID` and a secret set) requests a token for
+     the client's mirror in the child (`OCTO_CLI_CHILD_CLIENT_SECRET` when the mirror has its own secret).
+  4. The identity REST client and the GraphQL tenant client (CK methods `AddRole` / `RemoveRole`) are built for the child with
+     that token. `IdentityMethodCall` gets a fixed-token authentication, so the context's token never reaches the child's
+     routes. Options, output (`GetClientRoles`: the same JSON) and idempotency are the same as in the context's tenant;
+     `RemoveClientFromRole` names the child tenant (lower case) and the parent scope (tenant and host, as `Delete`) in its
+     confirmation question.
+- **Rights**: the same as the other child-tenant commands - the caller may list the context's child tenants and holds a token
+  for the child as a user provisioned there or as the client's mirror there (client credentials). The role the identity read or
+  method needs is checked by the service in the child, as in the context's tenant.
+- **Errors**, all without output on standard output and without a token in any message: not a child or the context's own
+  tenant `-5`; no token for the child (exchange refused, no client-credentials variables) `-5` with the reason of
+  `ChildTenantAccess`; a `403` of the descendants read or of the child (`Runner`, missing role or the `ProvisionCurrentUser`
+  hint) `-3`; a refused method call (`METHOD_FORBIDDEN`, `ROLE_NOT_FOUND`) `-3` as without the option.
+- **No server change**: the token is issued for the child, so the tenant authorization middleware sees a matching
+  `tenant_id`. Verified on the local stack 2026-11-26 with a client-credentials session of `octosystem` and a scratch child:
+  read, grant (twice, idempotent), read, remove; unknown tenant, the parent of the context and the context's own tenant
+  exit `-5`; a grandchild where the client's mirror holds no role exits `-3` with the role message.
+- Tests: `ClientRolesChildTenantCommandTests` (real `ChildTenantIdentityFactory` and `IdentityServicesClient` against a local
+  listener that records the bearer token, real `Runner`: success with the child token on every request, upper-case id, a
+  grandchild, unknown tenant, a tenant that exists but is no child, the context's own tenant, no token for the child, `403` in
+  the child, `403` of the descendants read, no child call without the option; `AddClientToRole` / `RemoveClientFromRole` call
+  the method on the child's clients only, the confirmation names child and parent scope, a refused child changes nothing,
+  `METHOD_FORBIDDEN` exits `-3`; the real factory builds the child's GraphQL route `tenants/<child>/GraphQL` and identity
+  route with the child token only and keeps it through the fixed-token authentication; a context without a tenant is
+  refused before any read).
 
 ## 403 names the missing role
 
