@@ -68,6 +68,11 @@ public sealed class ChildTenantIdentityFactory(
         var childId = childTenantId.Trim().ToLowerInvariant();
         var urls = options.Value;
         var contextTenantId = urls.TenantId?.Trim().ToLowerInvariant();
+        if (string.IsNullOrEmpty(contextTenantId))
+        {
+            throw new ToolException(
+                "The context names no tenant: --child-tenant-id needs a context of the parent tenant.");
+        }
 
         if (childId == contextTenantId)
         {

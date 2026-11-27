@@ -246,12 +246,15 @@ public sealed class ClientRolesChildTenantCommandTests : IClassFixture<ClientRol
         var confirmation = A.Fake<IConfirmationService>();
         A.CallTo(() => confirmation.Confirm(A<string>._)).Returns(false);
 
+        A.CallTo(() => _contextIdentity.ServiceUri).Returns(new Uri("https://identity.example.test/parent/v1/"));
+
         var exitCode = await RunMethodCommand(typeof(RemoveClientFromRole), child.Factory,
-            confirmation, "-id", ClientId, "-r", "CommunicationManagement", "-ctid", Child);
+            confirmation, "-id", ClientId, "-r", "CommunicationManagement", "-ctid", " CHILD-A ");
 
         Assert.NotEqual(0, exitCode);
         A.CallTo(() => confirmation.Confirm(
-                $"Are you sure you want to remove client '{ClientId}' from role 'CommunicationManagement' in tenant '{Child}'?"))
+                $"Are you sure you want to remove client '{ClientId}' from role 'CommunicationManagement' in child " +
+                $"tenant '{Child}' of parent tenant 'parent' at 'https://identity.example.test'?"))
             .MustHaveHappenedOnceExactly();
         A.CallTo(() => child.Factory.CreateAsync(A<string>._)).MustNotHaveHappened();
         Assert.Empty(child.Requests);
@@ -287,6 +290,45 @@ public sealed class ClientRolesChildTenantCommandTests : IClassFixture<ClientRol
 
         Assert.Equal(-3, exitCode);
         Assert.Single(child.Requests);
+    }
+
+    [Fact]
+    public async Task Factory_BuildsTheWritePathForTheChild_TenantRouteAndChildTokenOnly()
+    {
+        var options = Options.Create(new OctoToolOptions
+        {
+            TenantId = Parent, IdentityServiceUrl = "https://identity.example.test/",
+            AssetServiceUrl = "https://assets.example.test/"
+        });
+        var factory = new ChildTenantIdentityFactory(options, _asset, _contextAuth, _access);
+
+        var child = await factory.CreateAsync(Child);
+
+        Assert.Equal(Child, child.TenantId);
+        Assert.EndsWith($"tenants/{Child}/GraphQL", child.Tenant.ServiceUri.ToString().TrimEnd('/'));
+        Assert.Equal(ChildToken, child.Tenant.AccessToken.AccessToken);
+        Assert.Contains($"/{Child}/", child.Identity.ServiceUri.ToString());
+        Assert.Equal(ChildToken, child.Identity.AccessToken.AccessToken);
+
+        // What IdentityMethodCall does before every call: the child token stays, the context's never comes in.
+        await child.Authentication.EnsureAuthenticated(child.Tenant.AccessToken);
+        Assert.Equal(ChildToken, child.Tenant.AccessToken.AccessToken);
+        A.CallTo(() => _contextAuth.EnsureAuthenticated(child.Tenant.AccessToken)).MustNotHaveHappened();
+        A.CallTo(() => _contextAuth.EnsureAuthenticated(child.Identity.AccessToken)).MustNotHaveHappened();
+    }
+
+    [Fact]
+    public async Task Factory_ContextWithoutTenant_IsRefused_BeforeAnyRead()
+    {
+        var factory = new ChildTenantIdentityFactory(Options.Create(new OctoToolOptions()), _asset, _contextAuth,
+            _access);
+
+        var error = await Assert.ThrowsAsync<ToolException>(() => factory.CreateAsync(Child));
+
+        Assert.Equal("The context names no tenant: --child-tenant-id needs a context of the parent tenant.",
+            error.Message);
+        A.CallTo(() => _asset.GetTenantDescendantsAsync()).MustNotHaveHappened();
+        A.CallTo(() => _access.GetAccessTokenAsync(A<string>._)).MustNotHaveHappened();
     }
 
     [Fact]

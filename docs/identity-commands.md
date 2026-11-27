@@ -232,7 +232,8 @@ octo-cli --context <cluster>_octosystem -c RemoveClientFromRole -id ci-deploy-<c
 ```
 
 - **Flow** (`ChildTenantIdentityFactory`, `Commands/Implementations/Identity/Clients/ChildTenantIdentity.cs`):
-  1. A tenant id equal to the context's tenant is refused (`Tenant '<t>' is the tenant of the context, not a child of it: omit
+  1. A context without a tenant is refused (`The context names no tenant: --child-tenant-id needs a context of the parent
+     tenant.`); a tenant id equal to the context's tenant is refused (`Tenant '<t>' is the tenant of the context, not a child of it: omit
      --child-tenant-id.`).
   2. The descendants of the context's tenant are read with the context's token (`GetTenantDescendantsAsync`, the list of
      `GetTenants -r`). A tenant that is not among them - unknown, or below another parent - is refused before any token is
@@ -244,7 +245,8 @@ octo-cli --context <cluster>_octosystem -c RemoveClientFromRole -id ci-deploy-<c
   4. The identity REST client and the GraphQL tenant client (CK methods `AddRole` / `RemoveRole`) are built for the child with
      that token. `IdentityMethodCall` gets a fixed-token authentication, so the context's token never reaches the child's
      routes. Options, output (`GetClientRoles`: the same JSON) and idempotency are the same as in the context's tenant;
-     `RemoveClientFromRole` names the tenant in its confirmation question.
+     `RemoveClientFromRole` names the child tenant (lower case) and the parent scope (tenant and host, as `Delete`) in its
+     confirmation question.
 - **Rights**: the same as the other child-tenant commands - the caller may list the context's child tenants and holds a token
   for the child as a user provisioned there or as the client's mirror there (client credentials). The role the identity read or
   method needs is checked by the service in the child, as in the context's tenant.
@@ -260,8 +262,10 @@ octo-cli --context <cluster>_octosystem -c RemoveClientFromRole -id ci-deploy-<c
   listener that records the bearer token, real `Runner`: success with the child token on every request, upper-case id, a
   grandchild, unknown tenant, a tenant that exists but is no child, the context's own tenant, no token for the child, `403` in
   the child, `403` of the descendants read, no child call without the option; `AddClientToRole` / `RemoveClientFromRole` call
-  the method on the child's clients only, the confirmation names the tenant, a refused child changes nothing,
-  `METHOD_FORBIDDEN` exits `-3`).
+  the method on the child's clients only, the confirmation names child and parent scope, a refused child changes nothing,
+  `METHOD_FORBIDDEN` exits `-3`; the real factory builds the child's GraphQL route `tenants/<child>/GraphQL` and identity
+  route with the child token only and keeps it through the fixed-token authentication; a context without a tenant is
+  refused before any read).
 
 ## 403 names the missing role
 

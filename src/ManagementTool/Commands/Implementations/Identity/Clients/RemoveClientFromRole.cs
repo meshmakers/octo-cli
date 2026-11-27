@@ -42,7 +42,7 @@ internal class RemoveClientFromRole : ServiceClientOctoCommand<IIdentityServices
         _yesArg = CommandArgumentValue.AddArgument("y", "yes", ["Skip confirmation prompt"], false, 0);
         _childTenantIdArg = CommandArgumentValue.AddArgument("ctid", "child-tenant-id",
             ["ID of a child tenant of the context's tenant to act in instead of the context's tenant; your token " +
-             "is exchanged for that tenant (as Delete --disable-features does)"], false, 1);
+             "for that tenant is obtained as Delete --disable-features does"], false, 1);
     }
 
     public override CommandDocumentation? GetDocumentation() =>
@@ -81,13 +81,16 @@ internal class RemoveClientFromRole : ServiceClientOctoCommand<IIdentityServices
         var clientId = CommandArgumentValue.GetArgumentScalarValue<string>(_clientIdArg);
         var roleName = CommandArgumentValue.GetArgumentScalarValue<string>(_roleArg);
         var childTenantId = CommandArgumentValue.IsArgumentUsed(_childTenantIdArg)
-            ? CommandArgumentValue.GetArgumentScalarValue<string>(_childTenantIdArg)
+            ? CommandArgumentValue.GetArgumentScalarValue<string>(_childTenantIdArg).Trim().ToLowerInvariant()
             : null;
 
-        var question = childTenantId == null
+        // A child id alone does not identify the operation (the same id can exist below other parents and hosts), so
+        // the question names the parent scope as Delete does.
+        string Question() => childTenantId == null
             ? $"Are you sure you want to remove client '{clientId}' from role '{roleName}'?"
-            : $"Are you sure you want to remove client '{clientId}' from role '{roleName}' in tenant '{childTenantId}'?";
-        if (!CommandArgumentValue.IsArgumentUsed(_yesArg) && !_confirmationService.Confirm(question))
+            : $"Are you sure you want to remove client '{clientId}' from role '{roleName}' in child tenant " +
+              $"'{childTenantId}' of {ParentScopeDescription}?";
+        if (!CommandArgumentValue.IsArgumentUsed(_yesArg) && !_confirmationService.Confirm(Question()))
         {
             throw ToolException.OperationCancelledByUser();
         }

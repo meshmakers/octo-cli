@@ -36,7 +36,7 @@ internal class AddClientToRole : ServiceClientOctoCommand<IIdentityServicesClien
         _roleArg = CommandArgumentValue.AddArgument("r", "role", ["Existing role name"], true, 1);
         _childTenantIdArg = CommandArgumentValue.AddArgument("ctid", "child-tenant-id",
             ["ID of a child tenant of the context's tenant to act in instead of the context's tenant; your token " +
-             "is exchanged for that tenant (as Delete --disable-features does)"], false, 1);
+             "for that tenant is obtained as Delete --disable-features does"], false, 1);
     }
 
     public override CommandDocumentation? GetDocumentation() =>
