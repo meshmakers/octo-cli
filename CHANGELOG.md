@@ -6,6 +6,13 @@ All notable changes to octo-cli are listed here. Newest first.
 
 ### Added
 
+- **AB#8452 — a starter tenant created from the system tenant gets its default LLM cap.** `Create --blueprint
+  System.Ai.Starter-<version>` with a person login of the system tenant then calls the AI service's `starterDefault`
+  endpoint for the new tenant (the cluster's default monthly cap on the central key, created once, never changed), as MCP
+  `create_tenant starter=true` does. Other blueprints and other parent tenants make no AI call; a client-credentials session
+  skips the call with a warning that names `SetAiSpendCap`. Without an AI service URL in the context the command stops
+  before the tenant is created; a failed cap call names `SetAiSpendCap` as the remedy. **Requires octo-sdk with
+  `IAiServicesClient.ApplyStarterDefaultSpendCapAsync` and octo-ai-services with the endpoint (both AB#8452).**
 - **AB#8455 — Tenant administrators manage agents with octo-cli.** `CreateAgent`, `UpdateAgent`, `EnableAgent`,
   `DisableAgent` and `GetAgents` (list, or one agent with `-a`) call the agent tools of the MCP service (`create_agent`,
   `update_agent`, `set_agent_enabled`, `list_agents`, `get_agent`) on `<McpServiceUrl of the context>/<tenant>/mcp` with

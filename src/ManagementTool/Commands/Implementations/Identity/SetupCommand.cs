@@ -14,8 +14,6 @@ namespace Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Ident
 
 internal partial class SetupCommand : Command<OctoToolOptions>
 {
-    private static readonly string[] SystemTenantNames = ["octosystem", "system"];
-
     private readonly IAuthenticationService _authenticationService;
     private readonly IOptions<OctoToolAuthenticationOptions> _authenticationOptions;
     private readonly IChildTenantAccess _childTenantAccess;
@@ -145,7 +143,7 @@ internal partial class SetupCommand : Command<OctoToolOptions>
                 $"'{requestedTenantId}' is not a valid tenant id (1 to 64 letters, digits, '-' or '_').");
         }
 
-        var isSystemTenant = SystemTenantNames.Contains(normalizedTenantId);
+        var isSystemTenant = SystemTenants.IsSystemTenant(normalizedTenantId);
         return isSystemTenant ? null : normalizedTenantId;
     }
 

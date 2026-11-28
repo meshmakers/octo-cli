@@ -9,6 +9,7 @@ using Meshmakers.Octo.Frontend.ManagementTool;
 using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Asset.Tenants;
 using Meshmakers.Octo.Frontend.ManagementTool.Services;
 using Meshmakers.Octo.Sdk.ServiceClient;
+using Meshmakers.Octo.Sdk.ServiceClient.AiServices;
 using Meshmakers.Octo.Sdk.ServiceClient.AssetRepositoryServices.System;
 using Meshmakers.Octo.Sdk.ServiceClient.AssetRepositoryServices.Tenants;
 using Meshmakers.Octo.Sdk.ServiceClient.AssetRepositoryServices.Tenants.Methods;
@@ -104,7 +105,8 @@ public sealed class CreateTenantBlueprintCommandTests : IDisposable
         A.CallTo(() => asset.AccessToken).Returns(A.Fake<IServiceClientAccessToken>());
         var command = new CreateTenant(NullLogger<CreateTenant>.Instance,
             Options.Create(new OctoToolOptions { TenantId = "parent1" }), asset, tenant,
-            A.Fake<IAuthenticationService>());
+            A.Fake<IAiServicesClient>(), A.Fake<IAuthenticationService>(),
+            Options.Create(new OctoToolAuthenticationOptions()));
         return (command, asset, tenant, requests);
     }
 
@@ -186,7 +188,8 @@ public sealed class CreateTenantBlueprintCommandTests : IDisposable
         var tenant = MethodFakes.IdentityTenant(methodRequests);
         var command = new CreateTenant(NullLogger<CreateTenant>.Instance,
             Options.Create(new OctoToolOptions { TenantId = "parent1" }), asset, tenant,
-            A.Fake<IAuthenticationService>());
+            A.Fake<IAiServicesClient>(), A.Fake<IAuthenticationService>(),
+            Options.Create(new OctoToolAuthenticationOptions()));
         command.CommandArgumentValue.ParseLayer(["-tid", "t1", "-b", "Unknown-9.9.9"]);
 
         var parser = A.Fake<ICommandParser>();
@@ -215,7 +218,8 @@ public sealed class CreateTenantBlueprintCommandTests : IDisposable
         MethodFakes.AnswerMethodCalls(tenant, requests, "METHOD_HANDLER_NOT_AVAILABLE");
         var logger = new RecordingLogger<CreateTenant>();
         var command = new CreateTenant(logger, Options.Create(new OctoToolOptions { TenantId = "parent1" }), asset,
-            tenant, A.Fake<IAuthenticationService>());
+            tenant, A.Fake<IAiServicesClient>(), A.Fake<IAuthenticationService>(),
+            Options.Create(new OctoToolAuthenticationOptions()));
         command.CommandArgumentValue.ParseLayer(["-tid", "t1"]);
 
         var ex = await Assert.ThrowsAsync<ServiceClientException>(command.Execute);
@@ -236,7 +240,8 @@ public sealed class CreateTenantBlueprintCommandTests : IDisposable
         MethodFakes.AnswerMethodCalls(tenant, requests, "METHOD_FORBIDDEN");
         var logger = new RecordingLogger<CreateTenant>();
         var command = new CreateTenant(logger, Options.Create(new OctoToolOptions { TenantId = "parent1" }), asset,
-            tenant, A.Fake<IAuthenticationService>());
+            tenant, A.Fake<IAiServicesClient>(), A.Fake<IAuthenticationService>(),
+            Options.Create(new OctoToolAuthenticationOptions()));
         command.CommandArgumentValue.ParseLayer(["-tid", "t2"]);
 
         // The refusal keeps its own exception (and so the runner's exit code -3).

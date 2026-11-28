@@ -93,6 +93,24 @@ provisioned. Without `--blueprint` the command makes exactly the calls it made b
 parameter). It combines with `--database`, `--scratch` and `--no-provision`. Tests: `CreateTenantBlueprintCommandTests`
 (argument wiring, order create-then-provision, failure path through the real SDK client against a local listener and `Runner`).
 
+### Starter tenant: default LLM cap (AB#8452)
+
+When the context's tenant is the system tenant (`octosystem`, or `system`, case ignored) and the blueprint is
+`System.Ai.Starter-<version>`, `Create` then calls `IAiServicesClient.ApplyStarterDefaultSpendCapAsync(child)`
+(AI service, `POST system/v1/aiSpendCaps/<child>/starterDefault`), as MCP `create_tenant starter=true` does. The order is
+create (with the blueprint), cap, then the provisioning of the current user. The cluster configuration decides the amount
+(`StarterSpendCap:DefaultTenantSpendCapEur`); the outcome is logged: `created` (key source and EUR per month), `exists`
+(an existing cap is never changed) or `notConfigured` (warning, nothing written). Rules:
+
+- Other blueprints, other parent tenants and `Create` without `--blueprint` make no AI call.
+- The endpoint takes only a person login of the system tenant with `TenantManagement`. In a client-credentials session
+  (no refresh token, e.g. `--scratch`) the command does not call it and warns, naming `SetAiSpendCap`.
+- The context needs the AI service URL; without it the command stops before the tenant is created.
+- When the cap call fails, the tenant exists: the error names `SetAiSpendCap -t <child> -c <EUR> -ks CentralKey -r <reason>`
+  (and `ProvisionCurrentUser -ttid <child>`, which then did not run) and the command keeps the call's exit code.
+
+Tests: `CreateTenantStarterCapCommandTests`.
+
 ## Scratch tenants: an agent works in and cleans up what it creates
 
 An agent that creates throw-away child tenants with a client-credentials client no longer needs a human device-code login per tenant.
