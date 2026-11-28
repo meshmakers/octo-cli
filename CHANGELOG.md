@@ -63,6 +63,11 @@ All notable changes to octo-cli are listed here. Newest first.
 
 ### Changed
 
+- **AB#9059 — tests ready for the obsolete stream-data REST methods.** `AddArchiveColumnCommandTests` and
+  `ComputedColumnBackfillCommandTests` assert that the REST methods `AddArchiveColumnAsync` / `AddComputedColumnAsync`
+  of `IStreamDataServicesClient` are not called; that assertion now suppresses `CS0618` for its own lines, so the test
+  build stays green when octo-sdk marks the 15 replaced archive methods `[Obsolete]` (AB#9059 part 2). No `src` change:
+  the commands call the System.StreamData method clients since AB#9060.
 - **AB#7970 — `Setup` creates the first administrator of a child tenant.** New `-tid/--tenantId` calls `POST {tenant}/v1/setup` with a client-credentials token issued for that tenant (the context's own when it was signed in on that tenant, else one requested with `OCTO_CLI_CLIENT_ID`/`OCTO_CLI_CLIENT_SECRET`, e.g. of the client that created the tenant). A signed-in user is refused and pointed to `Create` / `ProvisionCurrentUser` and `CreateUser`, because the token exchange would create a user in the tenant and the setup runs only while it has none. Without `-tid` (or with `-tid octosystem`) `Setup` keeps the former `system/v1/setup` call without a token, whatever the tenant of the context.
 - **AB#9609 — NuGet dependency pass.** Updated NLog.Extensions.Logging 6.3.0, System.IdentityModel.Tokens.Jwt 8.23.0 and Microsoft.CodeAnalysis.CSharp 5.12.0 and the test packages (coverlet.collector 10.1.1, Microsoft.NET.Test.Sdk 18.12.0, xunit.v3.mtp-off 4.0.3, xunit.runner.visualstudio 4.0.1); no behaviour change.
 - **AB#9053 — Communication write commands run the System.Communication methods.** `DeployPipeline`, `ExecutePipeline`,
