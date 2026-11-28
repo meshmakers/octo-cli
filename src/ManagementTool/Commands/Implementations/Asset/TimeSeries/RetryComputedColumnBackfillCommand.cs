@@ -54,7 +54,8 @@ public class RetryComputedColumnBackfillCommand : ServiceClientOctoCommand<IStre
 
         var queued = await _methods.RunOnArchiveAsync(archiveRtId, RtRawArchiveMethodClient.RetryComputedColumnBackfillMethodId,
             client => client.RetryComputedColumnBackfillAsync(archiveRtId, name));
-        var job = queued is null ? null : ArchiveMethodCall.ToJobInfo(queued);
+        // A result without a job id cannot be followed: treated like no result.
+        var job = queued is null || string.IsNullOrEmpty(queued.JobRtId) ? null : ArchiveMethodCall.ToJobInfo(queued);
         Logger.LogInformation("Backfill of computed column '{Name}' queued as job {JobId} ({State}).",
             name, job?.RtId ?? "<none>", job?.State ?? "<unknown>");
 

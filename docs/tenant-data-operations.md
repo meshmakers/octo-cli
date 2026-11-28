@@ -46,7 +46,7 @@ and repair (`ValidateRollups`, `RepairRollups`, `GetRollupRepairStatus`), `Enabl
 | Command | CK method (`System.StreamData/…`) | Notes |
 |---|---|---|
 | `ActivateArchive` / `DisableArchive` / `EnableArchive` / `RetryArchiveActivation` | `Archive.Activate-1` / `Disable-1` / `Enable-1` / `RetryActivation-1` | on the client of the archive's concrete type |
-| `DeleteArchive` | `Archive.DeleteArchive-1` | confirmation as before |
+| `DeleteArchive` | `Archive.DeleteArchive-1` | confirmation as before; a result other than `true` ends the command (exit -3) |
 | `AddArchiveColumn` | `Archive.AddColumn-1` | |
 | `AddComputedColumn` / `RemoveComputedColumn` / `UpdateComputedColumnFormula` | `Archive.AddComputedColumn-1` / `RemoveComputedColumn-1` / `UpdateComputedColumnFormula-1` | `-r` takes `Boolean`, `Int`, `Int64`, `Double`, `DateTime` (case-insensitive); another value ends the command before any call; `-w` follows the backfill in the job list as before |
 | `RetryComputedColumnBackfill` | `Archive.RetryComputedColumnBackfill-1` | prints the queued job as before |
@@ -61,7 +61,8 @@ and repair (`ValidateRollups`, `RepairRollups`, `GetRollupRepairStatus`), `Enabl
 - **Archive type.** The lifecycle and column methods are declared on the abstract `Archive` and run through the client of the
   concrete type (`RawArchive`, `TimeRangeArchive`, `RollupArchive`). The command reads the archive's `ckTypeId` first
   (`GraphQlConstants.GetArchiveCkTypeById`) and compares its version-less form (`System.StreamData/RollupArchive-1` is a
-  rollup). An unknown archive or another type ends the command before any write (`Archive '<id>' not found.`). The three
+  rollup). An unknown archive ends the command before any write (`Archive '<id>' not found.`), an entity of another type
+  too (`Archive '<id>' is of type '<ckTypeId>', which is no RawArchive, TimeRangeArchive or RollupArchive.`). The three
   generated clients implement `IArchiveMethodClient` (`GraphQlDtos/ArchiveMethodClients.cs`, partial declarations over the
   generated code). The rollup commands call `RtRollupArchiveMethodClient` directly; an id that is no rollup ends with
   `METHOD_TARGET_NOT_FOUND`. A value that is no runtime id ends the command before any call.

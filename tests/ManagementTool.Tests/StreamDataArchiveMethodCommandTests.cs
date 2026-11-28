@@ -185,6 +185,31 @@ public sealed class StreamDataArchiveMethodCommandTests : IDisposable
         Assert.Contains("Cannot disable archive", error.Message);
     }
 
+    [Theory]
+    [InlineData("false")]
+    [InlineData("null")]
+    public async Task DeleteArchive_NotConfirmedByTheService_IsNoDeletion(string result)
+    {
+        Respond(true, Success("systemStreamDataTimeRangeArchives { deleteArchive(", result));
+
+        var ex = await Assert.ThrowsAsync<ServiceClientException>(() =>
+            Create(typeof(DeleteArchiveCommand), ["-id", ArchiveRtId, "-y"]).Execute());
+
+        Assert.StartsWith($"The service did not confirm the deletion of archive '{ArchiveRtId}'", ex.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task RetryComputedColumnBackfill_WithWait_ResultWithoutAJobId_RefusesToGuessTheJob()
+    {
+        Respond(true, Success("systemStreamDataTimeRangeArchives { retryComputedColumnBackfill(",
+            """{"jobRtId":null,"state":"Pending","computedColumnName":"Ratio"}"""));
+
+        await Assert.ThrowsAsync<ToolException>(() =>
+            Create(typeof(RetryComputedColumnBackfillCommand), ["-id", ArchiveRtId, "-n", "Ratio", "-w"]).Execute());
+
+        A.CallTo(() => _streamData.ListRecomputeJobsForArchiveAsync(A<string>._, A<string>._)).MustNotHaveHappened();
+    }
+
     [Fact]
     public async Task UnknownArchive_EndsBeforeAnyWrite()
     {

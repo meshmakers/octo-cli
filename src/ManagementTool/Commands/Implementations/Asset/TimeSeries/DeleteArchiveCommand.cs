@@ -1,6 +1,7 @@
 using GraphQlDtos.DataTransferObjects.System.StreamData.v1;
 using Meshmakers.Common.CommandLineParser;
 using Meshmakers.Octo.Frontend.ManagementTool.Services;
+using Meshmakers.Octo.Sdk.ServiceClient;
 using Meshmakers.Octo.Sdk.ServiceClient.AssetRepositoryServices.StreamData;
 using Meshmakers.Octo.Sdk.ServiceClient.AssetRepositoryServices.Tenants;
 using Microsoft.Extensions.Logging;
@@ -52,8 +53,14 @@ public class DeleteArchiveCommand : ServiceClientOctoCommand<IStreamDataServices
             "Deleting archive '{ArchiveRtId}' for tenant '{TenantId}' at '{ServiceClientServiceUri}'",
             archiveRtId, Options.Value.TenantId, ServiceClient.ServiceUri);
 
-        await _methods.RunOnArchiveAsync(archiveRtId, RtRawArchiveMethodClient.DeleteArchiveMethodId,
+        var deleted = await _methods.RunOnArchiveAsync(archiveRtId, RtRawArchiveMethodClient.DeleteArchiveMethodId,
             client => client.DeleteArchiveAsync(archiveRtId));
+        if (deleted != true)
+        {
+            // The method answers true when the archive was deleted; anything else is not reported as a deletion.
+            throw new ServiceClientException(
+                $"The service did not confirm the deletion of archive '{archiveRtId}' (result: {deleted?.ToString() ?? "none"}).");
+        }
 
         Logger.LogInformation("Archive '{ArchiveRtId}' for tenant '{TenantId}' deleted",
             archiveRtId, Options.Value.TenantId);

@@ -48,6 +48,7 @@ public sealed class RecomputeBackfillMethodCommandTests : IDisposable
         Assert.Contains("query CkOperationById", Query(_service.Bodies[1]), StringComparison.Ordinal);
         Assert.Contains("\"operationId\":\"55fd5a7137614c289ba808bc7b36b5e2\"", Variables(_service.Bodies[1]), StringComparison.Ordinal);
         A.CallTo(_streamData).Where(c => !c.Method.IsSpecialName).MustNotHaveHappened();
+        await AssertDocumentsValidAsync();
     }
 
     [Fact]
@@ -144,6 +145,17 @@ public sealed class RecomputeBackfillMethodCommandTests : IDisposable
             line, StringComparison.Ordinal);
         Assert.EndsWith(", error=none", line, StringComparison.Ordinal);
         A.CallTo(_streamData).Where(c => !c.Method.IsSpecialName).MustNotHaveHappened();
+        await AssertDocumentsValidAsync();
+    }
+
+    /// <summary>Every document sent (Recompute-2 / BackfillFromSource-2 and the operation reads) is valid for a stream-data tenant.</summary>
+    private async Task AssertDocumentsValidAsync()
+    {
+        Assert.NotEmpty(_service.Bodies);
+        foreach (var body in _service.Bodies)
+        {
+            Assert.Empty(await AssetRepositoryGraphQlSchema.ValidateAgainstSystemStreamDataAsync(Query(body), Variables(body)));
+        }
     }
 
     [Fact]
