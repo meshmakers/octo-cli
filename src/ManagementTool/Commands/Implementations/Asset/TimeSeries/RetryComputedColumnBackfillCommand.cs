@@ -1,6 +1,8 @@
+using GraphQlDtos.DataTransferObjects.System.StreamData.v1;
 using Meshmakers.Common.CommandLineParser;
 using Meshmakers.Octo.Frontend.ManagementTool.Services;
 using Meshmakers.Octo.Sdk.ServiceClient.AssetRepositoryServices.StreamData;
+using Meshmakers.Octo.Sdk.ServiceClient.AssetRepositoryServices.Tenants;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
@@ -12,17 +14,19 @@ namespace Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Asset
 /// </summary>
 public class RetryComputedColumnBackfillCommand : ServiceClientOctoCommand<IStreamDataServicesClient>
 {
+    private readonly ArchiveMethodCall _methods;
     private readonly IArgument _archiveRtIdArg;
     private readonly IArgument _nameArg;
     private readonly IArgument _waitArg;
 
     public RetryComputedColumnBackfillCommand(ILogger<RetryComputedColumnBackfillCommand> logger,
-        IOptions<OctoToolOptions> options, IStreamDataServicesClient serviceClient,
+        IOptions<OctoToolOptions> options, IStreamDataServicesClient serviceClient, ITenantClient tenantClient,
         IAuthenticationService authenticationService) : base(logger, Constants.AssetRepositoryServicesGroup,
         "RetryComputedColumnBackfill",
         "Queues the backfill of a computed column again — for a column whose backfill Failed, or that is stuck in Pending / Backfilling without a running job — without removing and re-adding it. The backfill runs as a background job on the asset repository; follow it with ListRecomputeJobs or pass -w. Rejected for an Active column. (AB#8002)",
         options, serviceClient, authenticationService)
     {
+        _methods = new ArchiveMethodCall(tenantClient, authenticationService, logger);
         _archiveRtIdArg = CommandArgumentValue.AddArgument("id", "identifier",
             ["Runtime id of the archive carrying the computed column"], true, 1);
         _nameArg = CommandArgumentValue.AddArgument("n", "name",
@@ -48,7 +52,9 @@ public class RetryComputedColumnBackfillCommand : ServiceClientOctoCommand<IStre
         Logger.LogInformation("Retrying the backfill of computed column '{Name}' on archive '{ArchiveRtId}' (tenant '{TenantId}')",
             name, archiveRtId, Options.Value.TenantId);
 
-        var job = await ServiceClient.RetryComputedColumnBackfillAsync(Options.Value.TenantId, archiveRtId, name);
+        var queued = await _methods.RunOnArchiveAsync(archiveRtId, RtRawArchiveMethodClient.RetryComputedColumnBackfillMethodId,
+            client => client.RetryComputedColumnBackfillAsync(archiveRtId, name));
+        var job = queued is null ? null : ArchiveMethodCall.ToJobInfo(queued);
         Logger.LogInformation("Backfill of computed column '{Name}' queued as job {JobId} ({State}).",
             name, job?.RtId ?? "<none>", job?.State ?? "<unknown>");
 

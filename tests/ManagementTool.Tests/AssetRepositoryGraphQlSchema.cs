@@ -40,6 +40,20 @@ internal static class AssetRepositoryGraphQlSchema
 
     private static readonly Lazy<ISchema> LazySystemBotSchema = new(() => Build(SystemBotSnapshotFile));
 
+    /// <summary>
+    ///     AB#9060: snapshot of a scratch tenant with stream data enabled and System.StreamData 1.30.0 on a local lane stack
+    ///     (asset repository with the Archive methods): <c>systemStreamDataArchive</c> and the archive method mutations, which
+    ///     the other snapshots lack. Same recording steps; System models only.
+    /// </summary>
+    public const string SystemStreamDataSnapshotFile = "asset-repo-schema.local-system-streamdata-1.30.json.gz";
+
+    private static readonly Lazy<ISchema> LazySystemStreamDataSchema = new(() => Build(SystemStreamDataSnapshotFile));
+
+    /// <summary>AB#9060: validates against the System.StreamData 1.30.0 snapshot (<see cref="SystemStreamDataSnapshotFile" />).</summary>
+    public static Task<IReadOnlyList<string>> ValidateAgainstSystemStreamDataAsync(string document,
+        string? variablesJson = null) =>
+        ValidateAsync(LazySystemStreamDataSchema.Value, document, variablesJson);
+
     private static readonly Lazy<ISchema> LazySchema = new(() => Build(SnapshotFile));
 
     /// <summary>

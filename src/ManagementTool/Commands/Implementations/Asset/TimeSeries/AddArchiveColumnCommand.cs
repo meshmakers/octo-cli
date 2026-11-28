@@ -1,6 +1,8 @@
+using GraphQlDtos.DataTransferObjects.System.StreamData.v1;
 using Meshmakers.Common.CommandLineParser;
 using Meshmakers.Octo.Frontend.ManagementTool.Services;
 using Meshmakers.Octo.Sdk.ServiceClient.AssetRepositoryServices.StreamData;
+using Meshmakers.Octo.Sdk.ServiceClient.AssetRepositoryServices.Tenants;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
@@ -12,17 +14,19 @@ namespace Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Asset
 /// </summary>
 public class AddArchiveColumnCommand : ServiceClientOctoCommand<IStreamDataServicesClient>
 {
+    private readonly ArchiveMethodCall _methods;
     private readonly IArgument _archiveRtIdArg;
     private readonly IArgument _pathArg;
     private readonly IArgument _indexedArg;
 
     public AddArchiveColumnCommand(ILogger<AddArchiveColumnCommand> logger,
-        IOptions<OctoToolOptions> options, IStreamDataServicesClient serviceClient,
+        IOptions<OctoToolOptions> options, IStreamDataServicesClient serviceClient, ITenantClient tenantClient,
         IAuthenticationService authenticationService) : base(logger, Constants.AssetRepositoryServicesGroup,
         "AddArchiveColumn",
         "Adds a column for an existing attribute of the target CK type to an Activated raw or time-range archive without recreating it. The table gains a nullable column (existing rows keep their data and read null), then the archive definition; the next ingested rows fill it. Idempotent. A computed column is added with AddComputedColumn. (AB#7997)",
         options, serviceClient, authenticationService)
     {
+        _methods = new ArchiveMethodCall(tenantClient, authenticationService, logger);
         _archiveRtIdArg = CommandArgumentValue.AddArgument("id", "identifier",
             ["Runtime id of the archive to add the column to"], true, 1);
         _pathArg = CommandArgumentValue.AddArgument("p", "path",
@@ -48,7 +52,8 @@ public class AddArchiveColumnCommand : ServiceClientOctoCommand<IStreamDataServi
         Logger.LogInformation("Adding column '{Path}' to archive '{ArchiveRtId}' (tenant '{TenantId}')",
             path, archiveRtId, Options.Value.TenantId);
 
-        await ServiceClient.AddArchiveColumnAsync(Options.Value.TenantId, archiveRtId, path, indexed);
+        await _methods.RunOnArchiveAsync(archiveRtId, RtRawArchiveMethodClient.AddColumnMethodId,
+            client => client.AddColumnAsync(archiveRtId, path, indexed));
 
         Logger.LogInformation(
             "Archive '{ArchiveRtId}' has column '{Path}'; existing rows read null for it, new rows fill it.",

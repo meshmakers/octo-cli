@@ -20,6 +20,17 @@ All notable changes to octo-cli are listed here. Newest first.
   of `Create --blueprint`: person login only (a client-credentials session skips the call with a warning naming
   `SetAiSpendCap`), an existing cap is never changed, a person login without an AI service URL stops before the install.
   This is the second call of the starter path until a starter can be created with its blueprint in one call (AB#10065).
+- **AB#9060 — archive commands run the System.StreamData methods.** `ActivateArchive`, `DisableArchive`, `EnableArchive`,
+  `RetryArchiveActivation`, `DeleteArchive`, `AddArchiveColumn`, `AddComputedColumn`, `RemoveComputedColumn`,
+  `UpdateComputedColumnFormula`, `RetryComputedColumnBackfill`, `FreezeRollupArchive`, `UnfreezeRollupArchive`,
+  `RewindRollupWatermark`, `RecomputeArchive` and `BackfillRollup` call the CK methods of `System.StreamData` (generated from
+  `System.StreamData-[1.30,2.0)`) through the asset repository instead of the REST endpoints; names, arguments and output are
+  unchanged. The lifecycle and column methods run through the client of the archive's concrete type (one GraphQL read of the
+  archive's type first). `RecomputeArchive` and `BackfillRollup` follow the operation of `Recompute-2` / `BackfillFromSource-2`
+  by its handle; a recompute job that ended Failed prints its job line and exits with 0, as before. A refused call prints the
+  declared code, message and parameters (exit -3). **Requires an asset repository whose tenant has System.StreamData 1.30.0**
+  (no REST fallback) and the role `StreamDataAdmin`, as the REST endpoints did. The reads, the rollup check/repair, the stream
+  data switches and the archive data export/import stay REST.
 - **AB#8455 — Tenant administrators manage agents with octo-cli.** `CreateAgent`, `UpdateAgent`, `EnableAgent`,
   `DisableAgent` and `GetAgents` (list, or one agent with `-a`) call the agent tools of the MCP service (`create_agent`,
   `update_agent`, `set_agent_enabled`, `list_agents`, `get_agent`) on `<McpServiceUrl of the context>/<tenant>/mcp` with

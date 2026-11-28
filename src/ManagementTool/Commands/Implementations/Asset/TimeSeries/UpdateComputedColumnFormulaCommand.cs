@@ -1,6 +1,8 @@
+using GraphQlDtos.DataTransferObjects.System.StreamData.v1;
 using Meshmakers.Common.CommandLineParser;
 using Meshmakers.Octo.Frontend.ManagementTool.Services;
 using Meshmakers.Octo.Sdk.ServiceClient.AssetRepositoryServices.StreamData;
+using Meshmakers.Octo.Sdk.ServiceClient.AssetRepositoryServices.Tenants;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
@@ -8,18 +10,20 @@ namespace Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Asset
 
 public class UpdateComputedColumnFormulaCommand : ServiceClientOctoCommand<IStreamDataServicesClient>
 {
+    private readonly ArchiveMethodCall _methods;
     private readonly IArgument _archiveRtIdArg;
     private readonly IArgument _nameArg;
     private readonly IArgument _waitArg;
     private readonly IArgument _formulaArg;
 
     public UpdateComputedColumnFormulaCommand(ILogger<UpdateComputedColumnFormulaCommand> logger,
-        IOptions<OctoToolOptions> options, IStreamDataServicesClient serviceClient,
+        IOptions<OctoToolOptions> options, IStreamDataServicesClient serviceClient, ITenantClient tenantClient,
         IAuthenticationService authenticationService) : base(logger, Constants.AssetRepositoryServicesGroup,
         "UpdateComputedColumnFormula",
         "Changes the formula of an existing computed column on an active archive. Readers keep the previous values while the asset repository backfills the new formula as a background job, then switch atomically; a failed job reverts to the previous formula. Returns once the job is queued (follow it with ListRecomputeJobs, or pass -w). Rejected if another computed column references this one, or while a backfill of the column is still running. (AB#4189, AB#8002)",
         options, serviceClient, authenticationService)
     {
+        _methods = new ArchiveMethodCall(tenantClient, authenticationService, logger);
         _archiveRtIdArg = CommandArgumentValue.AddArgument("id", "identifier",
             ["Runtime id of the archive carrying the computed column"], true, 1);
         _nameArg = CommandArgumentValue.AddArgument("n", "name",
@@ -49,7 +53,8 @@ public class UpdateComputedColumnFormulaCommand : ServiceClientOctoCommand<IStre
             "Changing formula of computed column '{Name}' on archive '{ArchiveRtId}' to '{Formula}' (tenant '{TenantId}')",
             name, archiveRtId, formula, Options.Value.TenantId);
 
-        await ServiceClient.UpdateComputedColumnFormulaAsync(Options.Value.TenantId, archiveRtId, name, formula);
+        await _methods.RunOnArchiveAsync(archiveRtId, RtRawArchiveMethodClient.UpdateComputedColumnFormulaMethodId,
+            client => client.UpdateComputedColumnFormulaAsync(archiveRtId, name, formula));
 
         Logger.LogInformation("Formula change of computed column '{Name}' on archive '{ArchiveRtId}' queued; its backfill runs in the background.",
             name, archiveRtId);

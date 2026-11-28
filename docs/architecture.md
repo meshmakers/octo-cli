@@ -25,7 +25,7 @@ src/
 │   ├── Services/             # Service layer (AuthenticationService, ContextManager, etc.)
 │   ├── Program.cs            # Entry point
 │   └── Runner.cs             # Command execution orchestrator
-└── GraphQlDtos/              # GraphQL DTOs and CK method clients generated from construction-kits.yaml (System, System.Bot, System.Communication, System.Identity)
+└── GraphQlDtos/              # GraphQL DTOs and CK method clients generated from construction-kits.yaml (System, System.Bot, System.Communication, System.Identity, System.StreamData)
 
 tests/
 ├── CommandReferenceGenerator.Tests/  # Tests for the Roslyn doc generator

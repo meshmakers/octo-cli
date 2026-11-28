@@ -1,7 +1,9 @@
 using System.Globalization;
+using GraphQlDtos.DataTransferObjects.System.StreamData.v1;
 using Meshmakers.Common.CommandLineParser;
 using Meshmakers.Octo.Frontend.ManagementTool.Services;
 using Meshmakers.Octo.Sdk.ServiceClient.AssetRepositoryServices.StreamData;
+using Meshmakers.Octo.Sdk.ServiceClient.AssetRepositoryServices.Tenants;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
@@ -9,16 +11,18 @@ namespace Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Asset
 
 public class RewindRollupWatermarkCommand : ServiceClientOctoCommand<IStreamDataServicesClient>
 {
+    private readonly ArchiveMethodCall _methods;
     private readonly IArgument _rollupRtIdArg;
     private readonly IArgument _toBucketEndArg;
 
     public RewindRollupWatermarkCommand(ILogger<RewindRollupWatermarkCommand> logger,
-        IOptions<OctoToolOptions> options, IStreamDataServicesClient serviceClient,
+        IOptions<OctoToolOptions> options, IStreamDataServicesClient serviceClient, ITenantClient tenantClient,
         IAuthenticationService authenticationService) : base(logger, Constants.AssetRepositoryServicesGroup,
         "RewindRollupWatermark",
         "Resets the rollup's watermark (truncated down to the bucket boundary) so subsequent orchestrator ticks re-aggregate the rewound range. Destructive: rows in that range are temporarily out of sync until the orchestrator catches up.",
         options, serviceClient, authenticationService)
     {
+        _methods = new ArchiveMethodCall(tenantClient, authenticationService, logger);
         _rollupRtIdArg = CommandArgumentValue.AddArgument("id", "identifier",
             ["Runtime id of the CkRollupArchive entity to rewind"], true, 1);
         _toBucketEndArg = CommandArgumentValue.AddArgument("t", "toBucketEnd",
@@ -47,7 +51,9 @@ public class RewindRollupWatermarkCommand : ServiceClientOctoCommand<IStreamData
             "Rewinding rollup '{RollupRtId}' watermark for tenant '{TenantId}' to {ToBucketEnd:O}",
             rollupRtId, Options.Value.TenantId, toBucketEnd);
 
-        await ServiceClient.RewindRollupWatermarkAsync(Options.Value.TenantId, rollupRtId, toBucketEnd);
+        ArchiveMethodCall.RequireObjectId(rollupRtId, "RollupRtId");
+        await _methods.RunAsync(RtRollupArchiveMethodClient.RewindWatermarkMethodId,
+            () => new RtRollupArchiveMethodClient(_methods.TenantClient).RewindWatermarkAsync(rollupRtId, toBucketEnd));
 
         Logger.LogInformation(
             "Rollup '{RollupRtId}' watermark rewound. Re-aggregation will occur on the next orchestrator tick.",
