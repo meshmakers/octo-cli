@@ -243,6 +243,23 @@ public sealed class RecomputeBackfillMethodCommandTests : IDisposable
     }
 
     [Fact]
+    public async Task Backfill_WithWait_WithoutAJobId_AfterARestart_SaysItMayStillRun()
+    {
+        _service.RespondInOrder([Recorded("rollup-backfill-from-source2-accepted"), .. Enumerable.Repeat(Running(null), 3),
+            Failed("METHOD_OUTCOME_UNKNOWN", ("reason", "handler-lost"))]);
+        var logger = new RecordingLogger<BackfillRollupCommand>();
+        var command = Backfill(logger, "-id", RollupRtId, "-w");
+        command.QueuedTimeout = TimeSpan.FromSeconds(12);
+
+        await command.Execute();
+
+        Assert.Contains(logger.Entries, e => e.Level == LogLevel.Warning &&
+                                             e.Message.Contains("ended without an outcome (METHOD_OUTCOME_UNKNOWN", StringComparison.Ordinal) &&
+                                             e.Message.Contains("ae9db76d1e4e47ea8beb3b81e7811ccb", StringComparison.Ordinal));
+        A.CallTo(() => _streamData.ListRecomputeJobsForArchiveAsync(A<string>._, A<string>._)).MustNotHaveHappened();
+    }
+
+    [Fact]
     public async Task Backfill_WithWait_AfterARestart_RefreshesTheStreamDataTokenBeforeEveryPoll()
     {
         _service.RespondInOrder(Recorded("rollup-backfill-from-source2-accepted"), Running("6b0a8911fa75fad21127ffc5"),

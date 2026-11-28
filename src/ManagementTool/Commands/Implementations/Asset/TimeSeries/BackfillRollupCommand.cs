@@ -79,6 +79,13 @@ public class BackfillRollupCommand : ServiceClientOctoCommand<IStreamDataService
         }
 
         var wait = CommandArgumentValue.IsArgumentUsed(_waitArg);
+        if (queued.Final is not null)
+        {
+            // The backfill ended before the first read: no "runs in the background", the final job line at once.
+            LogJob(queued.Final);
+            return;
+        }
+
         if (queued.JobRtId is null)
         {
             Logger.LogWarning(
@@ -91,13 +98,6 @@ public class BackfillRollupCommand : ServiceClientOctoCommand<IStreamDataService
                 await WaitForJobAsync(tenantId, rollupRtId, handle, null);
             }
 
-            return;
-        }
-
-        if (queued.Final is not null)
-        {
-            // The backfill ended before the first read: no "runs in the background", the final job line at once.
-            LogJob(queued.Final);
             return;
         }
 
@@ -192,7 +192,16 @@ public class BackfillRollupCommand : ServiceClientOctoCommand<IStreamDataService
             Logger.LogWarning(
                 "Timed out after {Timeout}min waiting for backfill job {RtId}; it may still be running in the "
                 + "background. Check with 'ListRecomputeJobs -id <rollupRtId>'.",
-                (int)PollTimeout.TotalMinutes, jobRtId);
+                (int)PollTimeout.TotalMinutes, jobRtId ?? handle.OperationId);
+            return;
+        }
+        catch (CkMethodCallException e) when (e.Code == ArchiveMethodCall.OutcomeUnknownCode && jobRtId is null)
+        {
+            // Without a job id there is nothing to follow in the job list; the queued work goes on.
+            Logger.LogWarning(
+                "The backfill operation {OperationId} ended without an outcome ({Code}, asset repository restart?); the "
+                + "backfill may still run in the background. Check with 'ListRecomputeJobs -id <rollupRtId>'.",
+                handle.OperationId, e.Code);
             return;
         }
         catch (CkMethodCallException e) when (e.Code == ArchiveMethodCall.OutcomeUnknownCode && jobRtId is not null)

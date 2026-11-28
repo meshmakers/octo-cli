@@ -211,6 +211,20 @@ public sealed class StreamDataArchiveMethodCommandTests : IDisposable
     }
 
     [Fact]
+    public async Task OtherErrorOfTheArchiveQuery_IsReportedAsItIs_AndWritesNothing()
+    {
+        // Not a schema validation error (no extensions.number): an authorization error of the query, reported as it is.
+        _service.RespondInOrder("""{"errors":[{"message":"Access denied to the archive.","extensions":{"code":"ACCESS_DENIED"}}]}""");
+
+        var ex = await Assert.ThrowsAsync<ServiceClientException>(() =>
+            Create(typeof(ActivateArchiveCommand), ["-id", ArchiveRtId]).Execute());
+
+        Assert.StartsWith($"Reading the type of archive '{ArchiveRtId}' failed: ", ex.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain("System.StreamData 1.30.0", ex.Message, StringComparison.Ordinal);
+        Assert.Single(_service.Bodies);
+    }
+
+    [Fact]
     public async Task NoObjectId_EndsBeforeAnyCall()
     {
         var ex = await Assert.ThrowsAsync<ServiceClientException>(() =>

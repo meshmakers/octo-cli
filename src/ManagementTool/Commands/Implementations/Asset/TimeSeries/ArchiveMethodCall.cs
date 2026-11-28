@@ -164,13 +164,18 @@ internal sealed class ArchiveMethodCall(
                 Variables = new { rtId = archiveRtId }
             });
         }
-        catch (QlQueryErrorException e)
+        catch (QlQueryErrorException e) when (IsSchemaValidationError(e))
         {
             // A tenant without stream data (or an asset repository without System.StreamData) has no archive query field:
             // the same message and exit code as a missing method, nothing was changed.
             logger.LogDebug("The archive type query failed: {Message}", e.Message);
             throw new ServiceClientException(MethodUnavailableMessage("System.StreamData/Archive",
                 tenantClient.ServiceUri?.ToString()));
+        }
+        catch (QlQueryErrorException e)
+        {
+            // Any other error of the query (authorization, server error) is reported as it is (exit -3), nothing was changed.
+            throw new ServiceClientException($"Reading the type of archive '{archiveRtId}' failed: {e.Message}");
         }
         var ckTypeId = result?.Items?.FirstOrDefault()?.CkTypeId;
         if (string.IsNullOrWhiteSpace(ckTypeId))
@@ -181,6 +186,14 @@ internal sealed class ArchiveMethodCall(
         return ParseArchiveKind(ckTypeId) ?? throw new ServiceClientException(
             $"Archive '{archiveRtId}' is of type '{ckTypeId}', which is no RawArchive, TimeRangeArchive or RollupArchive.");
     }
+
+    /// <summary>
+    ///     A GraphQL validation error (every error carries the spec section <c>extensions.number</c>): the schema lacks the
+    ///     query, as on a tenant without stream data.
+    /// </summary>
+    internal static bool IsSchemaValidationError(QlQueryErrorException exception) =>
+        exception.Errors is { Count: > 0 } errors &&
+        errors.All(e => e.Extensions != null && e.Extensions.ContainsKey("number"));
 
     /// <summary>
     ///     The archive kind of a CK type id such as <c>System.StreamData/RollupArchive</c> or

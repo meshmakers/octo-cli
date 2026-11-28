@@ -86,7 +86,8 @@ and repair (`ValidateRollups`, `RepairRollups`, `GetRollupRepairStatus`), `Enabl
   operation ends as `METHOD_OUTCOME_UNKNOWN` (the asset repository restarted, the queued work goes on) the wait continues on
   the job list (`PollUntilTerminalAsync`), with the stream data client's token refreshed before every poll.
 - **Archive type query.** A tenant without the archive query (no stream data, or no System.StreamData) ends the command with
-  the same version message as a missing method (exit -3), before any write.
+  the same version message as a missing method (exit -3), before any write; another error of that query (authorization,
+  server error) is reported as it is (`Reading the type of archive '<id>' failed: …`, exit -3).
 
 Tests: `StreamDataArchiveMethodCommandTests` (every command sends its method by runtime id and no REST write; the documents
 validate against the snapshot of a stream-data tenant, `Fixtures/asset-repo-schema.local-system-streamdata-1.30.json.gz`;
