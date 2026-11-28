@@ -137,14 +137,14 @@ public class ClientMirrorRolesCommandTests
     {
         MethodFakes.AnswerMethodCalls(_tenant, _requests, null, result: Plan(false,
             Tenant("plant-a", "Applied", added: ["CommunicationManagement"]),
-            Tenant("plant-x", "Failed", present: ["Reader"])));
+            Tenant("plant-x", "Failed")));
 
         var ex = await Assert.ThrowsAsync<ServiceClientException>(() =>
             Create<SetClientMirrorRoles>("-id", "ci-deploy", "-r", "CommunicationManagement", "--apply").Execute());
 
         Assert.Contains("plant-x", ex.Message);
         Assert.DoesNotContain("plant-a", ex.Message);
-        Assert.Equal(["plant-x", "FAILED,ALREADY-PRESENT", "Reader", "Reader"], Cells(_consoleLines[2]));
+        Assert.Equal(["plant-x", "FAILED", "?", "?"], Cells(_consoleLines[2]));
     }
 
     [Theory]
@@ -228,13 +228,39 @@ public class ClientMirrorRolesCommandTests
     [Fact]
     public async Task GetClientMirrorRoles_PrintsTheListOfTheOriginal_FromAGraphQlQuery()
     {
-        AnswerClientQuery(new RtClientDto { ClientId = "ci-deploy", MirrorRoleNames = ["Reader", "CommunicationManagement"] });
+        // A client whose id differs only in case is not the one asked for (ordinal match).
+        AnswerClientQuery(new RtClientDto { ClientId = "CI-DEPLOY", MirrorRoleNames = ["Other"] },
+            new RtClientDto { ClientId = "ci-deploy", MirrorRoleNames = ["Reader", "CommunicationManagement"] });
 
         await Create<GetClientMirrorRoles>("-id", "ci-deploy").Execute();
 
         Assert.Equal(["Client | Mirror roles", "ci-deploy | CommunicationManagement,Reader"], _consoleLines);
+        var request = Assert.Single(_requests);
+        Assert.Equal("getClientMirrorRoleNamesByClientId", request.OperationName);
+        Assert.Contains("mirrorRoleNames", request.Query, StringComparison.Ordinal);
+        Assert.Contains("attributePath: \"clientId\"", request.Query, StringComparison.Ordinal);
+        Assert.Equal("{\"clientId\":\"ci-deploy\"}", Variables(request));
         A.CallTo(() => _auth.EnsureAuthenticated(_tenant.AccessToken)).MustHaveHappened();
         AssertNoRestWrite();
+    }
+
+    [Fact]
+    public async Task GetClientMirrorRoles_OnAnOlderIdentityModel_NamesSystemIdentity390()
+    {
+        A.CallTo(() => _tenant.SendQueryAsync<RtClientDto>(A<GraphQLRequest>._)).ThrowsAsync(new QlQueryErrorException(
+            "GraphQL error",
+            [
+                new GraphQLError
+                {
+                    Message = "Cannot query field 'mirrorRoleNames' on type 'SystemIdentityClient'.",
+                    Extensions = new Map { ["code"] = "FIELDS_ON_CORRECT_TYPE", ["number"] = "5.3.1" }
+                }
+            ]));
+
+        var ex = await Assert.ThrowsAsync<ServiceClientException>(() => Create<GetClientMirrorRoles>("-id", "ci-deploy").Execute());
+
+        Assert.Contains("System.Identity 3.9.0", ex.Message);
+        Assert.Empty(_consoleLines);
     }
 
     [Fact]
@@ -245,8 +271,8 @@ public class ClientMirrorRolesCommandTests
         await Create<GetClientMirrorRoles>("-id", "ci-deploy", "-j").Execute();
 
         var json = JObject.Parse(Assert.Single(_consoleLines));
-        Assert.Equal("ci-deploy", (string?)json["clientId"]);
-        Assert.Empty((JArray)json["mirrorRoleNames"]!);
+        Assert.Equal("ci-deploy", (string?)json["ClientId"]);
+        Assert.Empty((JArray)json["MirrorRoleNames"]!);
     }
 
     [Fact]

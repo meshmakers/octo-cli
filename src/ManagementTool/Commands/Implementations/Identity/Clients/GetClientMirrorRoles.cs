@@ -4,6 +4,7 @@ using GraphQlDtos.DataTransferObjects.System.Identity.v3;
 using Meshmakers.Common.CommandLineParser;
 using Meshmakers.Common.Shared.Services;
 using Meshmakers.Octo.Frontend.ManagementTool.Services;
+using Meshmakers.Octo.Sdk.ServiceClient;
 using Meshmakers.Octo.Sdk.ServiceClient.AssetRepositoryServices.Tenants;
 using Meshmakers.Octo.Sdk.ServiceClient.IdentityServices;
 using Microsoft.Extensions.Logging;
@@ -46,12 +47,25 @@ internal class GetClientMirrorRoles : ServiceClientOctoCommand<IIdentityServices
             _tenantClient.ServiceUri);
 
         await _authenticationService.EnsureAuthenticated(_tenantClient.AccessToken);
-        var page = await _tenantClient.SendQueryAsync<RtClientDto>(new GraphQLRequest
+        QlItemsContainer<RtClientDto>? page;
+        try
         {
-            Query = GraphQlConstants.GetClientMirrorRoleNamesByClientId,
-            OperationName = "getClientMirrorRoleNamesByClientId",
-            Variables = new { clientId }
-        });
+            page = await _tenantClient.SendQueryAsync<RtClientDto>(new GraphQLRequest
+            {
+                Query = GraphQlConstants.GetClientMirrorRoleNamesByClientId,
+                OperationName = "getClientMirrorRoleNamesByClientId",
+                Variables = new { clientId }
+            });
+        }
+        catch (QlQueryErrorException ex) when (IsSchemaValidationError(ex))
+        {
+            // A tenant whose System.Identity is older than 3.9.0 has no mirrorRoleNames field: name the version, as
+            // SetClientMirrorRoles does, instead of the raw GraphQL validation text.
+            throw new ServiceClientException(
+                $"The service at '{_tenantClient.ServiceUri}' does not know Client.MirrorRoleNames. It needs identity services " +
+                $"with System.Identity {IdentityMethodCall.MirrorRolesSystemIdentityVersion} or newer (the mirror role list).");
+        }
+
         var client = page?.Items?.FirstOrDefault(c => string.Equals(c.ClientId, clientId, StringComparison.Ordinal))
                      ?? throw new ToolException($"Client '{clientId}' was not found in tenant '{Options.Value.TenantId}'.");
 
@@ -59,7 +73,8 @@ internal class GetClientMirrorRoles : ServiceClientOctoCommand<IIdentityServices
             .Order(StringComparer.OrdinalIgnoreCase).ToList();
         if (CommandArgumentValue.IsArgumentUsed(_jsonArg))
         {
-            _consoleService.WriteLine(JsonConvert.SerializeObject(new { clientId, mirrorRoleNames = roleNames },
+            // PascalCase like GetClient and GetClientMirrors.
+            _consoleService.WriteLine(JsonConvert.SerializeObject(new { ClientId = clientId, MirrorRoleNames = roleNames },
                 Formatting.Indented));
             return;
         }
@@ -67,4 +82,8 @@ internal class GetClientMirrorRoles : ServiceClientOctoCommand<IIdentityServices
         _consoleService.WriteLine("Client | Mirror roles");
         _consoleService.WriteLine($"{clientId} | {(roleNames.Count == 0 ? "-" : string.Join(",", roleNames))}");
     }
+
+    /// <summary>A GraphQL validation error (every error carries the spec section <c>extensions.number</c>).</summary>
+    private static bool IsSchemaValidationError(QlQueryErrorException exception) =>
+        exception.Errors is { Count: > 0 } errors && errors.All(e => e.Extensions != null && e.Extensions.ContainsKey("number"));
 }

@@ -239,8 +239,12 @@ octo-cli -c GetClientMirrorRoles -id ci-deploy [-j]
   after an apply). Status markers: `WOULD-ADD` / `ADDED`, `WOULD-REMOVE` / `REMOVED`, `WOULD-ADOPT` / `ADOPTED` (a listed role the
   mirror already held by hand becomes managed), `ALREADY-PRESENT`, `HAND-SET` (other roles of the mirror, never touched),
   `ROLE-MISSING` (the child tenant has no such role yet; granted once it exists), `DECLINED` (a tenant administrator removed it;
-  not set again), `ROLE-REFUSED` (refused in that child), `FAILED` / `SKIPPED` (outcome of the mirror), `NO-ROLES`.
-  `-j|--json` prints the method result instead.
+  not set again), `ROLE-REFUSED` (refused in that child), `FAILED` / `SKIPPED` (outcome of the mirror), `NO-ROLES` (the result
+  names no role for that mirror). `?` in the role columns means the result carries no role data for the mirror (a `FAILED` or
+  `SKIPPED` mirror, or an empty list on a client with nothing tracked): it does not say the mirror holds no roles.
+  `-j|--json` prints the method result instead (PascalCase, like `GetClient`; `GetClientMirrorRoles -j` prints
+  `{ "ClientId", "MirrorRoleNames" }`). Against identity services before System.Identity 3.9.0 both commands end with a
+  message naming that version.
 - A mirror that **failed** ends the command with exit code `-3` after the table, naming the child tenants (the periodic mirror
   reconciliation retries them).
 - Refusals (nothing written, exit `-3`): `MIRROR_ROLE_NOT_ALLOWED` (TenantManagement, UserManagement, SecretManagement,

@@ -10,6 +10,7 @@ namespace Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Ident
 ///             <b>Roles before</b> = already present + removed + hand-set; <b>roles after</b> = already present + added +
 ///             hand-set (hand-set are the roles of the mirror the list does not name and identity does not manage; they
 ///             are never removed). Roles the tenant declined, refused or missing roles are not on the mirror before or after.
+///             <c>?</c> = the result carries no role data for that mirror (<see cref="RolesRead" />).
 ///         </item>
 ///         <item>
 ///             A dry run names what would happen (<c>WOULD-ADD</c>, <c>WOULD-REMOVE</c>, <c>WOULD-ADOPT</c>), a real run what
@@ -52,15 +53,28 @@ internal static class ClientMirrorRolesTable
         return status;
     }
 
-    /// <summary>The direct roles of the mirror before the change, sorted.</summary>
-    public static IReadOnlyList<string> RolesBefore(RtClientMirrorRoleTenantResultRecordDto tenant) =>
-        Union(tenant.AlreadyPresent, tenant.Removed, tenant.HandSet);
+    /// <summary>
+    ///     Whether the result read the mirror's roles. A <c>Failed</c> or <c>Skipped</c> mirror and a mirror the server
+    ///     answered with empty lists only (an empty list on a client with nothing tracked) carry no role data, so the table
+    ///     prints <c>?</c> instead of claiming the mirror holds no roles.
+    /// </summary>
+    public static bool RolesRead(RtClientMirrorRoleTenantResultRecordDto tenant) =>
+        !string.Equals(tenant.Outcome, FailedOutcome, StringComparison.OrdinalIgnoreCase)
+        && !string.Equals(tenant.Outcome, "Skipped", StringComparison.OrdinalIgnoreCase)
+        && new[] { tenant.Added, tenant.Removed, tenant.AlreadyPresent, tenant.Adopted, tenant.HandSet, tenant.RoleMissing,
+                tenant.Declined, tenant.RoleRefused }
+            .Any(l => l?.Any(n => !string.IsNullOrWhiteSpace(n)) == true);
 
-    /// <summary>The direct roles of the mirror after the change (a dry run: after an apply), sorted.</summary>
-    public static IReadOnlyList<string> RolesAfter(RtClientMirrorRoleTenantResultRecordDto tenant) =>
-        string.Equals(tenant.Outcome, FailedOutcome, StringComparison.OrdinalIgnoreCase)
-            ? RolesBefore(tenant)
-            : Union(tenant.AlreadyPresent, tenant.Added, tenant.HandSet);
+    /// <summary>The direct roles of the mirror before the change, sorted; <c>null</c> when they were not read.</summary>
+    public static IReadOnlyList<string>? RolesBefore(RtClientMirrorRoleTenantResultRecordDto tenant) =>
+        RolesRead(tenant) ? Union(tenant.AlreadyPresent, tenant.Removed, tenant.HandSet) : null;
+
+    /// <summary>
+    ///     The direct roles of the mirror after the change (a dry run: after an apply), sorted; <c>null</c> when they were
+    ///     not read.
+    /// </summary>
+    public static IReadOnlyList<string>? RolesAfter(RtClientMirrorRoleTenantResultRecordDto tenant) =>
+        RolesRead(tenant) ? Union(tenant.AlreadyPresent, tenant.Added, tenant.HandSet) : null;
 
     /// <summary>The lines of the table, header first, columns padded.</summary>
     public static IReadOnlyList<string> Format(RtClientMirrorRolesResultRecordDto result)
@@ -82,7 +96,8 @@ internal static class ClientMirrorRolesTable
         return rows.Select(r => string.Join(" | ", r.Select((c, i) => c.PadRight(widths[i]))).TrimEnd()).ToList();
     }
 
-    private static string Join(IReadOnlyList<string> roles) => roles.Count == 0 ? "-" : string.Join(",", roles);
+    private static string Join(IReadOnlyList<string>? roles) =>
+        roles == null ? "?" : roles.Count == 0 ? "-" : string.Join(",", roles);
 
     private static void Add(List<string> status, IEnumerable<string?>? names, string marker)
     {
