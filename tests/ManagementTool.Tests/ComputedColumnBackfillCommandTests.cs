@@ -167,8 +167,10 @@ public sealed class ComputedColumnBackfillCommandTests
         Assert.Contains("RetryComputedColumnBackfill", exception.Message);
         var request = Assert.Single(_requests);
         Assert.Contains("addComputedColumn(", request.Query, StringComparison.Ordinal);
+#pragma warning disable CS0618 // AB#9059: asserts that the obsolete REST method is not called
         A.CallTo(() => client.AddComputedColumnAsync(A<string>._, A<string>._, A<string>._, A<string>._, A<string>._, A<bool>._))
             .MustNotHaveHappened();
+#pragma warning restore CS0618
     }
 
     [Fact]

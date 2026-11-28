@@ -48,7 +48,9 @@ public sealed class AddArchiveColumnCommandTests
         Assert.Contains("systemStreamDataRawArchives { addColumn(", request.Query, StringComparison.Ordinal);
         Assert.Contains("\"path\":\"DischargingPower\"", Variables(request), StringComparison.Ordinal);
         Assert.Contains("\"indexed\":false", Variables(request), StringComparison.Ordinal);
+#pragma warning disable CS0618 // AB#9059: asserts that the obsolete REST method is not called
         A.CallTo(() => client.AddArchiveColumnAsync(A<string>._, A<string>._, A<string>._, A<bool>._)).MustNotHaveHappened();
+#pragma warning restore CS0618
     }
 
     [Fact]
