@@ -3,6 +3,28 @@ namespace GraphQlDtos;
 public static class GraphQlConstants
 {
     /// <summary>
+    ///     The mirror role list (<c>Client.MirrorRoleNames</c>, System.Identity 3.9.0) of a client by client id; read by
+    ///     <c>GetClientMirrorRoles</c>. Names only, never a secret.
+    /// </summary>
+    public const string GetClientMirrorRoleNamesByClientId = @"
+      query getClientMirrorRoleNamesByClientId($clientId: SimpleScalar!) {
+        runtime {
+          systemIdentityClient(
+            fieldFilter: [
+              { attributePath: ""clientId"", operator: EQUALS, comparisonValue: $clientId }
+            ]
+          ) {
+            totalCount
+            items {
+              rtId
+              clientId
+              mirrorRoleNames
+            }
+          }
+        }
+      }";
+
+    /// <summary>
     ///     The runtime id of an API scope by name: the CK methods of <c>System.Identity/ApiScope</c> address the scope by
     ///     runtime id, the identity REST DTO carries none.
     /// </summary>

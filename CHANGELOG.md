@@ -6,6 +6,14 @@ All notable changes to octo-cli are listed here. Newest first.
 
 ### Added
 
+- **AB#9926 — operators preview, set and read the roles a client hands to its mirrors.** `SetClientMirrorRoles -id <client>
+  -r <role>[,<role>] | --clear [--apply] [-j]` runs `Client.SetMirrorRoles-1` (System.Identity 3.9.0) as a dry run unless
+  `--apply` is given and prints one line per child tenant (status, roles before, roles after); a failed mirror, a refusal
+  (`MIRROR_ROLE_NOT_ALLOWED`, `CLIENT_NOT_CONFIDENTIAL`, `MIRROR_ROLE_NOT_FOUND`, `CONCURRENT_CHANGE`, `METHOD_FORBIDDEN`) or an
+  unknown client end non-zero. `GetClientMirrorRoles -id <client> [-j]` prints the list (`Client.MirrorRoleNames`). GraphQlDtos
+  imports `System.Identity-[3.9,4.0)`. **Requires identity services with System.Identity 3.9.0.** Docs:
+  `docs/identity-commands.md`, `docs/cli-usage-examples.md`.
+
 - **AB#8455 — Tenant administrators manage agents with octo-cli.** `CreateAgent`, `UpdateAgent`, `EnableAgent`,
   `DisableAgent` and `GetAgents` (list, or one agent with `-a`) call the agent tools of the MCP service (`create_agent`,
   `update_agent`, `set_agent_enabled`, `list_agents`, `get_agent`) on `<McpServiceUrl of the context>/<tenant>/mcp` with

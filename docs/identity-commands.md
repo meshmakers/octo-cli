@@ -217,6 +217,43 @@ before and after a change; `--context` selects the tenant.
 - Tests: `GetClientRolesCommandTests` (real `IdentityServicesClient` against a local listener and the real `Runner`: success with
   names and order, no roles, role id outside the tenant, unknown client, unknown tenant without a client read).
 
+## Roles a client hands to its mirrors: SetClientMirrorRoles / GetClientMirrorRoles
+
+`SetClientMirrorRoles` sets the roles identity assigns to every tracked mirror of a client in its child tenants, also in child
+tenants created later (`System.Identity/Client.SetMirrorRoles-1`, System.Identity 3.9.0; identity docs
+`client-mirroring.md`, "Roles mirrored by allow-list"). `GetClientMirrorRoles` reads the list back
+(`Client.MirrorRoleNames`, a GraphQL query of the context's tenant). Both act on the **original** client in the context's tenant.
+
+```bash
+octo-cli -c SetClientMirrorRoles -id ci-deploy -r CommunicationManagement            # dry run (default)
+octo-cli -c SetClientMirrorRoles -id ci-deploy -r CommunicationManagement --apply    # write
+octo-cli -c SetClientMirrorRoles -id ci-deploy --clear --apply                       # clear the list
+octo-cli -c GetClientMirrorRoles -id ci-deploy [-j]
+```
+
+- `-r|--roles <name>[,<name>]` is the **complete** list (it replaces the stored one; names are trimmed, duplicates dropped
+  case-insensitively). Any role name the method accepts goes through the list; the command hard-codes none. `--clear` sends the
+  empty list: identity removes the roles it manages on the mirrors and leaves roles set by hand. Exactly one of the two.
+- **Dry run by default**: the command plans and writes nothing; `--apply` writes the list and reconciles the mirrors. Both print
+  one line per child tenant: `Tenant | Status | Roles before | Roles after` (the mirror's direct roles; a dry run shows the roles
+  after an apply). Status markers: `WOULD-ADD` / `ADDED`, `WOULD-REMOVE` / `REMOVED`, `WOULD-ADOPT` / `ADOPTED` (a listed role the
+  mirror already held by hand becomes managed), `ALREADY-PRESENT`, `HAND-SET` (other roles of the mirror, never touched),
+  `ROLE-MISSING` (the child tenant has no such role yet; granted once it exists), `DECLINED` (a tenant administrator removed it;
+  not set again), `ROLE-REFUSED` (refused in that child), `FAILED` / `SKIPPED` (outcome of the mirror), `NO-ROLES`.
+  `-j|--json` prints the method result instead.
+- A mirror that **failed** ends the command with exit code `-3` after the table, naming the child tenants (the periodic mirror
+  reconciliation retries them).
+- Refusals (nothing written, exit `-3`): `MIRROR_ROLE_NOT_ALLOWED` (TenantManagement, UserManagement, SecretManagement,
+  AdminPanelManagement and AiBudgetAdmin are never mirrored; `roleNames` names them), `CLIENT_NOT_CONFIDENTIAL` (only confidential
+  client_credentials clients), `MIRROR_ROLE_NOT_FOUND` (a role the list adds is no role of the context's tenant),
+  `CONCURRENT_CHANGE` (retry), `METHOD_FORBIDDEN` (the caller needs `TenantManagement` in the tenant of the client and every built-in
+  role it adds; `reason` says which rule). An unknown client ends with a message naming client and tenant (exit `-5`). A service
+  without the method ends with a message naming System.Identity 3.9.0; octo-cli does not fall back to REST.
+- The output holds tenant ids and role names only, never a secret or token.
+
+Tests: `ClientMirrorRolesCommandTests` (dry run and apply variables and table, any role name passed unchanged, clear, option
+errors, failed mirror, each declared error, `METHOD_FORBIDDEN`, unknown client, old service, JSON, the read command).
+
 ## Client roles in a child tenant (`--child-tenant-id`)
 
 `GetClientRoles`, `AddClientToRole` and `RemoveClientFromRole` take the optional `-ctid|--child-tenant-id <tenant>` (AB#9872),

@@ -18,7 +18,8 @@ namespace Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Ident
 ///     Runs one identity administration command through a CK method client of <c>System.Identity</c> (identity wave 2:
 ///     groups, clients, roles, API scopes and resources, data permissions and policies, identity providers, e-mail domain
 ///     group rules, external tenant user mappings, admin provisioning, secrets and client mirrors), generated in GraphQlDtos
-///     from <c>System.Identity-[3.8,4.0)</c>.
+///     from <c>System.Identity-[3.9,4.0)</c> (the mirror role list of <c>SetClientMirrorRoles</c> needs 3.9.0, the other
+///     methods 3.8.0).
 ///     <list type="bullet">
 ///         <item>
 ///             The tenant client is authenticated first: it carries its own access token, the command's
@@ -56,6 +57,9 @@ internal sealed class IdentityMethodCall(
 
     /// <summary>The <c>System.Identity</c> version that carries every method these commands call.</summary>
     internal const string RequiredSystemIdentityVersion = "3.8.0";
+
+    /// <summary>The <c>System.Identity</c> version of <c>Client.SetMirrorRoles-1</c> and <c>Client.MirrorRoleNames</c>.</summary>
+    internal const string MirrorRolesSystemIdentityVersion = "3.9.0";
 
     /// <summary>
     ///     The methods that carry a secret (a parameter or the result). The identity service offers their handlers on the
@@ -150,7 +154,9 @@ internal sealed class IdentityMethodCall(
     /// <summary>The message of a command whose method the service does not offer; names the needed version.</summary>
     internal static string MethodUnavailableMessage(string methodId, string? serviceUri) =>
         $"The service at '{serviceUri}' does not offer the CK method {methodId}. It needs identity services with " +
-        $"System.Identity {RequiredSystemIdentityVersion} or newer (the identity wave 2 methods)" +
+        (methodId == RtClientMethodClient.SetMirrorRolesMethodId
+            ? $"System.Identity {MirrorRolesSystemIdentityVersion} or newer (the mirror role list)"
+            : $"System.Identity {RequiredSystemIdentityVersion} or newer (the identity wave 2 methods)") +
         (SecretCarryingMethodIds.Contains(methodId)
             ? " with the password methods switched on (Methods:Identity:EnablePasswordMethods). "
             : ". ") +

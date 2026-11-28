@@ -352,6 +352,9 @@ internal static class Program
         services.AddTransient<ICommand, ProvisionClientInTenant>();
         services.AddTransient<ICommand, UnprovisionClientFromTenant>();
         services.AddTransient<ICommand, SetClientAutoProvision>();
+        // System.Identity 3.9.0: the roles a client hands to its mirrors (Client.SetMirrorRoles-1, Client.MirrorRoleNames)
+        services.AddTransient<ICommand, SetClientMirrorRoles>();
+        services.AddTransient<ICommand, GetClientMirrorRoles>();
 
         // AB#4209 Step 4 PR 2 — overlay URI write for blueprint-managed clients
         services.AddTransient<ICommand, ApplyClientOverlay>();
