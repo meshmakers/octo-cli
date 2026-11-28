@@ -64,8 +64,15 @@ internal sealed class ArchiveMethodCall(
     ///     failed job did. A job no longer listed is printed from the error parameters (<c>jobRtId</c>, <c>reason</c>).
     ///     Another declared error ends the command.
     /// </summary>
+    /// <param name="client">The stream data client (the job list stays REST).</param>
+    /// <param name="tenantId">The tenant of the context.</param>
+    /// <param name="archiveRtId">The rollup whose jobs are listed.</param>
+    /// <param name="error">The error of the operation.</param>
+    /// <param name="ensureAuthenticated">
+    ///     Refreshes the stream data client's token first: the read follows a wait of up to 30 minutes on the tenant client.
+    /// </param>
     internal static async Task<RollupRecomputeJobInfoDto> FailedJobAsync(IStreamDataServicesClient client,
-        string tenantId, string archiveRtId, CkMethodError error)
+        string tenantId, string archiveRtId, CkMethodError error, Func<Task> ensureAuthenticated)
     {
         if (!string.Equals(error.Code, RecomputeFailedCode, StringComparison.Ordinal) ||
             !error.Parameters.TryGetValue("jobRtId", out var jobRtId) || string.IsNullOrWhiteSpace(jobRtId))
@@ -73,6 +80,7 @@ internal sealed class ArchiveMethodCall(
             throw new ServiceClientException(CkMethodErrorText.Format(error));
         }
 
+        await ensureAuthenticated();
         var jobs = await client.ListRecomputeJobsForArchiveAsync(tenantId, archiveRtId);
         return jobs.FirstOrDefault(j => string.Equals(j.RtId, jobRtId, StringComparison.Ordinal))
                ?? new RollupRecomputeJobInfoDto(jobRtId, "Failed", null, null, null, null, null,
@@ -147,11 +155,23 @@ internal sealed class ArchiveMethodCall(
         RequireObjectId(archiveRtId, "ArchiveRtId");
         await authenticationService.EnsureAuthenticated(tenantClient.AccessToken);
 
-        var result = await tenantClient.SendQueryAsync<ArchiveTypeDto>(new GraphQLRequest
+        QlItemsContainer<ArchiveTypeDto>? result;
+        try
         {
-            Query = GraphQlConstants.GetArchiveCkTypeById,
-            Variables = new { rtId = archiveRtId }
-        });
+            result = await tenantClient.SendQueryAsync<ArchiveTypeDto>(new GraphQLRequest
+            {
+                Query = GraphQlConstants.GetArchiveCkTypeById,
+                Variables = new { rtId = archiveRtId }
+            });
+        }
+        catch (QlQueryErrorException e)
+        {
+            // A tenant without stream data (or an asset repository without System.StreamData) has no archive query field:
+            // the same message and exit code as a missing method, nothing was changed.
+            logger.LogDebug("The archive type query failed: {Message}", e.Message);
+            throw new ServiceClientException(MethodUnavailableMessage("System.StreamData/Archive",
+                tenantClient.ServiceUri?.ToString()));
+        }
         var ckTypeId = result?.Items?.FirstOrDefault()?.CkTypeId;
         if (string.IsNullOrWhiteSpace(ckTypeId))
         {

@@ -129,6 +129,7 @@ public class RecomputeArchiveCommand : ServiceClientOctoCommand<IStreamDataServi
                 : ArchiveMethodCall.ToJobInfo(result.Value);
         }
 
-        return await ArchiveMethodCall.FailedJobAsync(ServiceClient, tenantId, rollupRtId, result.Error!);
+        return await ArchiveMethodCall.FailedJobAsync(ServiceClient, tenantId, rollupRtId, result.Error!,
+            EnsureAuthenticatedAsync);
     }
 }

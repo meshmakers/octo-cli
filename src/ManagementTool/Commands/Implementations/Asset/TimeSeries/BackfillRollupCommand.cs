@@ -69,7 +69,7 @@ public class BackfillRollupCommand : ServiceClientOctoCommand<IStreamDataService
         Logger.LogDebug("Backfill of rollup '{RollupRtId}' accepted as operation {OperationId}", rollupRtId,
             handle.OperationId);
 
-        var queued = await ReadQueuedJobAsync(handle);
+        var queued = await ReadQueuedJobAsync(handle, tenantId, rollupRtId);
         if (queued.NoData)
         {
             Logger.LogInformation(
@@ -78,12 +78,26 @@ public class BackfillRollupCommand : ServiceClientOctoCommand<IStreamDataService
             return;
         }
 
+        var wait = CommandArgumentValue.IsArgumentUsed(_waitArg);
         if (queued.JobRtId is null)
         {
             Logger.LogWarning(
                 "Backfill of rollup '{RollupRtId}' was accepted as operation {OperationId}, but it named no job within "
                 + "{Timeout}s. It runs in the background — poll with 'ListRecomputeJobs -id <rollupRtId>'.",
                 rollupRtId, handle.OperationId, (int)QueuedTimeout.TotalSeconds);
+            if (wait)
+            {
+                // -w was asked for: keep waiting on the operation itself.
+                await WaitForJobAsync(tenantId, rollupRtId, handle, null);
+            }
+
+            return;
+        }
+
+        if (queued.Final is not null)
+        {
+            // The backfill ended before the first read: no "runs in the background", the final job line at once.
+            LogJob(queued.Final);
             return;
         }
 
@@ -92,7 +106,7 @@ public class BackfillRollupCommand : ServiceClientOctoCommand<IStreamDataService
             + "poll with 'ListRecomputeJobs -id <rollupRtId>'.",
             rollupRtId, queued.JobRtId, queued.State);
 
-        if (!CommandArgumentValue.IsArgumentUsed(_waitArg))
+        if (!wait)
         {
             return;
         }
@@ -104,7 +118,8 @@ public class BackfillRollupCommand : ServiceClientOctoCommand<IStreamDataService
     ///     Reads the operation until it names its job (stage <c>QUEUED</c>) or is final. A final operation without a job is
     ///     the no-op of a source archive without data.
     /// </summary>
-    private async Task<QueuedJob> ReadQueuedJobAsync(CkOperationHandle<RtRecomputeJobInfoRecordDto?> handle)
+    private async Task<QueuedJob> ReadQueuedJobAsync(CkOperationHandle<RtRecomputeJobInfoRecordDto?> handle,
+        string tenantId, string rollupRtId)
     {
         string? jobRtId = null;
         using var named = new CancellationTokenSource();
@@ -124,11 +139,11 @@ public class BackfillRollupCommand : ServiceClientOctoCommand<IStreamDataService
         }
         catch (OperationCanceledException) when (jobRtId is not null)
         {
-            return new QueuedJob(jobRtId, "Pending", false);
+            return new QueuedJob(jobRtId, "Pending", false, null);
         }
         catch (CkOperationWaitTimeoutException)
         {
-            return new QueuedJob(null, null, false);
+            return new QueuedJob(null, null, false, null);
         }
 
         if (operation.State == CkOperationState.Failed)
@@ -137,7 +152,8 @@ public class BackfillRollupCommand : ServiceClientOctoCommand<IStreamDataService
             var failedId = operation.Error?.Parameters.GetValueOrDefault("jobRtId");
             if (operation.Error?.Code == ArchiveMethodCall.RecomputeFailedCode && !string.IsNullOrEmpty(failedId))
             {
-                return new QueuedJob(failedId, "Failed", false);
+                return new QueuedJob(failedId, "Failed", false, await ArchiveMethodCall.FailedJobAsync(ServiceClient,
+                    tenantId, rollupRtId, operation.Error, EnsureAuthenticatedAsync));
             }
 
             throw new ServiceClientException(operation.Error is null
@@ -147,8 +163,8 @@ public class BackfillRollupCommand : ServiceClientOctoCommand<IStreamDataService
 
         var job = handle.ReadResult(operation);
         return job is null
-            ? new QueuedJob(null, null, true)
-            : new QueuedJob(job.JobRtId, job.State?.ToString() ?? "Unknown", false);
+            ? new QueuedJob(null, null, true, null)
+            : new QueuedJob(job.JobRtId, job.State?.ToString() ?? "Unknown", false, ArchiveMethodCall.ToJobInfo(job));
     }
 
     /// <summary>
@@ -157,10 +173,10 @@ public class BackfillRollupCommand : ServiceClientOctoCommand<IStreamDataService
     ///     the wait continues on the archive's recompute jobs.
     /// </summary>
     private async Task WaitForJobAsync(string tenantId, string rollupRtId,
-        CkOperationHandle<RtRecomputeJobInfoRecordDto?> handle, string jobRtId)
+        CkOperationHandle<RtRecomputeJobInfoRecordDto?> handle, string? jobRtId)
     {
         Logger.LogInformation("Waiting for backfill job {RtId} to complete (poll every {Interval}s, timeout {Timeout}min)...",
-            jobRtId, (int)PollInterval.TotalSeconds, (int)PollTimeout.TotalMinutes);
+            jobRtId ?? handle.OperationId, (int)PollInterval.TotalSeconds, (int)PollTimeout.TotalMinutes);
 
         RollupRecomputeJobInfoDto? job;
         try
@@ -168,7 +184,8 @@ public class BackfillRollupCommand : ServiceClientOctoCommand<IStreamDataService
             var result = await _methods.WaitForJobAsync(handle, PollTimeout, TimeProvider, PollInterval);
             job = result.IsSuccess
                 ? result.Value is null ? null : ArchiveMethodCall.ToJobInfo(result.Value)
-                : await ArchiveMethodCall.FailedJobAsync(ServiceClient, tenantId, rollupRtId, result.Error!);
+                : await ArchiveMethodCall.FailedJobAsync(ServiceClient, tenantId, rollupRtId, result.Error!,
+                    EnsureAuthenticatedAsync);
         }
         catch (CkOperationWaitTimeoutException)
         {
@@ -178,12 +195,17 @@ public class BackfillRollupCommand : ServiceClientOctoCommand<IStreamDataService
                 (int)PollTimeout.TotalMinutes, jobRtId);
             return;
         }
-        catch (CkMethodCallException e) when (e.Code == ArchiveMethodCall.OutcomeUnknownCode)
+        catch (CkMethodCallException e) when (e.Code == ArchiveMethodCall.OutcomeUnknownCode && jobRtId is not null)
         {
             Logger.LogDebug("The backfill operation ended without an outcome ({Code}); following job {RtId} in the job list.",
                 e.Code, jobRtId);
+            // The stream data client's token is refreshed before every poll: this follows a wait of up to 30 minutes.
             var (pollResult, polled) = await PollUntilTerminalAsync(
-                () => ServiceClient.ListRecomputeJobsForArchiveAsync(tenantId, rollupRtId),
+                async () =>
+                {
+                    await EnsureAuthenticatedAsync();
+                    return await ServiceClient.ListRecomputeJobsForArchiveAsync(tenantId, rollupRtId);
+                },
                 jobRtId, () => DateTime.UtcNow, Task.Delay, PollInterval, PollTimeout);
             switch (pollResult)
             {
@@ -205,10 +227,16 @@ public class BackfillRollupCommand : ServiceClientOctoCommand<IStreamDataService
 
         if (job is null)
         {
-            Logger.LogWarning("Backfill job {RtId} reached a terminal state, but no job snapshot was returned.", jobRtId);
+            Logger.LogWarning("Backfill job {RtId} reached a terminal state, but no job snapshot was returned.",
+                jobRtId ?? handle.OperationId);
             return;
         }
 
+        LogJob(job);
+    }
+
+    private void LogJob(RollupRecomputeJobInfoDto job)
+    {
         Logger.LogInformation(
             "Backfill job {RtId}: state={State}, rows={Rows}, windows={Windows}, duration={Duration}ms, " +
             "lastProgress={LastProgress}, error={Error}",
@@ -283,7 +311,8 @@ public class BackfillRollupCommand : ServiceClientOctoCommand<IStreamDataService
         state.Equals("Completed", StringComparison.OrdinalIgnoreCase)
         || state.Equals("Failed", StringComparison.OrdinalIgnoreCase);
 
-    private sealed record QueuedJob(string? JobRtId, string? State, bool NoData);
+    /// <summary>The queued job: its id and state, the no-op, or the final job when the backfill ended before the first read.</summary>
+    private sealed record QueuedJob(string? JobRtId, string? State, bool NoData, RollupRecomputeJobInfoDto? Final);
 
     /// <summary>An <see cref="IProgress{T}" /> that reports synchronously, so the job id is known before the next read.</summary>
     private sealed class SyncProgress(Action<CkOperation> report) : IProgress<CkOperation>

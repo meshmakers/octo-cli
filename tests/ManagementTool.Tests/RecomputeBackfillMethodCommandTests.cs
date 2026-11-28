@@ -34,7 +34,8 @@ public sealed class RecomputeBackfillMethodCommandTests : IDisposable
     [Fact]
     public async Task Recompute_StartsRecompute2_WaitsForTheOperation_AndPrintsTheJobLineOfToday()
     {
-        _service.RespondInOrder(Recorded("rollup-recompute2-accepted"), Recorded("operation-recompute-succeeded"));
+        // Accepted answer and final operation of the same run (a recompute of the activated rollup).
+        _service.RespondInOrder(Recorded("rollup-recompute2-accepted-activated"), Recorded("operation-recompute-succeeded"));
         var logger = new RecordingLogger<RecomputeArchiveCommand>();
 
         await Recompute(logger, "-id", RollupRtId, "-f", "2026-11-27T00:00:00Z", "-t", "2026-11-28T00:00:00Z").Execute();
@@ -45,7 +46,7 @@ public sealed class RecomputeBackfillMethodCommandTests : IDisposable
         Assert.Contains($"\"rtId\":\"{RollupRtId}\"", Variables(_service.Bodies[0]), StringComparison.Ordinal);
         Assert.Contains("\"from\":\"2026-11-27T00:00:00", Variables(_service.Bodies[0]), StringComparison.Ordinal);
         Assert.Contains("query CkOperationById", Query(_service.Bodies[1]), StringComparison.Ordinal);
-        Assert.Contains("\"operationId\":\"0b7f29f96d6348769cb8357648aba59d\"", Variables(_service.Bodies[1]), StringComparison.Ordinal);
+        Assert.Contains("\"operationId\":\"55fd5a7137614c289ba808bc7b36b5e2\"", Variables(_service.Bodies[1]), StringComparison.Ordinal);
         A.CallTo(_streamData).Where(c => !c.Method.IsSpecialName).MustNotHaveHappened();
     }
 
@@ -193,9 +194,75 @@ public sealed class RecomputeBackfillMethodCommandTests : IDisposable
             "Backfill job 6b0a8908fa75fad21127ffb6: state=Failed, rows=n/a, windows=n/a, duration=7ms, lastProgress=n/a, error=source gone");
     }
 
-    private RecomputeArchiveCommand Recompute(RecordingLogger<RecomputeArchiveCommand> logger, params string[] args)
+    [Fact]
+    public async Task Recompute_RefreshesTheTenantTokenBeforeEveryRead_AndTheStreamDataTokenBeforeTheJobList()
     {
-        var command = new RecomputeArchiveCommand(logger, Tenant(), _streamData, TenantClient(), _auth)
+        // A recompute outlives an access token: the tenant client is authenticated before the call and before every
+        // operation read, the stream data client before the job list that follows the wait.
+        _service.RespondInOrder(Recorded("rollup-recompute2-accepted"), Running(null), Running(null),
+            Recorded("operation-recompute-failed"));
+        A.CallTo(() => _streamData.ListRecomputeJobsForArchiveAsync("acme", RollupRtId)).Returns([]);
+        var tenantClient = TenantClient();
+
+        await Recompute(new RecordingLogger<RecomputeArchiveCommand>(), tenantClient, "-id", RollupRtId, "-f",
+            "2026-11-27T00:00:00Z", "-t", "2026-11-28T00:00:00Z").Execute();
+
+        // One for the call, one before each of the three operation reads.
+        A.CallTo(() => _auth.EnsureAuthenticated(tenantClient.AccessToken)).MustHaveHappened(4, Times.Exactly);
+        A.CallTo(() => _auth.EnsureAuthenticated(_streamData.AccessToken)).MustHaveHappenedOnceExactly()
+            .Then(A.CallTo(() => _streamData.ListRecomputeJobsForArchiveAsync("acme", RollupRtId)).MustHaveHappened());
+    }
+
+    [Fact]
+    public async Task Backfill_EndedBeforeTheFirstRead_PrintsTheFinalJobLine()
+    {
+        _service.RespondInOrder(Recorded("rollup-backfill-from-source2-accepted"), Recorded("operation-recompute-succeeded"));
+        var logger = new RecordingLogger<BackfillRollupCommand>();
+
+        await Backfill(logger, "-id", RollupRtId).Execute();
+
+        Assert.DoesNotContain(logger.Entries, e => e.Message.Contains("runs in the background", StringComparison.Ordinal));
+        Assert.Contains(logger.Entries, e => e.Message.StartsWith(
+            "Backfill job 6b0a8911fa75fad21127ffbb: state=Completed, rows=0, windows=24, duration=209ms", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task Backfill_WithWait_NamingNoJobInTime_KeepsWaitingOnTheOperation()
+    {
+        _service.RespondInOrder([Recorded("rollup-backfill-from-source2-accepted"), .. Enumerable.Repeat(Running(null), 3),
+            Recorded("operation-recompute-succeeded")]);
+        var logger = new RecordingLogger<BackfillRollupCommand>();
+        var command = Backfill(logger, "-id", RollupRtId, "-w");
+        command.QueuedTimeout = TimeSpan.FromSeconds(12);
+
+        await command.Execute();
+
+        Assert.Contains(logger.Entries, e => e.Level == LogLevel.Warning && e.Message.Contains("named no job", StringComparison.Ordinal));
+        Assert.Contains(logger.Entries, e => e.Message.StartsWith("Backfill job 6b0a8911fa75fad21127ffbb: state=Completed",
+            StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task Backfill_WithWait_AfterARestart_RefreshesTheStreamDataTokenBeforeEveryPoll()
+    {
+        _service.RespondInOrder(Recorded("rollup-backfill-from-source2-accepted"), Running("6b0a8911fa75fad21127ffc5"),
+            Failed("METHOD_OUTCOME_UNKNOWN", ("reason", "handler-lost")));
+        A.CallTo(() => _streamData.ListRecomputeJobsForArchiveAsync("acme", RollupRtId)).ReturnsNextFromSequence(
+            [new RollupRecomputeJobInfoDto("6b0a8911fa75fad21127ffc5", "Running", 1, 1, null, null, null, null)],
+            [new RollupRecomputeJobInfoDto("6b0a8911fa75fad21127ffc5", "Completed", 100, 4, null, null, 50, null)]);
+
+        await Backfill(new RecordingLogger<BackfillRollupCommand>(), "-id", RollupRtId, "-w").Execute();
+
+        A.CallTo(() => _auth.EnsureAuthenticated(_streamData.AccessToken)).MustHaveHappened(2, Times.Exactly);
+    }
+
+    private RecomputeArchiveCommand Recompute(RecordingLogger<RecomputeArchiveCommand> logger, params string[] args) =>
+        Recompute(logger, TenantClient(), args);
+
+    private RecomputeArchiveCommand Recompute(RecordingLogger<RecomputeArchiveCommand> logger, ITenantClient tenantClient,
+        params string[] args)
+    {
+        var command = new RecomputeArchiveCommand(logger, Tenant(), _streamData, tenantClient, _auth)
         {
             TimeProvider = new AdvancingTimeProvider()
         };

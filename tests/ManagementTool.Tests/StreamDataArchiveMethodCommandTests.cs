@@ -198,6 +198,19 @@ public sealed class StreamDataArchiveMethodCommandTests : IDisposable
     }
 
     [Fact]
+    public async Task TenantWithoutTheArchiveQuery_NamesTheNeededVersion_AndWritesNothing()
+    {
+        // A tenant without stream data (or System.StreamData) has no systemStreamDataArchive field: GraphQL validation error.
+        _service.RespondInOrder("""{"errors":[{"message":"Cannot query field 'systemStreamDataArchive' on type 'RuntimeModelQuery'.","extensions":{"code":"FIELDS_ON_CORRECT_TYPE","number":"5.3.1"}}]}""");
+
+        var ex = await Assert.ThrowsAsync<ServiceClientException>(() =>
+            Create(typeof(ActivateArchiveCommand), ["-id", ArchiveRtId]).Execute());
+
+        Assert.Contains("System.StreamData 1.30.0 or newer", ex.Message);
+        Assert.Single(_service.Bodies);
+    }
+
+    [Fact]
     public async Task NoObjectId_EndsBeforeAnyCall()
     {
         var ex = await Assert.ThrowsAsync<ServiceClientException>(() =>
