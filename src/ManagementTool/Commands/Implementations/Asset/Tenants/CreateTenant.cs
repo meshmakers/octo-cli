@@ -3,6 +3,7 @@ using Meshmakers.Common.CommandLineParser;
 using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Identity;
 using Meshmakers.Octo.Frontend.ManagementTool.Services;
 using Meshmakers.Octo.Sdk.ServiceClient;
+using Meshmakers.Octo.Sdk.ServiceClient.AiServices;
 using Meshmakers.Octo.Sdk.ServiceClient.AssetRepositoryServices.System;
 using Meshmakers.Octo.Sdk.ServiceClient.AssetRepositoryServices.Tenants;
 using Meshmakers.Octo.Sdk.ServiceClient.AssetRepositoryServices.Tenants.Methods;
@@ -13,6 +14,15 @@ namespace Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Asset
 
 internal class CreateTenant : ServiceClientOctoCommand<IAssetServicesClient>
 {
+    /// <summary>
+    ///     Blueprint name (without version) of the starter tenant (AB#8452). Creating it from the system tenant gives the
+    ///     new tenant the cluster's default monthly LLM cap, as MCP <c>create_tenant starter=true</c> does.
+    /// </summary>
+    internal const string StarterBlueprintName = StarterDefaultCap.StarterBlueprintName;
+
+    private readonly IAiServicesClient _aiServicesClient;
+    private readonly IAuthenticationService _authenticationService;
+    private readonly IOptions<OctoToolAuthenticationOptions> _authenticationOptions;
     private readonly IdentityMethodCall _methods;
     private readonly IArgument _databaseArg;
     private readonly IArgument _tenantIdArg;
@@ -22,7 +32,8 @@ internal class CreateTenant : ServiceClientOctoCommand<IAssetServicesClient>
 
     public CreateTenant(ILogger<CreateTenant> logger, IOptions<OctoToolOptions> options,
         IAssetServicesClient assetServicesClient, ITenantClient tenantClient,
-        IAuthenticationService authenticationService)
+        IAiServicesClient aiServicesClient, IAuthenticationService authenticationService,
+        IOptions<OctoToolAuthenticationOptions> authenticationOptions)
         : base(logger, Constants.AssetRepositoryServicesGroup, "Create",
             "Creates a new tenant and provisions the current user as admin.", options,
             assetServicesClient, authenticationService)
@@ -30,6 +41,9 @@ internal class CreateTenant : ServiceClientOctoCommand<IAssetServicesClient>
         // The provisioning runs the System.Identity method ExternalTenantUserMapping.ProvisionCurrentUser in the current
         // (parent) tenant, like the ProvisionCurrentUser command; the REST method of the SDK is obsolete (AB#9044).
         _methods = new IdentityMethodCall(tenantClient, authenticationService, logger);
+        _aiServicesClient = aiServicesClient;
+        _authenticationService = authenticationService;
+        _authenticationOptions = authenticationOptions;
 
         _tenantIdArg = CommandArgumentValue.AddArgument("tid", "tenantId", ["Id of tenant"],
             true, 1);
@@ -70,6 +84,11 @@ internal class CreateTenant : ServiceClientOctoCommand<IAssetServicesClient>
                     new CodeSampleArgument(_blueprintArg, "MyBlueprint-1.0.0"),
                 ],
                     description: "Tenant with a catalog blueprint applied in the same call"),
+                new CodeSample(arguments: [
+                    new CodeSampleArgument(_tenantIdArg, "starter1"),
+                    new CodeSampleArgument(_blueprintArg, "System.Ai.Starter-1.2.0"),
+                ],
+                    description: "Starter tenant from the system tenant: blueprint applied and the default LLM cap set"),
             ],
             Notes:
             [
@@ -93,6 +112,16 @@ internal class CreateTenant : ServiceClientOctoCommand<IAssetServicesClient>
                 "Combines with --database, --scratch and --no-provision; the current user is provisioned only after the tenant " +
                 "and its blueprint exist. Same result as Create followed by InstallBlueprint, without a half-set-up tenant in " +
                 "between.",
+                "Starter tenant (AB#8452): when the context's tenant is the system tenant and the blueprint is " +
+                $"{StarterBlueprintName}-<version>, the command then gives the new tenant the cluster's default monthly LLM " +
+                "cap on the central key (AI service, POST system/v1/aiSpendCaps/<tenant>/starterDefault), as MCP " +
+                "create_tenant starter=true does. The cluster configuration decides the amount; an existing cap is never " +
+                "changed, and a cluster without a configured default writes nothing (a warning says so). The context needs " +
+                "the AI service URL; without it the command stops before the tenant is created. Other blueprints and other " +
+                "parent tenants set no cap. The endpoint takes only a person login (device code) of the system tenant with " +
+                "TenantManagement: in a client-credentials session (e.g. --scratch) the command does not call it and warns, " +
+                "naming SetAiSpendCap. When the cap call fails, the tenant exists: the error names SetAiSpendCap as the " +
+                "remedy and the command ends with a non-zero exit code.",
             ]
         );
 
@@ -114,6 +143,18 @@ internal class CreateTenant : ServiceClientOctoCommand<IAssetServicesClient>
         }
         // A scratch tenant is created by a service token: there is no user to provision, the creator's mirror is the admin.
         var skipProvisioning = scratch || CommandArgumentValue.IsArgumentUsed(_noProvisionArg);
+        // AB#8452: the platform operator's starter path also sets the default LLM cap, as MCP create_tenant starter=true.
+        var applyStarterCap = blueprintId != null && IsStarterBlueprint(blueprintId) &&
+                              SystemTenants.IsSystemTenant(Options.Value.TenantId);
+        // A client-credentials session skips the cap call (warning below), so it needs no AI service URL.
+        if (applyStarterCap && !IsServiceSession() && string.IsNullOrWhiteSpace(Options.Value.AiServiceUrl))
+        {
+            // Fail before anything is created: otherwise the tenant would exist without its cap.
+            throw new ToolException(
+                $"Creating a {StarterBlueprintName} tenant from the system tenant sets its default LLM cap on the AI " +
+                "service, but the context has no AI service URL. Add it to the context, or create the tenant without " +
+                "--blueprint and install the blueprint afterwards.");
+        }
 
         Logger.LogInformation(
             "Creating {Kind} tenant \'{TenantId}\' (database \'{DatabaseName}\') at \'{ServiceClientServiceUri}\'",
@@ -136,6 +177,17 @@ internal class CreateTenant : ServiceClientOctoCommand<IAssetServicesClient>
         Logger.LogInformation(
             "Tenant \'{TenantId}\' (database \'{DatabaseName}\') at \'{ServiceClientServiceUri}\' created", tenantId,
             databaseName ?? "<default>", ServiceClient.ServiceUri);
+
+        if (applyStarterCap && IsServiceSession())
+        {
+            StarterDefaultCap.WarnSkipped(Logger, $"Tenant '{tenantId}' was created", tenantId);
+        }
+        else if (applyStarterCap)
+        {
+            await StarterDefaultCap.ApplyAsync(Logger, _aiServicesClient, _authenticationService, tenantId,
+                $"Tenant '{tenantId}' was created",
+                skipProvisioning ? "" : $", and 'ProvisionCurrentUser -ttid {tenantId}' (provisioning was not run)");
+        }
 
         if (!skipProvisioning)
         {
@@ -175,4 +227,9 @@ internal class CreateTenant : ServiceClientOctoCommand<IAssetServicesClient>
             Logger.LogInformation("Admin provisioning skipped (--no-provision)");
         }
     }
+
+    private bool IsServiceSession() => StarterDefaultCap.IsServiceSession(_authenticationOptions.Value);
+
+    /// <summary>True for <c>System.Ai.Starter-&lt;version&gt;</c> (name compared without case).</summary>
+    internal static bool IsStarterBlueprint(string blueprintId) => StarterDefaultCap.IsStarterBlueprint(blueprintId);
 }

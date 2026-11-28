@@ -281,6 +281,8 @@ internal static class Program
         services.AddSingleton<IChildTenantFeaturesFactory, ChildTenantFeaturesFactory>();
         // AB#9872: the identity clients of a child tenant (client role commands with --child-tenant-id).
         services.AddSingleton<IChildTenantIdentityFactory, ChildTenantIdentityFactory>();
+        // AB#8452: the asset repository client of a child tenant (InstallBlueprint --child-tenant-id).
+        services.AddSingleton<IChildTenantAssetClientFactory, ChildTenantAssetClientFactory>();
         services.AddSingleton<ITenantSetupClientFactory, TenantSetupClientFactory>();
         services.AddSingleton<ICommunicationServicesClient, CommunicationServicesClient>();
         services.AddSingleton<IStreamDataServicesClient, StreamDataServicesClient>();

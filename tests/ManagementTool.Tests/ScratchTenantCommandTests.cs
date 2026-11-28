@@ -7,6 +7,7 @@ using Meshmakers.Octo.Frontend.ManagementTool;
 using Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Asset.Tenants;
 using Meshmakers.Octo.Frontend.ManagementTool.Services;
 using Meshmakers.Octo.Sdk.ServiceClient;
+using Meshmakers.Octo.Sdk.ServiceClient.AiServices;
 using Meshmakers.Octo.Sdk.ServiceClient.AssetRepositoryServices.System;
 using Meshmakers.Octo.Sdk.ServiceClient.AssetRepositoryServices.Tenants;
 using Meshmakers.Octo.Sdk.ServiceClient.Authentication;
@@ -45,7 +46,8 @@ public sealed class ScratchTenantCommandTests : IDisposable
         A.CallTo(() => asset.AccessToken).Returns(A.Fake<IServiceClientAccessToken>());
         var command = new CreateTenant(NullLogger<CreateTenant>.Instance,
             Options.Create(new OctoToolOptions { TenantId = "parent1" }), asset, tenant,
-            A.Fake<IAuthenticationService>());
+            A.Fake<IAiServicesClient>(), A.Fake<IAuthenticationService>(),
+            Options.Create(new OctoToolAuthenticationOptions()));
         return (command, asset, tenant, requests);
     }
 
