@@ -172,6 +172,22 @@ public sealed class CreateTenantStarterCapCommandTests
     }
 
     [Fact]
+    public async Task StarterFromSystemTenant_ClientCredentialsWithoutAiServiceUrl_CreatesTheTenant_AndWarns()
+    {
+        // The call is skipped in a client session anyway, so a missing AI service URL must not stop the create.
+        var s = NewCreate(aiServiceUrl: null, refreshToken: null);
+        s.Command.CommandArgumentValue.ParseLayer(["-tid", "scratch1", "-sc", "-b", Starter]);
+
+        await s.Command.Execute();
+
+        A.CallTo(() => s.Asset.CreateTenantAsync("scratch1", null, true, Starter)).MustHaveHappenedOnceExactly();
+        A.CallTo(s.Ai).Where(c => c.Method.Name == nameof(IAiServicesClient.ApplyStarterDefaultSpendCapAsync))
+            .MustNotHaveHappened();
+        var warning = Assert.Single(s.Logger.Entries, e => e.Level == LogLevel.Warning);
+        Assert.Contains("client-credentials session", warning.Message);
+    }
+
+    [Fact]
     public async Task CapCallFails_KeepsTheError_SaysTheTenantExists_AndNamesTheRemedies()
     {
         var s = NewCreate();

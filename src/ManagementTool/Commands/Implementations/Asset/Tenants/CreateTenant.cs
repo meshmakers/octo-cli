@@ -146,7 +146,8 @@ internal class CreateTenant : ServiceClientOctoCommand<IAssetServicesClient>
         // AB#8452: the platform operator's starter path also sets the default LLM cap, as MCP create_tenant starter=true.
         var applyStarterCap = blueprintId != null && IsStarterBlueprint(blueprintId) &&
                               SystemTenants.IsSystemTenant(Options.Value.TenantId);
-        if (applyStarterCap && string.IsNullOrWhiteSpace(Options.Value.AiServiceUrl))
+        // A client-credentials session skips the cap call (warning below), so it needs no AI service URL.
+        if (applyStarterCap && !IsServiceSession() && string.IsNullOrWhiteSpace(Options.Value.AiServiceUrl))
         {
             // Fail before anything is created: otherwise the tenant would exist without its cap.
             throw new ToolException(

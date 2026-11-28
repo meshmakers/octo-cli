@@ -105,7 +105,8 @@ create (with the blueprint), cap, then the provisioning of the current user. The
 - Other blueprints, other parent tenants and `Create` without `--blueprint` make no AI call.
 - The endpoint takes only a person login of the system tenant with `TenantManagement`. In a client-credentials session
   (no refresh token, e.g. `--scratch`) the command does not call it and warns, naming `SetAiSpendCap`.
-- The context needs the AI service URL; without it the command stops before the tenant is created.
+- With a person login the context needs the AI service URL; without it the command stops before the tenant is created. A
+  client-credentials session makes no AI call and needs none.
 - When the cap call fails, the tenant exists: the error names `SetAiSpendCap -t <child> -c <EUR> -ks CentralKey -r <reason>`
   (and `ProvisionCurrentUser -ttid <child>`, which then did not run) and the command keeps the call's exit code.
 
