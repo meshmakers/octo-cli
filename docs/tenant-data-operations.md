@@ -112,6 +112,16 @@ create (with the blueprint), cap, then the provisioning of the current user. The
 
 Tests: `CreateTenantStarterCapCommandTests`.
 
+The same rules apply to `InstallBlueprint System.Ai.Starter-<version> --child-tenant-id <child>` from a context of the
+system tenant: after a successful install into the child, the command calls `starterDefault` for the child (the
+endpoint creates the cap once, so a repeated install changes nothing). Until a starter tenant can be created with its
+blueprint in one call (AB#10065: the System.Communication model reaches a new tenant only after the create commits), the
+CLI path of a starter tenant is `Create -tid <child>` followed by this install. `--child-tenant-id` checks that the tenant
+is a descendant of the context's tenant (`ChildTenantCheck`, shared with the client role commands) and installs with the
+caller's token for the child (`IChildTenantAccess`: a user session exchanges the context's token, a client-credentials
+session uses the client's mirror there). An install without `--child-tenant-id`, into a child of another parent or of
+another blueprint sets no cap. Tests: `InstallBlueprintStarterCapCommandTests`.
+
 ## Scratch tenants: an agent works in and cleans up what it creates
 
 An agent that creates throw-away child tenants with a client-credentials client no longer needs a human device-code login per tenant.

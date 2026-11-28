@@ -13,6 +13,13 @@ All notable changes to octo-cli are listed here. Newest first.
   skips the call with a warning that names `SetAiSpendCap`. With a person login and without an AI service URL in the
   context the command stops before the tenant is created (a client-credentials session needs none); a failed cap call names `SetAiSpendCap` as the remedy. **Requires octo-sdk with
   `IAiServicesClient.ApplyStarterDefaultSpendCapAsync` and octo-ai-services with the endpoint (both AB#8452).**
+- **AB#8452 — `InstallBlueprint --child-tenant-id` installs into a child tenant, and the starter gets its cap there too.**
+  `InstallBlueprint -b <blueprint> -ctid <child>` installs into a child tenant (at any depth) of the context's tenant with
+  the caller's token for that child (the token path of `Delete --disable-features`). From the system tenant with
+  `System.Ai.Starter-<version>` a successful install then sets the child's default LLM cap (`starterDefault`) with the rules
+  of `Create --blueprint`: person login only (a client-credentials session skips the call with a warning naming
+  `SetAiSpendCap`), an existing cap is never changed, a person login without an AI service URL stops before the install.
+  This is the second call of the starter path until a starter can be created with its blueprint in one call (AB#10065).
 - **AB#8455 — Tenant administrators manage agents with octo-cli.** `CreateAgent`, `UpdateAgent`, `EnableAgent`,
   `DisableAgent` and `GetAgents` (list, or one agent with `-a`) call the agent tools of the MCP service (`create_agent`,
   `update_agent`, `set_agent_enabled`, `list_agents`, `get_agent`) on `<McpServiceUrl of the context>/<tenant>/mcp` with

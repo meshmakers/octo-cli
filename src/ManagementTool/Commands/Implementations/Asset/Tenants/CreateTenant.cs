@@ -18,7 +18,7 @@ internal class CreateTenant : ServiceClientOctoCommand<IAssetServicesClient>
     ///     Blueprint name (without version) of the starter tenant (AB#8452). Creating it from the system tenant gives the
     ///     new tenant the cluster's default monthly LLM cap, as MCP <c>create_tenant starter=true</c> does.
     /// </summary>
-    internal const string StarterBlueprintName = "System.Ai.Starter";
+    internal const string StarterBlueprintName = StarterDefaultCap.StarterBlueprintName;
 
     private readonly IAiServicesClient _aiServicesClient;
     private readonly IAuthenticationService _authenticationService;
@@ -180,16 +180,13 @@ internal class CreateTenant : ServiceClientOctoCommand<IAssetServicesClient>
 
         if (applyStarterCap && IsServiceSession())
         {
-            // The endpoint refuses service tokens (PersonTokenRequirement): a mirrored client's credentials are also
-            // its parent's, so a client token of the system tenant does not prove who calls.
-            Logger.LogWarning(
-                "Tenant '{TenantId}' was created without its default LLM cap: the starter cap needs a person login of " +
-                "the system tenant, this is a client-credentials session. A platform admin sets it with 'SetAiSpendCap -t " +
-                "{TenantId} -c <EUR> -ks CentralKey -r <reason>'", tenantId, tenantId);
+            StarterDefaultCap.WarnSkipped(Logger, $"Tenant '{tenantId}' was created", tenantId);
         }
         else if (applyStarterCap)
         {
-            await ApplyStarterDefaultCapAsync(tenantId, skipProvisioning);
+            await StarterDefaultCap.ApplyAsync(Logger, _aiServicesClient, _authenticationService, tenantId,
+                $"Tenant '{tenantId}' was created",
+                skipProvisioning ? "" : $", and 'ProvisionCurrentUser -ttid {tenantId}' (provisioning was not run)");
         }
 
         if (!skipProvisioning)
@@ -231,53 +228,8 @@ internal class CreateTenant : ServiceClientOctoCommand<IAssetServicesClient>
         }
     }
 
-    /// <summary>
-    ///     A client-credentials session has no refresh token (the convention of <see cref="ChildTenantAccess" />); a
-    ///     person login (device code) has one.
-    /// </summary>
-    private bool IsServiceSession() => string.IsNullOrEmpty(_authenticationOptions.Value.RefreshToken);
+    private bool IsServiceSession() => StarterDefaultCap.IsServiceSession(_authenticationOptions.Value);
 
     /// <summary>True for <c>System.Ai.Starter-&lt;version&gt;</c> (name compared without case).</summary>
-    internal static bool IsStarterBlueprint(string blueprintId) =>
-        blueprintId.StartsWith(StarterBlueprintName + "-", StringComparison.OrdinalIgnoreCase) &&
-        blueprintId.Length > StarterBlueprintName.Length + 1;
-
-    private async Task ApplyStarterDefaultCapAsync(string tenantId, bool skipProvisioning)
-    {
-        Logger.LogInformation("Setting the default LLM cap of starter tenant '{TenantId}' at '{AiServiceUri}'", tenantId,
-            _aiServicesClient.ServiceUri);
-
-        StarterSpendCapResultDto result;
-        try
-        {
-            await _authenticationService.EnsureAuthenticated(_aiServicesClient.AccessToken);
-            result = await _aiServicesClient.ApplyStarterDefaultSpendCapAsync(tenantId);
-        }
-        catch (Exception e) when (e is ServiceClientException or ServiceClientResultException or HttpRequestException)
-        {
-            // The tenant and its blueprint exist; say so, and name the remedy. Exception and exit code stay the call's.
-            Logger.LogError(
-                "Tenant '{TenantId}' was created, but setting its default LLM cap failed; it stays without central-key " +
-                "spend until a cap is set. Fix the cause below, then run 'SetAiSpendCap -t {TenantId} -c <EUR> -ks " +
-                "CentralKey -r <reason>' as platform admin{Provisioning}", tenantId, tenantId,
-                skipProvisioning ? "" : $", and 'ProvisionCurrentUser -ttid {tenantId}' (provisioning was not run)");
-            throw;
-        }
-
-        switch (result.Outcome)
-        {
-            case StarterSpendCapResultDto.Created:
-                Logger.LogInformation("Default LLM cap of tenant '{TenantId}' set: {KeySource}, {Cap} EUR per month",
-                    tenantId, result.KeySource, result.CapMonthlyEur);
-                break;
-            case StarterSpendCapResultDto.Exists:
-                Logger.LogInformation(
-                    "Tenant '{TenantId}' already has an LLM cap ({KeySource}, {Cap} EUR per month); it was not changed",
-                    tenantId, result.KeySource, result.CapMonthlyEur);
-                break;
-            default:
-                Logger.LogWarning("No default LLM cap set for tenant '{TenantId}': {Message}", tenantId, result.Message);
-                break;
-        }
-    }
+    internal static bool IsStarterBlueprint(string blueprintId) => StarterDefaultCap.IsStarterBlueprint(blueprintId);
 }

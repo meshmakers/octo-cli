@@ -63,32 +63,9 @@ public sealed class ChildTenantIdentityFactory(
     /// <inheritdoc />
     public async Task<ChildTenantIdentity> CreateAsync(string childTenantId)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(childTenantId);
-
-        var childId = childTenantId.Trim().ToLowerInvariant();
         var urls = options.Value;
-        var contextTenantId = urls.TenantId?.Trim().ToLowerInvariant();
-        if (string.IsNullOrEmpty(contextTenantId))
-        {
-            throw new ToolException(
-                "The context names no tenant: --child-tenant-id needs a context of the parent tenant.");
-        }
-
-        if (childId == contextTenantId)
-        {
-            throw new ToolException(
-                $"Tenant '{childId}' is the tenant of the context, not a child of it: omit --child-tenant-id.");
-        }
-
-        await authenticationService.EnsureAuthenticated(assetServicesClient.AccessToken);
-        var descendants = await assetServicesClient.GetTenantDescendantsAsync();
-        if (!descendants.Any(t => string.Equals(t.TenantId, childId, StringComparison.OrdinalIgnoreCase)))
-        {
-            throw new ToolException(
-                $"Tenant '{childId}' is not a child tenant of '{contextTenantId}' at " +
-                $"'{assetServicesClient.ServiceUri.GetLeftPart(UriPartial.Authority)}': it does not exist or belongs to " +
-                "another parent. GetTenants -r lists the child tenants of the context.");
-        }
+        var childId = await ChildTenantCheck.EnsureDescendantAsync(urls, assetServicesClient, authenticationService,
+            childTenantId);
 
         var accessToken = await childTenantAccess.GetAccessTokenAsync(childId);
 
