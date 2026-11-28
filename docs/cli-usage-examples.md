@@ -282,6 +282,15 @@ octo-cli -c UnprovisionClientFromTenant -id ci-deploy -ctid acme
 # Flip the AutoProvisionInChildTenants flag on an existing client.
 # Note: flipping true does NOT auto-backfill — use ProvisionClientInExistingTenants for that.
 octo-cli -c SetClientAutoProvision -id ci-deploy -e true
+# Roles the client hands to its mirrors in every child tenant (System.Identity 3.9.0).
+# Dry run by default: one line per child tenant (status | roles before | roles after), nothing is written.
+octo-cli -c SetClientMirrorRoles -id ci-deploy -r CommunicationManagement
+# Write it (prints the same table with the result; exit code non-zero when a mirror failed).
+octo-cli -c SetClientMirrorRoles -id ci-deploy -r CommunicationManagement --apply
+# Clear the list: removes the roles identity manages on the mirrors (roles set by hand stay).
+octo-cli -c SetClientMirrorRoles -id ci-deploy --clear --apply
+# Read the list back (-j for JSON).
+octo-cli -c GetClientMirrorRoles -id ci-deploy
 
 # Client overlay URIs — append operator-scoped URIs onto blueprint-managed
 # clients (e.g. local-dev callbacks on the Refinery Studio client) without modifying the
