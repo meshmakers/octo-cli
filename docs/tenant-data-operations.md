@@ -34,6 +34,69 @@ M rollup(s) not checked: <id> [Cause]. The tenant is not fully restored.` (`rest
 Informational not-checked rollups (never activated) are logged as `not checked (info)` and do not change the result. A bot without these
 fields (older bot, no `-w`) behaves as before. Tests: `RestoreOutcomeTests`; `RestoreOutcomeContractTests` feeds the wire JSON captured in the bot tests (failed archive, clean, informational) through the real `BotServicesClient` into the command.
 
+## Archive commands run the System.StreamData methods
+
+The archive write commands of `Asset/TimeSeries/` call the CK methods of `System.StreamData` through the method clients
+generated in `GraphQlDtos` (`construction-kits.yaml`: `System.StreamData-[1.30,2.0)`). The call goes to the asset repository
+of the context's tenant (GraphQL mutation `runtime.systemStreamData<Type>s.<method>`), which runs the handler. Command names,
+arguments, confirmations and output are unchanged. The reads (`ListRollupsForArchive`, `ListRecomputeJobs`), the rollup check
+and repair (`ValidateRollups`, `RepairRollups`, `GetRollupRepairStatus`), `EnableStreamData` / `DisableStreamData` and
+`ExportArchiveData` / `ImportArchiveData` (bot services) stay REST.
+
+| Command | CK method (`System.StreamData/…`) | Notes |
+|---|---|---|
+| `ActivateArchive` / `DisableArchive` / `EnableArchive` / `RetryArchiveActivation` | `Archive.Activate-1` / `Disable-1` / `Enable-1` / `RetryActivation-1` | on the client of the archive's concrete type |
+| `DeleteArchive` | `Archive.DeleteArchive-1` | confirmation as before; a result other than `true` ends the command (exit -3) |
+| `AddArchiveColumn` | `Archive.AddColumn-1` | |
+| `AddComputedColumn` / `RemoveComputedColumn` / `UpdateComputedColumnFormula` | `Archive.AddComputedColumn-1` / `RemoveComputedColumn-1` / `UpdateComputedColumnFormula-1` | `-r` takes `Boolean`, `Int`, `Int64`, `Double`, `DateTime` (case-insensitive); another value ends the command before any call; `-w` follows the backfill in the job list as before |
+| `RetryComputedColumnBackfill` | `Archive.RetryComputedColumnBackfill-1` | prints the queued job as before |
+| `FreezeRollupArchive` / `UnfreezeRollupArchive` / `RewindRollupWatermark` | `RollupArchive.Freeze-1` / `Unfreeze-1` / `RewindWatermark-1` | |
+| `RecomputeArchive` | `RollupArchive.Recompute-2` | asynchronous; the command follows the operation (below) |
+| `BackfillRollup` | `RollupArchive.BackfillFromSource-2` | asynchronous; the command follows the operation (below) |
+
+`ArchiveMethodCall` (in `Commands/Implementations/Asset/TimeSeries/`) runs every call:
+
+- **Role.** Every method requires the role `StreamDataAdmin` (scope `octo_api`), the same rule as the REST endpoints; a caller
+  without it gets `METHOD_FORBIDDEN` (exit -3).
+- **Archive type.** The lifecycle and column methods are declared on the abstract `Archive` and run through the client of the
+  concrete type (`RawArchive`, `TimeRangeArchive`, `RollupArchive`). The command reads the archive's `ckTypeId` first
+  (`GraphQlConstants.GetArchiveCkTypeById`) and compares its version-less form (`System.StreamData/RollupArchive-1` is a
+  rollup). An unknown archive ends the command before any write (`Archive '<id>' not found.`), an entity of another type
+  too (`Archive '<id>' is of type '<ckTypeId>', which is no RawArchive, TimeRangeArchive or RollupArchive.`). The three
+  generated clients implement `IArchiveMethodClient` (`GraphQlDtos/ArchiveMethodClients.cs`, partial declarations over the
+  generated code). The rollup commands call `RtRollupArchiveMethodClient` directly; an id that is no rollup ends with
+  `METHOD_TARGET_NOT_FOUND`. A value that is no runtime id ends the command before any call.
+- **No REST fallback.** A service whose tenant lacks the methods (GraphQL validation fails, or `METHOD_HANDLER_NOT_AVAILABLE`)
+  ends the command with a message that names System.StreamData 1.30.0 and that nothing was changed (exit -3).
+- **Errors.** A declared error ends the command with `CODE: message (parameters)`, e.g.
+  `STREAMDATA_INVALID_TRANSITION: … (archiveRtId=…, attemptedTransition=disable, fromStatus=Created, message=Cannot disable
+  archive '…' from status Created.)` (exit -3). Other refusals (`METHOD_FORBIDDEN`, `METHOD_TARGET_NOT_FOUND`,
+  `METHOD_TIMEOUT`) end the same way through the Runner.
+- **RecomputeArchive** starts `Recompute-2` (an operation handle at once) and waits for the operation, as the blocking REST call
+  did (at most 30 minutes; the tenant token is refreshed before every read). It prints the same job line as before
+  (`Recompute job <id>: state=…, rows=…, windows=…, duration=…ms, lastProgress=…, error=…`). A job that ended Failed
+  (`STREAMDATA_RECOMPUTE_FAILED`, also a refused precondition such as a rollup that is not activated) is read from the archive's
+  recompute jobs and printed with `state=Failed`; the command still exits with 0, as with REST (decided 2026-11-28; a stricter
+  exit code is a later decision). After the 30 minutes the command ends with exit -3 and names the operation id and
+  `ListRecomputeJobs`; the recompute goes on.
+- **BackfillRollup** starts `BackfillFromSource-2` and reads the operation until it names the queued job (progress stage
+  `QUEUED`, parameter `jobRtId`, at most one minute), then prints the queued line as before. A source archive without data
+  prints the no-op line; a backfill that already ended before the first read prints its final job line instead of the queued
+  one. When no job is named within the minute the command warns (operation id, `ListRecomputeJobs`); with `-w` it then keeps
+  waiting on the operation. With `-w` it follows the operation (30 minutes) and prints the final job line; when the
+  operation ends as `METHOD_OUTCOME_UNKNOWN` (the asset repository restarted, the queued work goes on) the wait continues on
+  the job list (`PollUntilTerminalAsync`), with the stream data client's token refreshed before every poll.
+- **Archive type query.** A tenant without the archive query (no stream data, or no System.StreamData) ends the command with
+  the same version message as a missing method (exit -3), before any write; another error of that query (authorization,
+  server error) is reported as it is (`Reading the type of archive '<id>' failed: …`, exit -3).
+
+Tests: `StreamDataArchiveMethodCommandTests` (every command sends its method by runtime id and no REST write; the documents
+validate against the snapshot of a stream-data tenant, `Fixtures/asset-repo-schema.local-system-streamdata-1.30.json.gz`;
+`METHOD_FORBIDDEN`, missing methods, the recorded declared error through the Runner with exit -3, archive type resolution,
+result types), `RecomputeBackfillMethodCommandTests` (recorded accepted, succeeded and failed operations,
+`Fixtures/assetrepo-streamdata-answer-*.json` from octo-sdk), `AddArchiveColumnCommandTests`,
+`ComputedColumnBackfillCommandTests`.
+
 ## Rollup validate and repair
 
 `ValidateRollups`, `RepairRollups` and `GetRollupRepairStatus` (`Asset/TimeSeries/`) are the operator check for the rollup state after a

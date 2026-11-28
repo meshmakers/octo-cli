@@ -60,6 +60,24 @@ public static class GraphQlConstants
         }
       }";
 
+    /// <summary>
+    ///     The CK type of an archive by runtime id: the lifecycle and column methods of <c>System.StreamData</c> are declared
+    ///     on the abstract <c>Archive</c> and run through the method client of the concrete type (RawArchive,
+    ///     TimeRangeArchive or RollupArchive).
+    /// </summary>
+    public const string GetArchiveCkTypeById = @"
+      query getArchiveCkTypeById($rtId: OctoObjectId!) {
+        runtime {
+          systemStreamDataArchive(rtId: $rtId) {
+            totalCount
+            items {
+              rtId
+              ckTypeId
+            }
+          }
+        }
+      }";
+
     public const string GetNotifications = @"query getNotifications(
           $after: String
           $first: Int

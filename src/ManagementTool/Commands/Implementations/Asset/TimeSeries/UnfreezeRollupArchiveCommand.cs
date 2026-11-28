@@ -1,6 +1,8 @@
+using GraphQlDtos.DataTransferObjects.System.StreamData.v1;
 using Meshmakers.Common.CommandLineParser;
 using Meshmakers.Octo.Frontend.ManagementTool.Services;
 using Meshmakers.Octo.Sdk.ServiceClient.AssetRepositoryServices.StreamData;
+using Meshmakers.Octo.Sdk.ServiceClient.AssetRepositoryServices.Tenants;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
@@ -8,16 +10,18 @@ namespace Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Asset
 
 public class UnfreezeRollupArchiveCommand : ServiceClientOctoCommand<IStreamDataServicesClient>
 {
+    private readonly ArchiveMethodCall _methods;
     private readonly IArgument _rollupRtIdArg;
     private readonly IArgument _acceptGapsArg;
 
     public UnfreezeRollupArchiveCommand(ILogger<UnfreezeRollupArchiveCommand> logger,
-        IOptions<OctoToolOptions> options, IStreamDataServicesClient serviceClient,
+        IOptions<OctoToolOptions> options, IStreamDataServicesClient serviceClient, ITenantClient tenantClient,
         IAuthenticationService authenticationService) : base(logger, Constants.AssetRepositoryServicesGroup,
         "UnfreezeRollupArchive",
         "Clears FrozenUntil on a CkRollupArchive. Idempotent. Pass --acceptGaps when source data inside the previously frozen range has been truncated and the resulting gaps are acceptable.",
         options, serviceClient, authenticationService)
     {
+        _methods = new ArchiveMethodCall(tenantClient, authenticationService, logger);
         _rollupRtIdArg = CommandArgumentValue.AddArgument("id", "identifier",
             ["Runtime id of the CkRollupArchive entity to unfreeze"], true, 1);
         _acceptGapsArg = CommandArgumentValue.AddArgument("ag", "acceptGaps",
@@ -39,7 +43,9 @@ public class UnfreezeRollupArchiveCommand : ServiceClientOctoCommand<IStreamData
             "Unfreezing rollup archive '{RollupRtId}' for tenant '{TenantId}' (acceptGaps={AcceptGaps})",
             rollupRtId, Options.Value.TenantId, acceptGaps);
 
-        await ServiceClient.UnfreezeRollupArchiveAsync(Options.Value.TenantId, rollupRtId, acceptGaps);
+        ArchiveMethodCall.RequireObjectId(rollupRtId, "RollupRtId");
+        await _methods.RunAsync(RtRollupArchiveMethodClient.UnfreezeMethodId,
+            () => new RtRollupArchiveMethodClient(_methods.TenantClient).UnfreezeAsync(rollupRtId, acceptGaps));
 
         Logger.LogInformation("Rollup archive '{RollupRtId}' unfrozen", rollupRtId);
     }

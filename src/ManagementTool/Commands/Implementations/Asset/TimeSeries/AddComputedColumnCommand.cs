@@ -1,6 +1,8 @@
+using GraphQlDtos.DataTransferObjects.System.StreamData.v1;
 using Meshmakers.Common.CommandLineParser;
 using Meshmakers.Octo.Frontend.ManagementTool.Services;
 using Meshmakers.Octo.Sdk.ServiceClient.AssetRepositoryServices.StreamData;
+using Meshmakers.Octo.Sdk.ServiceClient.AssetRepositoryServices.Tenants;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
@@ -8,6 +10,7 @@ namespace Meshmakers.Octo.Frontend.ManagementTool.Commands.Implementations.Asset
 
 public class AddComputedColumnCommand : ServiceClientOctoCommand<IStreamDataServicesClient>
 {
+    private readonly ArchiveMethodCall _methods;
     private readonly IArgument _archiveRtIdArg;
     private readonly IArgument _nameArg;
     private readonly IArgument _waitArg;
@@ -16,12 +19,13 @@ public class AddComputedColumnCommand : ServiceClientOctoCommand<IStreamDataServ
     private readonly IArgument _indexedArg;
 
     public AddComputedColumnCommand(ILogger<AddComputedColumnCommand> logger,
-        IOptions<OctoToolOptions> options, IStreamDataServicesClient serviceClient,
+        IOptions<OctoToolOptions> options, IStreamDataServicesClient serviceClient, ITenantClient tenantClient,
         IAuthenticationService authenticationService) : base(logger, Constants.AssetRepositoryServicesGroup,
         "AddComputedColumn",
         "Adds a computed column to an Activated raw or time-range archive. The asset repository backfills the existing rows as a background job and returns at once; the column becomes visible atomically when the job completes (follow it with ListRecomputeJobs, or pass -w). A failed backfill is retried with RetryComputedColumnBackfill. (AB#4189, AB#8002)",
         options, serviceClient, authenticationService)
     {
+        _methods = new ArchiveMethodCall(tenantClient, authenticationService, logger);
         _archiveRtIdArg = CommandArgumentValue.AddArgument("id", "identifier",
             ["Runtime id of the archive to add the computed column to"], true, 1);
         _nameArg = CommandArgumentValue.AddArgument("n", "name",
@@ -59,7 +63,9 @@ public class AddComputedColumnCommand : ServiceClientOctoCommand<IStreamDataServ
             "Adding computed column '{Name}' ({ResultType}) = '{Formula}' to archive '{ArchiveRtId}' (tenant '{TenantId}')",
             name, resultType, formula, archiveRtId, Options.Value.TenantId);
 
-        await ServiceClient.AddComputedColumnAsync(Options.Value.TenantId, archiveRtId, name, formula, resultType, indexed);
+        var resultTypeValue = ArchiveMethodCall.ParseComputedColumnResultType(resultType);
+        await _methods.RunOnArchiveAsync(archiveRtId, RtRawArchiveMethodClient.AddComputedColumnMethodId,
+            client => client.AddComputedColumnAsync(archiveRtId, name, formula, resultTypeValue, indexed));
 
         Logger.LogInformation("Computed column '{Name}' added to archive '{ArchiveRtId}'; its backfill runs in the background.",
             name, archiveRtId);
